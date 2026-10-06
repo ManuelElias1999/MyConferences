@@ -1,0 +1,18 @@
+{
+  "name": "myconferences",
+  "private": true,
+  "description": "Plataforma de eventos online con salón virtual 2D, salas simultáneas, presentaciones en vivo, chat y preguntas.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
