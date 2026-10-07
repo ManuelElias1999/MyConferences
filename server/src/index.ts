@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "socket.io";
 import { DEFAULT_LOOK } from "../../shared/look.ts";
-import { auditoriumMap, inFront, isWalkable, MAX_ROOMS, receptionMap, roomMap, venueMap, type SceneMap, type Tile } from "../../shared/maps.ts";
+import { inFront, interiorFor, isWalkable, MAX_ROOMS, receptionMap, venueMap, type SceneMap, type Tile } from "../../shared/maps.ts";
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   Account,
@@ -61,10 +61,8 @@ interface VenueState {
 }
 
 const RECEPTION = receptionMap();
-// Las salas comparten la distribución de asientos; el estilo solo cambia la decoración.
-const ROOM_MAP = roomMap("minimal", "#000");
-const AUDITORIUM_MAP = auditoriumMap("minimal", "#000");
-const interiorOf = (room: Room | undefined) => (room?.main ? AUDITORIUM_MAP : ROOM_MAP);
+/** Mapa interior de una sala: define sus asientos y por dónde se entra. */
+const interiorOf = (venue: Venue, roomId: string) => interiorFor(venue.theme, venue.rooms, roomId);
 
 const newRoomState = (): RoomState => ({
   stage: { mode: "slides", slidesUrl: null, slidesName: null, slide: 1, streamUrl: null, presenterId: null, live: null },
@@ -470,7 +468,7 @@ function sceneMapFor(u: User): SceneMap {
   if (!u.venueId) return RECEPTION;
   const state = venues.get(u.venueId);
   if (!state) return RECEPTION;
-  if (u.roomId) return interiorOf(state.venue.rooms.find((r) => r.id === u.roomId));
+  if (u.roomId) return interiorOf(state.venue, u.roomId);
   return state.map;
 }
 
@@ -639,7 +637,7 @@ io.on("connection", (socket) => {
       socket.leave(hallChannel(u.venueId));
       socket.join(roomChannel(u.venueId, roomId));
       u.roomId = roomId;
-      const interior = interiorOf(venues.get(u.venueId)!.venue.rooms.find((r) => r.id === roomId));
+      const interior = interiorOf(venues.get(u.venueId)!.venue, roomId);
       u.x = interior.spawn.x;
       u.y = interior.spawn.y;
       if (u.speakerFor === roomId) {
@@ -651,7 +649,7 @@ io.on("connection", (socket) => {
     let seat: number | null = null;
     for (const [s, id] of state.seats) if (id === u.id) seat = s;
     if (seat === null && u.speakerFor !== roomId) {
-      seat = interiorOf(venues.get(u.venueId)!.venue.rooms.find((r) => r.id === roomId)).seats.findIndex((_, i) => !state.seats.has(i));
+      seat = interiorOf(venues.get(u.venueId)!.venue, roomId).seats.findIndex((_, i) => !state.seats.has(i));
       if (seat < 0) seat = null;
       else state.seats.set(seat, u.id);
     }

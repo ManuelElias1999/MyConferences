@@ -1,7 +1,7 @@
 // Dibujo de los mapas vistos desde arriba, al estilo Gather: pisos y muros según el
 // estilo de cada lugar, adornos, puertas, escaleras, muebles y la búsqueda de caminos.
 
-import { isWalkable, spanTiles, type Decor, type Door, type Furni, type SceneMap, type Span, type StyleId, type Tile } from "../../shared/maps.ts";
+import { isWalkable, spanTiles, type Decor, type Door, type Furni, type Roof, type SceneMap, type Span, type StyleId, type Tile } from "../../shared/maps.ts";
 import type { ThemeId } from "../../shared/themes.ts";
 import type { Sponsor } from "../../shared/types.ts";
 import { shade } from "./avatar.ts";
@@ -241,7 +241,7 @@ interface Style {
 
 const STYLES: Record<StyleId, Style> = {
   cowork: { floor: planks(["#e2c49a", "#dcbd91", "#e6caa2", "#d8b88b"]), face: bricks(["#c96f52", "#bf654a", "#d0785a", "#c46a4e"], "#ead8c8"), cap: "#5d6170", base: "#8b5a44" },
-  tech: { floor: tiles(["#e4e9f1", "#dfe5ee"], 32, "rgba(56,189,248,0.35)"), face: panels, cap: "#475569", base: "#38bdf8" },
+  tech: { floor: tiles(["#e8ecf3", "#e3e8f0"], 64, "rgba(56,189,248,0.18)"), face: panels, cap: "#475569", base: "#38bdf8" },
   minimal: { floor: planks(["#efe3cf", "#eadcc5", "#f2e8d6", "#e8d8bf"], "rgba(150,120,80,0.25)"), face: plaster("#f8f6f2", null, "#e9e4dc"), cap: "#bdb6aa", base: "#ddd5c8" },
   rustic: { floor: planks(["#a87445", "#b07c4b", "#9f6c3f", "#a9784a"]), face: logs, cap: "#6b4a2f", base: "#5a3a22" },
   medieval: { floor: flagstones(["#c9c4b8", "#c2bdb0", "#cfcabe", "#bdb8ab"]), face: bricks(["#b5b0bf", "#aca7b7", "#bbb6c5", "#a8a3b2"], "#8f8a9b"), cap: "#7a7486", base: "#6c6779" },
@@ -666,6 +666,60 @@ function mainDoor(ctx: CanvasRenderingContext2D, door: Door) {
   ctx.fillRect(x + w / 2 + 3, top + 30, 3, 10);
 }
 
+const ROOF: Record<StyleId, { base: string; line: string }> = {
+  tech: { base: "#dbe3ee", line: "#c3cedd" },
+  minimal: { base: "#f1ede6", line: "#e2ddd3" },
+  rustic: { base: "#b07443", line: "#8f5a30" },
+  medieval: { base: "#9a95a6", line: "#7f7a8c" },
+  garden: { base: "#93c66e", line: "#79ad57" },
+  cowork: { base: "#dbe3ee", line: "#c3cedd" },
+};
+
+/** Techo de un edificio de sala: claro, con el color de la sala y su nombre bien grande. */
+function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
+  const x = roof.x * T;
+  const y = roof.y * T;
+  const w = roof.w * T;
+  const h = roof.h * T;
+  const r = ROOF[style];
+  ctx.fillStyle = r.base;
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = r.line;
+  for (let ly = y + 8; ly < y + h; ly += 8) ctx.fillRect(x, ly, w, 1);
+  if (style === "tech") {
+    // Paneles solares y ventilaciones.
+    for (let px = x + 10; px < x + w - 26; px += 34) {
+      ctx.fillStyle = "#2f4a7a";
+      ctx.fillRect(px, y + 8, 22, 12);
+      ctx.fillStyle = "#4f74b3";
+      ctx.fillRect(px + 1, y + 9, 10, 5);
+    }
+  }
+  if (style === "garden") {
+    for (let i = 0; i < roof.w * 2; i++) {
+      ctx.fillStyle = i % 3 ? "#5f9a45" : "#ffd166";
+      ctx.fillRect(x + 6 + ((i * 37) % (w - 12)), y + 6 + ((i * 23) % (h - 12)), 4, 4);
+    }
+  }
+  ctx.fillStyle = "rgba(22,22,29,0.35)";
+  ctx.fillRect(x, y, w, 2);
+  ctx.fillRect(x, y, 2, h);
+  ctx.fillRect(x + w - 2, y, 2, h);
+  ctx.fillStyle = roof.open ? roof.color : "#b9b4ab";
+  ctx.fillRect(x, y + h - 6, w, 6);
+  // Nombre pintado sobre un cartel en el techo.
+  ctx.font = `700 ${roof.w > 12 ? 16 : 12}px ${FONT}`;
+  const label = roof.label.toUpperCase();
+  const tw = Math.min(w - 16, ctx.measureText(label).width + 18);
+  const ty = y + h / 2 - 4;
+  ctx.fillStyle = roof.open ? "#16161d" : "rgba(22,22,29,0.35)";
+  ctx.fillRect(x + w / 2 - tw / 2, ty - 12, tw, 22);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.fillText(label, x + w / 2, ty + 4, tw - 10);
+  ctx.textAlign = "left";
+}
+
 /** Dibuja todo lo que no cambia en un canvas aparte, que luego se copia en cada frame. */
 export function renderStatic(map: SceneMap, scale: number) {
   const canvas = document.createElement("canvas");
@@ -694,6 +748,8 @@ export function renderStatic(map: SceneMap, scale: number) {
       }
     }
   }
+
+  for (const roof of map.roofs) drawRoof(ctx, map.style, roof);
 
   for (const f of map.furni) {
     if (f.kind === "rug") rug(ctx, f);
@@ -1053,15 +1109,34 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
       case "chair": {
         const c = CHAIR[map.style];
         const accent = f.color ?? c.seat;
-        add(y + 0.3, (ctx) => {
-          box(ctx, px + 6, py + 8, T - 12, 12, 3, c.frame, map.style === "tech" ? shade(accent, -0.2) : c.seat);
-        });
-        // El respaldo queda del lado sur y tapa las piernas de quien se sienta, como en Gather.
-        add(y + 0.95, (ctx) => {
-          box(ctx, px + 5, py + 18, T - 10, 4, 9, c.frame);
-          ctx.fillStyle = map.style === "minimal" ? "#e8dcc6" : accent;
-          ctx.fillRect(px + 8, py + 23, T - 16, 3);
-        });
+        const seatTop = map.style === "tech" ? shade(accent, -0.2) : c.seat;
+        const strip = map.style === "minimal" ? "#e8dcc6" : accent;
+        if (f.dir === "down") {
+          // Mira hacia abajo: el respaldo queda arriba, detrás de quien se sienta.
+          add(y + 0.3, (ctx) => {
+            box(ctx, px + 5, py + 1, T - 10, 4, 9, c.frame);
+            ctx.fillStyle = strip;
+            ctx.fillRect(px + 8, py + 6, T - 16, 3);
+            box(ctx, px + 6, py + 12, T - 12, 10, 4, c.frame, seatTop);
+          });
+        } else if (f.dir === "left" || f.dir === "right") {
+          // De costado: el respaldo va del lado contrario hacia donde mira.
+          const bx = f.dir === "right" ? px + 4 : px + T - 10;
+          add(y + 0.3, (ctx) => {
+            box(ctx, px + 7, py + 10, T - 14, 10, 4, c.frame, seatTop);
+            box(ctx, bx, py + 2, 6, 6, 18, c.frame);
+            ctx.fillStyle = strip;
+            ctx.fillRect(bx + 1, py + 10, 4, 10);
+          });
+        } else {
+          add(y + 0.3, (ctx) => box(ctx, px + 6, py + 8, T - 12, 12, 3, c.frame, seatTop));
+          // El respaldo queda del lado sur y tapa las piernas de quien se sienta.
+          add(y + 0.95, (ctx) => {
+            box(ctx, px + 5, py + 18, T - 10, 4, 9, c.frame);
+            ctx.fillStyle = strip;
+            ctx.fillRect(px + 8, py + 23, T - 16, 3);
+          });
+        }
         break;
       }
       case "lectern": {
@@ -1240,6 +1315,116 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           box(ctx, px + 2, py + 6, w * T - 4, 14, 6, "#8a5a32", "#b07a46");
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(cx - 4, py + 10, 8, 6);
+        });
+        break;
+      case "neonpath": {
+        // Camino de luz en el piso: un pulso recorre la franja.
+        const color = f.color ?? "#22d3ee";
+        const vertical = d > w;
+        add(-1000, (ctx, t) => {
+          const len = (vertical ? d : w) * T;
+          ctx.fillStyle = "rgba(22,22,29,0.12)";
+          ctx.fillRect(px + 4, py + 4, w * T - 8, d * T - 8);
+          ctx.fillStyle = color;
+          if (vertical) {
+            ctx.fillRect(px + 6, py, 2, len);
+            ctx.fillRect(px + w * T - 8, py, 2, len);
+          } else {
+            ctx.fillRect(px, py + 6, len, 2);
+            ctx.fillRect(px, py + d * T - 8, len, 2);
+          }
+          const pos = ((t / 6) % (len + 60)) - 30;
+          ctx.globalAlpha = 0.7;
+          for (let k = 0; k < 4; k++) {
+            const p = (pos + k * (len / 4)) % len;
+            if (vertical) ctx.fillRect(px + 10, py + len - p, w * T - 20, 6);
+            else ctx.fillRect(px + p, py + 10, 6, d * T - 20);
+          }
+          ctx.globalAlpha = 1;
+        });
+        break;
+      }
+      case "hologram": {
+        // Base baja con anillo de luz y un holograma que gira y flota sobre ella.
+        add(y + d, (ctx, t) => {
+          const by = py + d * T - 10;
+          frame(ctx, px + 10, by - 10, w * T - 20, 12, "#1f2937");
+          ctx.fillStyle = `hsl(${(t / 15) % 360}, 90%, 60%)`;
+          ctx.fillRect(px + 14, by - 7, w * T - 28, 3);
+          const float = Math.sin(t / 450) * 4;
+          const top = by - 58 + float;
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          ctx.fillStyle = "#22d3ee";
+          ctx.beginPath();
+          ctx.moveTo(px + 14, by - 9);
+          ctx.lineTo(px + w * T - 14, by - 9);
+          ctx.lineTo(cx + 14, top + 10);
+          ctx.lineTo(cx - 14, top + 10);
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 0.9;
+          ctx.translate(cx, top + 14);
+          ctx.rotate(t / 900);
+          ctx.strokeStyle = "#67e8f9";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(-11, -11, 22, 22);
+          ctx.rotate(Math.PI / 4);
+          ctx.strokeStyle = "#f0abfc";
+          ctx.strokeRect(-7, -7, 14, 14);
+          ctx.restore();
+          // Líneas de barrido del holograma.
+          ctx.fillStyle = "rgba(103,232,249,0.5)";
+          const scan = (t / 25) % 40;
+          ctx.fillRect(cx - 14, top + scan - 6, 28, 1);
+        });
+        break;
+      }
+      case "ledpillar": {
+        add(y + 1, (ctx, t) => {
+          shadowUnder(ctx, cx, base - 3, 10);
+          frame(ctx, cx - 7, base - 58, 14, 56, "#1f2937");
+          for (let k = 0; k < 6; k++) {
+            const hue = (t / 20 + k * 40 + x * 30) % 360;
+            ctx.fillStyle = `hsl(${hue}, 90%, 62%)`;
+            ctx.fillRect(cx - 5, base - 55 + k * 9, 10, 6);
+          }
+          ctx.fillStyle = "#e5e7eb";
+          ctx.fillRect(cx - 9, base - 61, 18, 4);
+        });
+        break;
+      }
+      case "robot": {
+        add(y + 1, (ctx, t) => {
+          const bob = Math.round(Math.sin(t / 350 + x) * 1.5);
+          shadowUnder(ctx, cx, base - 3, 9);
+          frame(ctx, cx - 8, base - 22 + bob, 16, 16, "#e5e7eb");
+          frame(ctx, cx - 7, base - 36 + bob, 14, 12, "#f9fafb");
+          ctx.fillStyle = "#1f2937";
+          ctx.fillRect(cx - 5, base - 33 + bob, 10, 6);
+          const blink = Math.floor(t / 1600 + x) % 4 === 0 && t % 1600 < 140;
+          ctx.fillStyle = "#22d3ee";
+          if (!blink) {
+            ctx.fillRect(cx - 4, base - 31 + bob, 3, 3);
+            ctx.fillRect(cx + 1, base - 31 + bob, 3, 3);
+          }
+          ctx.fillStyle = "#ff5c39";
+          ctx.fillRect(cx - 1, base - 41 + bob, 2, 5);
+          ctx.fillStyle = "#2f6bff";
+          ctx.fillRect(cx - 4, base - 17 + bob, 8, 4);
+          ctx.fillStyle = "#9ca3af";
+          ctx.fillRect(cx - 7, base - 6, 5, 4);
+          ctx.fillRect(cx + 2, base - 6, 5, 4);
+        });
+        break;
+      }
+      case "sculpture":
+        add(y + d, (ctx) => {
+          shadowUnder(ctx, cx, base - 3, (w * T) / 2 - 4);
+          frame(ctx, cx - 14, base - 14, 28, 10, "#d9d4cb");
+          frame(ctx, cx - 10, base - 36, 9, 22, "#f8f6f2");
+          frame(ctx, cx - 2, base - 48, 9, 34, "#ff5c39");
+          frame(ctx, cx + 6, base - 28, 7, 14, "#2f6bff");
         });
         break;
       case "directory":

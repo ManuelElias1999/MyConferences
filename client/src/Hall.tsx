@@ -84,8 +84,8 @@ export default function Hall({
           label={`Recinto de ${venue.name}`}
         />
         <p className="scene-hint">
-          Recorre el evento: el auditorio está al fondo del pasillo central y hay salas a la izquierda y a la derecha. Usa los tótems <b>?</b> para
-          saber cómo llegar.
+          Recorre el evento: el auditorio está al fondo de la plaza y las salas, en los edificios de los lados. Usa los tótems <b>?</b> para saber cómo
+          llegar.
         </p>
         {guiding && (
           <p className="guide-chip">

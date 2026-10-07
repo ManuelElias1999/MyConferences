@@ -50,6 +50,11 @@ export type FurniKind =
   | "bench"
   | "table"
   | "totem"
+  | "hologram"
+  | "ledpillar"
+  | "robot"
+  | "sculpture"
+  | "neonpath"
   | "rug"
   | "carpet";
 
@@ -146,10 +151,25 @@ export interface SceneMap {
   desk: Tile[];
   /** Pantallas de directorio: se usan para saber cómo llegar a cada sala. */
   directories: Tile[];
+  /** Techos de los edificios de sala, que llevan su nombre pintado. */
+  roofs: Roof[];
   blocked: boolean[];
 }
 
-const FLAT: FurniKind[] = ["rug", "carpet", "chair", "officechair"];
+/** Techo de un edificio de sala visto desde arriba. */
+export interface Roof {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  color: string;
+  /** false si el puesto no tiene sala asignada. */
+  open: boolean;
+}
+
+/** Lo que se puede pisar: alfombras, sillas (para sentarse) y caminos de luz. */
+const FLAT: FurniKind[] = ["rug", "carpet", "chair", "officechair", "neonpath"];
 
 export const spanTiles = (s: Span): Tile[] => Array.from({ length: s.w }, (_, i) => ({ x: s.x + i, y: s.y }));
 
@@ -169,8 +189,8 @@ interface Rect {
  * Arma el terreno a partir de las zonas de piso: todo lo demás es muro, y las
  * dos filas de muro sobre cada piso se convierten en cara de muro.
  */
-function carve(w: number, h: number, floors: Rect[]) {
-  const grid = Array.from({ length: h }, () => Array.from({ length: w }, () => "#"));
+function carve(w: number, h: number, floors: Rect[], base?: string[]) {
+  const grid = base ? base.map((row) => [...row]) : Array.from({ length: h }, () => Array.from({ length: w }, () => "#"));
   for (const r of floors) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) grid[y]![x] = ".";
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -194,7 +214,7 @@ function finish(map: Omit<SceneMap, "blocked">): SceneMap {
     if (FLAT.includes(f.kind)) continue;
     for (let dx = 0; dx < (f.w ?? 1); dx++) for (let dy = 0; dy < (f.d ?? 1); dy++) blocked[(f.y + dy) * map.w + f.x + dx] = true;
   }
-  for (const n of [...map.npcs, ...map.crowd]) blocked[n.y * map.w + n.x] = true;
+  // A las personas se las puede atravesar: nunca bloquean el paso.
   // Puertas y salida se pueden pisar aunque estén en el muro.
   for (const s of [...map.doors, ...(map.exit ? [map.exit] : [])]) for (const t of spanTiles(s)) blocked[t.y * map.w + t.x] = false;
   return { ...map, blocked };
@@ -215,6 +235,7 @@ const empty = {
   exit: null,
   desk: [],
   directories: [],
+  roofs: [],
 };
 
 /** Asistente de ambiente con una apariencia estable según su número. */
@@ -289,164 +310,131 @@ export function receptionMap(): SceneMap {
 // ---------- Recinto del evento ----------
 
 const CARPET: Record<ThemeId, string> = { tech: "#1e3a5f", minimal: "#d6d3cd", rustic: "#8e3b2f", medieval: "#9b2335", garden: "#c9b48a" };
-const SOFA: Record<ThemeId, string> = { tech: "#2f6bff", minimal: "#9aa5b1", rustic: "#a0522d", medieval: "#7a2a3a", garden: "#5a8f3e" };
 
 /** Objetos de ambiente de cada estilo, que se reparten por rincones libres. */
 const ACCENTS: Record<ThemeId, FurniKind[]> = {
-  tech: ["rack", "arcade", "bigplant", "kiosk"],
-  minimal: ["bigplant", "lamp", "plant", "bigplant"],
+  tech: ["ledpillar", "robot", "rack", "ledpillar"],
+  minimal: ["bigplant", "lamp", "sculpture", "bigplant"],
   rustic: ["barrel", "lantern", "bookshelf", "plant"],
   medieval: ["armor", "candelabra", "pillar", "armor"],
   garden: ["tree", "lantern", "tree", "flowerbed"],
 };
 
-/** Puestos de puerta en orden de llenado: se alternan oeste y este para repartir las salas. */
-const SLOTS: (Omit<Span, "w"> & { zone: string })[] = [
-  { side: "top", x: 12, y: 32, zone: "Ala oeste" },
-  { side: "top", x: 48, y: 32, zone: "Ala este" },
-  { side: "bottom", x: 9, y: 39, zone: "Ala oeste" },
-  { side: "bottom", x: 51, y: 39, zone: "Ala este" },
-  { side: "top", x: 18, y: 32, zone: "Ala oeste" },
-  { side: "top", x: 42, y: 32, zone: "Ala este" },
-  { side: "bottom", x: 16, y: 39, zone: "Ala oeste" },
-  { side: "bottom", x: 44, y: 39, zone: "Ala este" },
-  { side: "top", x: 4, y: 13, zone: "Plaza oeste" },
-  { side: "top", x: 58, y: 13, zone: "Plaza este" },
-  { side: "top", x: 12, y: 13, zone: "Plaza oeste" },
-  { side: "top", x: 50, y: 13, zone: "Plaza este" },
-];
+/** Pieza central de la plaza según el estilo. */
+const CENTERPIECE: Record<ThemeId, FurniKind> = {
+  tech: "hologram",
+  minimal: "sculpture",
+  rustic: "fountain",
+  medieval: "fountain",
+  garden: "fountain",
+};
 
-/** El auditorio principal más una sala por cada puesto de puerta. */
-export const MAX_ROOMS = SLOTS.length + 1;
+export const ROOMS_PER_EVENT = 8;
+/** El auditorio principal más ocho salas. */
+export const MAX_ROOMS = ROOMS_PER_EVENT + 1;
 
-const VENUE_W = 64;
-const VENUE_H = 46;
-const EXIT_X = 31;
+const VENUE_W = 50;
+const VENUE_H = 36;
+const EXIT_X = 24;
+const BLOCK_W = 10;
+const BLOCK_H = 6;
+
+/** Edificios de sala: cuatro a la izquierda y cuatro a la derecha, alternando para repartirlas. */
+const BLOCKS = [3, 11, 19, 27].flatMap((y, row) => [
+  { x: 1, y, zone: `Lado izquierdo · ${row + 1}.ª fila` },
+  { x: VENUE_W - 1 - BLOCK_W, y, zone: `Lado derecho · ${row + 1}.ª fila` },
+]);
 
 /**
- * El recinto: atrio de entrada, pasillo central hasta el auditorio principal,
- * alas oeste y este con salas a ambos lados y plazas de networking al fondo.
+ * El recinto: una gran plaza abierta con el auditorio principal al fondo y ocho
+ * edificios de sala a los lados. Cada edificio muestra su nombre en el techo.
  */
 export function venueMap(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color" | "main">[]): SceneMap {
-  const tiles = carve(VENUE_W, VENUE_H, [
-    { x: 24, y: 30, w: 16, h: 13 }, // atrio
-    { x: 28, y: 12, w: 8, h: 18 }, // pasillo central
-    { x: 6, y: 33, w: 18, h: 6 }, // ala oeste
-    { x: 6, y: 26, w: 4, h: 7 }, // pasaje oeste
-    { x: 3, y: 14, w: 12, h: 12 }, // plaza oeste
-    { x: 40, y: 33, w: 18, h: 6 }, // ala este
-    { x: 54, y: 26, w: 4, h: 7 }, // pasaje este
-    { x: 49, y: 14, w: 12, h: 12 }, // plaza este
-  ]);
-
   const main = rooms.find((r) => r.main) ?? rooms[0];
-  const others = rooms.filter((r) => r !== main);
+  const others = rooms.filter((r) => r !== main).slice(0, ROOMS_PER_EVENT);
+
+  const grid = Array.from({ length: VENUE_H }, (_, y) =>
+    Array.from({ length: VENUE_W }, (_, x) => (x >= 1 && x <= VENUE_W - 2 && y >= 3 && y <= VENUE_H - 2 ? "." : "#")),
+  );
+  const auditorium = { x: 15, y: 3, w: 20, h: 8 };
+  for (const b of [auditorium, ...BLOCKS.map((b) => ({ ...b, w: BLOCK_W, h: BLOCK_H }))]) {
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) grid[y]![x] = "#";
+  }
+  const tiles = carve(
+    VENUE_W,
+    VENUE_H,
+    [],
+    grid.map((r) => r.join("")),
+  );
+
   const doors: Door[] = [];
-  if (main) doors.push({ side: "top", x: 30, y: 11, w: 4, id: main.id, label: main.name, color: main.color, theme, zone: "Pasillo central", main: true });
-  others.slice(0, SLOTS.length).forEach((r, i) => {
-    const slot = SLOTS[i]!;
-    doors.push({ ...slot, w: 2, id: r.id, label: r.name, color: r.color, theme, main: false });
+  const roofs: Roof[] = [];
+  if (main) {
+    roofs.push({ x: auditorium.x, y: auditorium.y, w: auditorium.w, h: auditorium.h - 2, label: main.name, color: main.color, open: true });
+    doors.push({ side: "top", x: 23, y: auditorium.y + auditorium.h - 1, w: 4, id: main.id, label: main.name, color: main.color, theme, zone: "Al fondo de la plaza", main: true });
+  }
+  const decor: Decor[] = [];
+  BLOCKS.forEach((b, i) => {
+    const room = others[i];
+    const facade = b.y + BLOCK_H - 1;
+    roofs.push({ x: b.x, y: b.y, w: BLOCK_W, h: BLOCK_H - 2, label: room?.name ?? "Próximamente", color: room?.color ?? "#9aa5b1", open: Boolean(room) });
+    if (room) doors.push({ side: "top", x: b.x + 4, y: facade, w: 2, id: room.id, label: room.name, color: room.color, theme, zone: b.zone, main: false });
+    // Ventanas a los lados de la puerta para que la fachada no quede vacía.
+    decor.push({ kind: room ? "window" : "art", x: b.x + 1, y: facade, w: 2, color: "#9aa5b1" }, { kind: room ? "window" : "art", x: b.x + 7, y: facade, w: 2, color: "#9aa5b1" });
   });
+  decor.push(
+    { kind: "sponsors", x: 16, y: 10, w: 5 },
+    { kind: "sponsors", x: 29, y: 10, w: 5 },
+    { kind: "entrance", x: EXIT_X, y: VENUE_H - 1, w: 2 },
+  );
 
-  // Los puestos de puerta del muro norte que quedan libres se usan para cuadros.
-  const freeTop = SLOTS.slice(others.length).filter((s) => s.side === "top");
-  const decor: Decor[] = [
-    // Anuncios gigantes a los lados de la entrada al pasillo central, en las alas y en las plazas.
-    { kind: "sponsors", x: 24, y: 29, w: 4 },
-    { kind: "sponsors", x: 36, y: 29, w: 4 },
-    { kind: "sponsors", x: 14, y: 32, w: 4 },
-    { kind: "sponsors", x: 44, y: 32, w: 4 },
-    { kind: "sponsors", x: 7, y: 13, w: 4 },
-    { kind: "sponsors", x: 53, y: 13, w: 4 },
-    { kind: "clock", x: 21, y: 32 },
-    { kind: "clock", x: 51, y: 32 },
-    { kind: theme === "medieval" ? "torch" : "art", x: 28, y: 11, color: "#ff5c39" },
-    { kind: theme === "medieval" ? "torch" : "art", x: 35, y: 11, color: "#2f6bff" },
-    { kind: "entrance", x: EXIT_X, y: VENUE_H - 3, w: 2 },
-    ...freeTop.map((s) => ({ kind: "art" as const, x: s.x, y: s.y, w: 2, color: "#9aa5b1" })),
-  ];
-
-  const sofa = SOFA[theme];
+  const accents = ACCENTS[theme];
   const furni: Furni[] = [
-    // Alfombras que marcan el camino: de la entrada al auditorio y por cada ala.
-    { kind: "carpet", x: EXIT_X, y: 12, w: 2, d: 31, color: CARPET[theme] },
-    { kind: "carpet", x: 6, y: 35, w: 18, d: 2, color: CARPET[theme] },
-    { kind: "carpet", x: 40, y: 35, w: 18, d: 2, color: CARPET[theme] },
-    // Atrio: directorios junto a la entrada, tótems y dos salas de estar.
-    { kind: "directory", x: 28, y: 39 },
-    { kind: "directory", x: 35, y: 39 },
-    { kind: "totem", x: 29, y: 31 },
-    { kind: "totem", x: 34, y: 31 },
-    { kind: "rug", x: 24, y: 33, w: 4, d: 4, color: "#e9e4dc" },
-    { kind: "sofa", x: 24, y: 33, w: 3, color: sofa, dir: "down" },
-    { kind: "coffeetable", x: 24, y: 35, w: 2 },
-    { kind: "rug", x: 36, y: 33, w: 4, d: 4, color: "#e9e4dc" },
-    { kind: "sofa", x: 37, y: 33, w: 3, color: sofa, dir: "down" },
-    { kind: "coffeetable", x: 38, y: 35, w: 2 },
-    { kind: "bigplant", x: 24, y: 41 },
-    { kind: "bigplant", x: 39, y: 41 },
-    // Pasillo central: tótems y bancos para conversar camino al auditorio.
-    { kind: "totem", x: 28, y: 18 },
-    { kind: "totem", x: 35, y: 18 },
-    { kind: "bench", x: 28, y: 25, w: 2 },
-    { kind: "bench", x: 34, y: 25, w: 2 },
-    { kind: "plant", x: 28, y: 28 },
-    { kind: "plant", x: 35, y: 28 },
-    // Alas: bancos contra el muro sur, entre puertas.
-    { kind: "bench", x: 12, y: 38, w: 3 },
-    { kind: "bench", x: 47, y: 38, w: 3 },
-    { kind: "plant", x: 6, y: 38 },
-    { kind: "plant", x: 21, y: 38 },
-    { kind: "plant", x: 41, y: 38 },
-    { kind: "plant", x: 57, y: 38 },
-    // Plazas de networking: sillones, café y un directorio.
-    ...[5, 51].flatMap((px): Furni[] => [
-      { kind: "rug", x: px, y: 17, w: 8, d: 6, color: "#e9e4dc" },
-      { kind: "sofa", x: px + 1, y: 17, w: 3, color: sofa, dir: "down" },
-      { kind: "coffeetable", x: px + 1, y: 19, w: 3 },
-      { kind: "sofa", x: px + 1, y: 21, w: 3, color: sofa, dir: "up" },
-      { kind: "armchair", x: px + 5, y: 18, color: "#ffb703" },
-      { kind: "armchair", x: px + 5, y: 20, color: "#ffb703" },
-    ]),
-    { kind: "coffeebar", x: 11, y: 25, w: 3 },
-    { kind: "coffeebar", x: 50, y: 25, w: 3 },
-    { kind: "directory", x: 13, y: 22 },
-    { kind: "directory", x: 50, y: 22 },
+    // Camino de la entrada al auditorio: de luz en el estilo tecnológico, alfombra en los demás.
+    theme === "tech"
+      ? { kind: "neonpath", x: EXIT_X, y: 11, w: 2, d: VENUE_H - 12, color: "#22d3ee" }
+      : { kind: "carpet", x: EXIT_X, y: 11, w: 2, d: VENUE_H - 12, color: CARPET[theme] },
+    // Caminos transversales hacia las salas de cada lado.
+    ...[
+      { x: 11, y: 9, w: 4 },
+      { x: 35, y: 9, w: 4 },
+      { x: 11, y: 17, w: 28 },
+      { x: 11, y: 25, w: 28 },
+      { x: 11, y: 33, w: 28 },
+    ].map((l): Furni =>
+      theme === "tech" ? { kind: "neonpath", ...l, d: 1, color: "#a78bfa" } : { kind: "carpet", ...l, d: 1, color: CARPET[theme] },
+    ),
+    { kind: CENTERPIECE[theme], x: 18, y: 20, w: 2, d: 2 },
+    { kind: CENTERPIECE[theme], x: 30, y: 20, w: 2, d: 2 },
+    { kind: "directory", x: 21, y: 30 },
+    { kind: "directory", x: 28, y: 30 },
+    { kind: "totem", x: 13, y: 13 },
+    { kind: "totem", x: 36, y: 13 },
+    { kind: "totem", x: 13, y: 29 },
+    { kind: "totem", x: 36, y: 29 },
+    { kind: accents[0]!, x: 12, y: 11 },
+    { kind: accents[0]!, x: 37, y: 11 },
+    { kind: accents[1]!, x: 12, y: 21 },
+    { kind: accents[1]!, x: 37, y: 21 },
+    { kind: accents[2]!, x: 16, y: 34 },
+    { kind: accents[2]!, x: 33, y: 34 },
   ];
-  const accentSpots: Tile[] = [
-    { x: 3, y: 14 },
-    { x: 14, y: 14 },
-    { x: 3, y: 25 },
-    { x: 14, y: 25 },
-    { x: 49, y: 14 },
-    { x: 60, y: 14 },
-    { x: 49, y: 25 },
-    { x: 60, y: 25 },
-    { x: 24, y: 30 },
-    { x: 39, y: 30 },
-  ];
-  accentSpots.forEach((t, i) => furni.push({ kind: ACCENTS[theme][i % ACCENTS[theme].length]!, x: t.x, y: t.y }));
+  if (theme === "tech") furni.push({ kind: "robot", x: 22, y: 24 }, { kind: "robot", x: 27, y: 16 });
 
-  // Gente conversando en grupos, mirándose entre sí.
+  // Gente conversando en la plaza (se la puede atravesar).
   const crowd: Npc[] = [
-    attendee(0, 25, 38, "right"),
-    attendee(1, 26, 38, "left"),
-    attendee(2, 37, 38, "right"),
-    attendee(3, 38, 38, "left"),
-    attendee(4, 29, 22, "right"),
-    attendee(5, 30, 22, "left"),
-    attendee(6, 34, 14, "down"),
-    attendee(7, 34, 15, "up"),
-    attendee(8, 14, 34, "right"),
-    attendee(9, 15, 34, "left"),
-    attendee(10, 49, 34, "right"),
-    attendee(11, 50, 34, "left"),
-    attendee(12, 6, 24, "right"),
-    attendee(13, 7, 24, "left"),
-    attendee(14, 57, 23, "down"),
-    attendee(15, 57, 24, "up"),
-    attendee(16, 12, 16, "down"),
-    attendee(17, 12, 17, "up"),
+    attendee(0, 16, 26, "right"),
+    attendee(1, 17, 26, "left"),
+    attendee(2, 32, 26, "right"),
+    attendee(3, 33, 26, "left"),
+    attendee(4, 20, 14, "down"),
+    attendee(5, 20, 15, "up"),
+    attendee(6, 29, 14, "right"),
+    attendee(7, 30, 14, "left"),
+    attendee(8, 13, 18, "right"),
+    attendee(9, 14, 18, "left"),
+    attendee(10, 35, 18, "right"),
+    attendee(11, 36, 18, "left"),
   ];
 
   return finish({
@@ -455,17 +443,16 @@ export function venueMap(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "colo
     h: VENUE_H,
     tiles,
     style: theme,
-    spawn: { x: EXIT_X, y: VENUE_H - 5 },
+    spawn: { x: EXIT_X, y: VENUE_H - 3 },
     furni,
     decor,
     doors,
     crowd,
-    exit: { side: "bottom", x: EXIT_X, y: VENUE_H - 3, w: 2 },
+    roofs,
+    exit: { side: "bottom", x: EXIT_X, y: VENUE_H - 1, w: 2 },
     directories: [
-      { x: 28, y: 39 },
-      { x: 35, y: 39 },
-      { x: 13, y: 22 },
-      { x: 50, y: 22 },
+      { x: 21, y: 30 },
+      { x: 28, y: 30 },
     ],
   });
 }
@@ -478,10 +465,8 @@ function themedCorners(theme: ThemeId, w: number, h: number, color: string): { f
   const furni: Furni[] = [
     { kind: k[0]!, x: 1, y: 3 },
     { kind: k[0]!, x: r, y: 3 },
-    { kind: k[1]!, x: 1, y: 9 },
-    { kind: k[1]!, x: r, y: 9 },
-    { kind: k[2]!, x: 1, y: h - 2 },
-    { kind: k[2]!, x: r, y: h - 2 },
+    { kind: k[1]!, x: 1, y: h - 2 },
+    { kind: k[1]!, x: r, y: h - 2 },
   ];
   const decor: Decor[] = [];
   if (theme === "tech") decor.push({ kind: "neon", x: 1, y: 2, w: 2, text: "</>", color: "#22d3ee" }, { kind: "neon", x: w - 3, y: 2, w: 2, text: "LIVE", color: "#ff5c39" });
@@ -492,38 +477,36 @@ function themedCorners(theme: ThemeId, w: number, h: number, color: string): { f
   return { furni, decor };
 }
 
-interface HallSpec {
+const STAGE_RUG: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4" };
+
+interface InteriorSpec {
   w: number;
   h: number;
-  rows: number[];
-  /** Columnas de asientos a la izquierda y a la derecha del pasillo. */
-  left: number[];
-  right: number[];
+  /** Columna izquierda del pasillo de dos baldosas que lleva a la salida. */
   aisle: number;
   screen: { x: number; w: number };
   sponsors: { x: number; w: number }[];
   stage: { x: number; w: number; d: number };
+  podium: Tile;
+  seats: Seat[];
+  extra?: Furni[];
 }
 
-function hall(theme: ThemeId, color: string, spec: HallSpec): SceneMap {
+/** Arma una sala a partir de su distribución: escenario, pantalla, asientos y decoración. */
+function interior(theme: ThemeId, color: string, spec: InteriorSpec): SceneMap {
   const { w, h, aisle } = spec;
-  const seats: Seat[] = [];
-  const stageRug: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4" };
   const furni: Furni[] = [
-    { kind: "rug", x: spec.stage.x, y: 3, w: spec.stage.w, d: spec.stage.d, color: stageRug[theme] },
-    { kind: "carpet", x: aisle, y: 3 + spec.stage.d, w: 2, d: h - 4 - spec.stage.d, color: CARPET[theme] },
+    { kind: "rug", x: spec.stage.x, y: 3, w: spec.stage.w, d: spec.stage.d, color: STAGE_RUG[theme] },
+    theme === "tech"
+      ? { kind: "neonpath", x: aisle, y: 3 + spec.stage.d, w: 2, d: h - 4 - spec.stage.d, color: "#22d3ee" }
+      : { kind: "carpet", x: aisle, y: 3 + spec.stage.d, w: 2, d: h - 4 - spec.stage.d, color: CARPET[theme] },
+    ...spec.seats.map((s): Furni => ({ kind: "chair", x: s.x, y: s.y, dir: s.dir, color })),
+    { kind: "lectern", x: spec.podium.x, y: spec.podium.y + 1, color },
+    ...(spec.extra ?? []),
   ];
-  const center = aisle + 0.5;
-  for (const y of spec.rows) {
-    for (const x of [...spec.left, ...spec.right].sort((a, b) => Math.abs(a - center) - Math.abs(b - center))) {
-      seats.push({ x, y, dir: "up" });
-      furni.push({ kind: "chair", x, y, color });
-    }
-  }
-  const podium = { x: aisle + 1, y: 1 + spec.stage.d };
-  furni.push({ kind: "lectern", x: podium.x, y: podium.y + 1, color });
   const corners = themedCorners(theme, w, h, color);
   furni.push(...corners.furni);
+  const seatSet = new Set(spec.seats.map((s) => `${s.x},${s.y}`));
   return finish({
     ...empty,
     w,
@@ -538,20 +521,21 @@ function hall(theme: ThemeId, color: string, spec: HallSpec): SceneMap {
       ...corners.decor,
     ],
     doors: [{ id: "salida", side: "bottom", x: aisle, y: h - 1, w: 2, label: "Salida", color, theme, zone: "", main: false }],
-    seats,
-    standing: [...spec.left, ...spec.right].map((x) => ({ x, y: h - 2 })),
-    podium,
+    // Los asientos se ocupan de adelante hacia atrás y del centro hacia afuera.
+    seats: [...spec.seats].sort((a, b) => a.y - b.y || Math.abs(a.x - w / 2) - Math.abs(b.x - w / 2)),
+    standing: Array.from({ length: w - 6 }, (_, i) => ({ x: i + 3, y: h - 2 })).filter((t) => !seatSet.has(`${t.x},${t.y}`) && (t.x < aisle || t.x > aisle + 1)),
+    podium: spec.podium,
   });
 }
 
-/** Sala de charla: misma distribución en todos los estilos, con decoración propia. */
-export const roomMap = (theme: ThemeId, color: string) =>
-  hall(theme, color, {
+const rows = (ys: number[], xs: number[], dir: Dir): Seat[] => ys.flatMap((y) => xs.map((x) => ({ x, y, dir })));
+const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+/** Aula clásica: filas mirando a la pantalla. */
+const classroom = (theme: ThemeId, color: string) =>
+  interior(theme, color, {
     w: 20,
     h: 17,
-    rows: [8, 10, 12, 14],
-    left: [3, 4, 5, 6, 7, 8],
-    right: [11, 12, 13, 14, 15, 16],
     aisle: 9,
     screen: { x: 6, w: 8 },
     sponsors: [
@@ -559,16 +543,76 @@ export const roomMap = (theme: ThemeId, color: string) =>
       { x: 15, w: 2 },
     ],
     stage: { x: 6, w: 8, d: 3 },
+    podium: { x: 10, y: 4 },
+    seats: rows([8, 10, 12, 14], [...range(3, 8), ...range(11, 16)], "up"),
+  });
+
+/** Sala ancha y baja, con un escenario largo. */
+const wideHall = (theme: ThemeId, color: string) =>
+  interior(theme, color, {
+    w: 28,
+    h: 14,
+    aisle: 13,
+    screen: { x: 9, w: 10 },
+    sponsors: [
+      { x: 3, w: 4 },
+      { x: 21, w: 4 },
+    ],
+    stage: { x: 6, w: 16, d: 2 },
+    podium: { x: 14, y: 3 },
+    seats: rows([7, 9, 11], [...range(3, 12), ...range(15, 24)], "up"),
+  });
+
+/** Taller: mesas con sillas a ambos lados. */
+const workshop = (theme: ThemeId, color: string) => {
+  const tables = [3, 7, 13, 17].flatMap((x) => [8, 12].map((y) => ({ x, y })));
+  return interior(theme, color, {
+    w: 22,
+    h: 17,
+    aisle: 10,
+    screen: { x: 7, w: 8 },
+    sponsors: [
+      { x: 3, w: 3 },
+      { x: 16, w: 3 },
+    ],
+    stage: { x: 7, w: 8, d: 3 },
+    podium: { x: 11, y: 4 },
+    seats: tables.flatMap((t) => [
+      { x: t.x, y: t.y - 1, dir: "down" as const },
+      { x: t.x + 1, y: t.y - 1, dir: "down" as const },
+      { x: t.x, y: t.y + 1, dir: "up" as const },
+      { x: t.x + 1, y: t.y + 1, dir: "up" as const },
+    ]),
+    extra: tables.map((t): Furni => ({ kind: "table", x: t.x, y: t.y, w: 2 })),
+  });
+};
+
+/** Anfiteatro en U: el público rodea el centro desde tres lados. */
+const arena = (theme: ThemeId, color: string) =>
+  interior(theme, color, {
+    w: 22,
+    h: 18,
+    aisle: 10,
+    screen: { x: 7, w: 8 },
+    sponsors: [
+      { x: 2, w: 4 },
+      { x: 16, w: 4 },
+    ],
+    stage: { x: 6, w: 10, d: 3 },
+    podium: { x: 11, y: 4 },
+    seats: [
+      ...rows(range(7, 13), [3, 4], "right"),
+      ...rows(range(7, 13), [17, 18], "left"),
+      ...rows([15], [...range(5, 9), ...range(12, 16)], "up"),
+    ],
+    extra: [{ kind: "rug", x: 6, y: 7, w: 10, d: 6, color: STAGE_RUG[theme] }],
   });
 
 /** Auditorio principal: más grande, con escenario amplio y pantallas de patrocinadores enormes. */
 export const auditoriumMap = (theme: ThemeId, color: string) =>
-  hall(theme, color, {
+  interior(theme, color, {
     w: 30,
     h: 23,
-    rows: [10, 12, 14, 16, 18, 20],
-    left: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
-    right: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
     aisle: 14,
     screen: { x: 9, w: 12 },
     sponsors: [
@@ -576,4 +620,16 @@ export const auditoriumMap = (theme: ThemeId, color: string) =>
       { x: 22, w: 5 },
     ],
     stage: { x: 5, w: 20, d: 5 },
+    podium: { x: 15, y: 6 },
+    seats: rows([10, 12, 14, 16, 18, 20], [...range(3, 13), ...range(16, 26)], "up"),
   });
+
+const LAYOUTS = [classroom, workshop, arena, wideHall];
+
+/** Mapa interior de una sala: el auditorio, o una de cuatro distribuciones según su lugar en el evento. */
+export function interiorFor(theme: ThemeId, rooms: Pick<Room, "id" | "color" | "main">[], roomId: string): SceneMap {
+  const room = rooms.find((r) => r.id === roomId);
+  if (!room || room.main) return auditoriumMap(theme, room?.color ?? "#5b5bf0");
+  const index = rooms.filter((r) => !r.main).findIndex((r) => r.id === roomId);
+  return LAYOUTS[Math.max(0, index) % LAYOUTS.length]!(theme, room.color);
+}

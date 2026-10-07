@@ -22,8 +22,8 @@ import {
   type Media,
 } from "./world.ts";
 
-const SPEED = 6.5; // baldosas por segundo
-const REMOTE_SPEED = 7;
+const SPEED = 8; // baldosas por segundo
+const REMOTE_SPEED = 8.5;
 const BUBBLE_MS = 7000;
 const EMOTE_MS = 2600;
 const CHATTER_MS = 4200;
@@ -188,8 +188,21 @@ export default function Scene(props: SceneProps) {
       if (dir) {
         e.preventDefault();
         keys.current = [dir, ...keys.current.filter((d) => d !== dir)];
-        my.current.path = [];
-        my.current.then = null;
+        const s = my.current;
+        s.path = [];
+        s.then = null;
+        // Si va en sentido contrario, se da vuelta en el acto en vez de terminar el paso.
+        if (s.seg) {
+          const d = DELTA[dir];
+          const sx = Math.sign(s.seg.to.x - s.seg.from.x);
+          const sy = Math.sign(s.seg.to.y - s.seg.from.y);
+          if (d.x === -sx && d.y === -sy) {
+            const back = { x: Math.round(s.seg.from.x), y: Math.round(s.seg.from.y) };
+            s.seg = { from: { x: s.x, y: s.y }, to: back, t: 0 };
+            s.dir = dir;
+            socket.emit("move", back);
+          }
+        }
       } else if (/^[1-5]$/.test(k)) {
         socket.emit("emote", EMOTES[Number(k) - 1]!);
       } else if (k === "x") {
@@ -327,7 +340,6 @@ export default function Scene(props: SceneProps) {
       };
     };
 
-    const lookAhead = { x: 0, y: 0 };
     const updateCamera = () => {
       const v = view.current;
       if (live.current.camera === "fit") {
@@ -344,17 +356,14 @@ export default function Scene(props: SceneProps) {
         return;
       }
       // Mapas chicos se ven completos; en el recinto grande la cámara sigue al personaje.
-      v.zoom = showMinimap ? Math.max(1.1, Math.min(1.8, v.h / (19 * T))) : Math.max(1, Math.min(2, v.h / H, v.w / W));
+      v.zoom = showMinimap ? Math.max(1.1, Math.min(1.8, v.h / (17 * T))) : Math.max(1, Math.min(2, v.h / H, v.w / W));
+      // El personaje siempre queda al centro; solo deja de estarlo al llegar a los bordes del mapa.
       const f = feet(my.current.x, my.current.y);
-      // En el recinto se mira un poco hacia donde camina el personaje.
-      const ahead = showMinimap ? DELTA[my.current.dir] : { x: 0, y: 0 };
-      lookAhead.x += (ahead.x * 3 * T - lookAhead.x) * 0.04;
-      lookAhead.y += (ahead.y * 3 * T - lookAhead.y) * 0.04;
       const halfW = v.w / 2 / v.zoom;
       const halfH = v.h / 2 / v.zoom;
       const clamp = (c: number, size: number, half: number) => (size <= half * 2 ? size / 2 : Math.max(half, Math.min(size - half, c)));
-      v.camX = clamp(f.x + lookAhead.x, W, halfW);
-      v.camY = clamp(f.y - 24 + lookAhead.y, H, halfH);
+      v.camX = clamp(f.x, W, halfW);
+      v.camY = clamp(f.y - 20, H, halfH);
     };
 
     let raf = 0;

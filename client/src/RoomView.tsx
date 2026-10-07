@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { auditoriumMap, roomMap } from "../../shared/maps.ts";
+import { interiorFor } from "../../shared/maps.ts";
 import type { ChatMessage, Question, Room, RoomSnapshot, Stage, StageMode, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { useBroadcaster, useLiveViewer } from "./live.ts";
@@ -36,7 +36,7 @@ export default function RoomView({
   onLeave: () => void;
   onClaim: (code: string) => Promise<void>;
 }) {
-  const map = useMemo(() => (room.main ? auditoriumMap : roomMap)(venue.theme, room.color), [room.main, venue.theme, room.color]);
+  const map = useMemo(() => interiorFor(venue.theme, venue.rooms, room.id), [venue.theme, venue.rooms, room.id]);
   const scene = useRef<SceneHandle>(null);
   const [phase, setPhase] = useState<"entering" | "seated">("entering");
   const [stage, setStage] = useState<Stage>(snapshot.stage);

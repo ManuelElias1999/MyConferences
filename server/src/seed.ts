@@ -37,6 +37,9 @@ const seeds: VenueSeed[] = [
       { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899", main: false },
       { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9", main: false },
       { id: "producto", name: "Sala Producto", topic: "Diseño, producto y comunidad", color: "#ef4444", main: false },
+      { id: "devops", name: "Sala DevOps", topic: "Cloud, contenedores y CI/CD", color: "#14b8a6", main: false },
+      { id: "seguridad", name: "Sala Seguridad", topic: "Ciberseguridad para equipos de producto", color: "#8b5cf6", main: false },
+      { id: "datos", name: "Sala Datos", topic: "Datos, analítica y visualización", color: "#f97316", main: false },
     ],
     program: {
       auditorio: [
@@ -45,6 +48,27 @@ const seeds: VenueSeed[] = [
         ["Panel: comunidades tech en Latinoamérica", "Varios invitados", "Organizadores de comunidades comparten qué funciona para crecer y sostenerlas."],
         ["Keynote: construir producto con IA", "Andrés Ríos", "Lecciones de llevar funcionalidades con IA de la demo a producción."],
         ["Cierre y premios", "Equipo organizador", "Resumen del día, ganadores del demo day y próximos eventos."],
+      ],
+      devops: [
+        ["Kubernetes sin miedo", "Hugo Benítez", "Lo mínimo para desplegar y operar con confianza."],
+        ["Pipelines que no fallan", "Elena Castro", "CI/CD rápido y confiable."],
+        ["Observabilidad práctica", "Gabriel Núñez", "Logs, métricas y trazas que sirven."],
+        ["Costos en la nube", "Ricardo Vega", "Cómo bajar la factura sin perder velocidad."],
+        ["Incidentes y postmortems", "Mariana López", "Aprender de lo que falla."],
+      ],
+      seguridad: [
+        ["Seguridad para devs", "Natalia Ortiz", "Los errores más comunes y cómo evitarlos."],
+        ["Autenticación moderna", "Javier Molina", "Passkeys, OAuth y sesiones."],
+        ["Secretos y credenciales", "Daniela Rojas", "Dónde guardarlos y cómo rotarlos."],
+        ["Pentesting en vivo", "Equipo rojo", "Atacamos una app de ejemplo."],
+        ["Privacidad por diseño", "Natalia Ortiz", "Datos mínimos y consentimiento."],
+      ],
+      datos: [
+        ["Analítica de producto", "Carla Méndez", "Eventos, embudos y retención."],
+        ["SQL que escala", "Javier Molina", "Consultas rápidas sobre muchos datos."],
+        ["Dashboards que se usan", "Iván Torres", "Diseñar para decidir."],
+        ["Pipelines de datos", "Lucía Fernández", "De la fuente al almacén sin dolor."],
+        ["Datos y IA", "Sofía Herrera", "Preparar datos para modelos."],
       ],
       stellar: [
         ["Introducción a Stellar", "Camila Torres", "Cuentas, activos, anchors y cómo se mueve el dinero en la red."],
@@ -97,6 +121,10 @@ const seeds: VenueSeed[] = [
       { id: "wallets", name: "Sala Wallets", topic: "Billeteras y experiencia de usuario", color: "#14b8a6", main: false },
       { id: "anchors", name: "Sala Anchors", topic: "Integraciones con bancos", color: "#f59e0b", main: false },
       { id: "mentorias", name: "Mentorías", topic: "Sesiones con el equipo core", color: "#ec4899", main: false },
+      { id: "defi", name: "Sala DeFi", topic: "Finanzas descentralizadas", color: "#10b981", main: false },
+      { id: "hackathon", name: "Hackathon", topic: "Equipos construyendo en vivo", color: "#ef4444", main: false },
+      { id: "comunidad", name: "Comunidad", topic: "Embajadores y meetups", color: "#8b5cf6", main: false },
+      { id: "demos", name: "Demos", topic: "Proyectos de la comunidad", color: "#0ea5e9", main: false },
     ],
     program: {
       auditorio: [
@@ -148,6 +176,12 @@ const seeds: VenueSeed[] = [
       { id: "auditorio", name: "Auditorio principal", topic: "Bienvenida y resultados", color: "#64748b", main: true },
       { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899", main: false },
       { id: "reuniones", name: "Sala de Reuniones", topic: "Conversaciones con fundadores", color: "#0ea5e9", main: false },
+      { id: "fintech", name: "Fintech", topic: "Startups de pagos y crédito", color: "#10b981", main: false },
+      { id: "salud", name: "Salud", topic: "Startups de salud digital", color: "#ef4444", main: false },
+      { id: "educacion", name: "Educación", topic: "Startups de educación", color: "#f59e0b", main: false },
+      { id: "clima", name: "Clima", topic: "Startups de energía y clima", color: "#14b8a6", main: false },
+      { id: "legal", name: "Legal", topic: "Asesoría legal para fundadores", color: "#8b5cf6", main: false },
+      { id: "networking", name: "Networking", topic: "Conversaciones abiertas", color: "#0ea5e9", main: false },
     ],
     program: {
       auditorio: [

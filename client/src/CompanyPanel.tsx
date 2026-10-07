@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MAX_ROOMS, venueMap } from "../../shared/maps.ts";
+import { MAX_ROOMS, ROOMS_PER_EVENT, venueMap } from "../../shared/maps.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import type { Account, CompanyEvent, EventInput, TalkInput } from "../../shared/types.ts";
 import { companyApi, loadToken } from "./lib.ts";
@@ -120,7 +120,12 @@ function EventEditor({
       talks: ev.venue.talks.filter((t) => t.roomId === r.id).map(({ title, speaker, start, end }) => ({ title, speaker, start, end })),
     }));
   const [rooms, setRooms] = useState<RoomDraft[]>(
-    initial ? draftsFrom(initial) : [{ ...blankRoom(0), name: "Auditorio principal", topic: "Charlas principales" }, { ...blankRoom(1), name: "Sala 1" }],
+    initial
+      ? draftsFrom(initial)
+      : [
+          { ...blankRoom(0), name: "Auditorio principal", topic: "Charlas principales" },
+          ...Array.from({ length: ROOMS_PER_EVENT }, (_, i) => ({ ...blankRoom(i + 1), name: `Sala ${i + 1}` })),
+        ],
   );
   const [openAgenda, setOpenAgenda] = useState<number | null>(0);
   const [error, setError] = useState("");
@@ -222,7 +227,10 @@ function EventEditor({
 
         <fieldset className="rooms-editor">
           <legend>Salas y agenda</legend>
-          <p className="muted small">La primera es el auditorio principal: es más grande y tiene una entrada propia al fondo del pasillo central.</p>
+          <p className="muted small">
+            El auditorio principal está al fondo de la plaza; las ocho salas, en edificios a los lados. Cada sala tiene una forma distinta: aula, taller con
+            mesas, anfiteatro en U o sala ancha.
+          </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
               <div className="room-row">
