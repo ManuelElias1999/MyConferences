@@ -1,10 +1,25 @@
 // Tipos compartidos entre el servidor y el cliente.
 
-export interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+import type { ThemeId } from "./themes.ts";
+
+export type HairStyle = "short" | "long" | "spiky" | "bun" | "cap" | "bald";
+
+/** Apariencia del personaje. Los colores salen de las paletas de shared/look.ts. */
+export interface Look {
+  skin: string;
+  hair: HairStyle;
+  hairColor: string;
+  shirt: string;
+  pants: string;
+  shoes: string;
+}
+
+/** Datos de la cuenta que ve su dueño. El correo nunca se envía a otros usuarios. */
+export interface Account {
+  id: string;
+  email: string;
+  name: string;
+  look: Look;
 }
 
 export interface Room {
@@ -12,10 +27,9 @@ export interface Room {
   name: string;
   topic: string;
   color: string;
-  /** Zona de la sala dibujada en el mapa del salón. */
-  area: Rect;
-  /** Al pisar la puerta se entra a la sala. */
-  door: Rect;
+  theme: ThemeId;
+  /** Nombre de quien la creó, si no es una sala del programa oficial. */
+  createdBy: string | null;
 }
 
 export interface Talk {
@@ -29,10 +43,16 @@ export interface Talk {
   end: number;
 }
 
-export interface EventInfo {
+/** Lo que se muestra en recepción antes de entrar: los salones privados no aparecen. */
+export interface VenueSummary {
+  id: string;
   name: string;
   tagline: string;
-  map: { width: number; height: number; spawn: { x: number; y: number } };
+}
+
+/** Un salón (se elige por su número en recepción) con sus salas y su agenda. */
+export interface Venue extends VenueSummary {
+  private: boolean;
   rooms: Room[];
   talks: Talk[];
 }
@@ -40,12 +60,18 @@ export interface EventInfo {
 export interface User {
   id: string;
   name: string;
-  title: string;
-  color: string;
-  /** Sala en la que está, o null si está en el salón principal. */
+  look: Look;
+  /** true si entró con una cuenta; false si es invitado. */
+  registered: boolean;
+  /** Salón en el que está, o null si está en recepción. */
+  venueId: string | null;
+  /** Sala del salón en la que está, o null si está caminando por el salón. */
   roomId: string | null;
-  /** Sala que puede presentar, si entró con código de expositor. */
+  /** Piso del edificio en el que camina (0 es la planta baja). */
+  floor: number;
+  /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
+  /** Posición en baldosas del mapa en el que está. */
   x: number;
   y: number;
 }
@@ -54,7 +80,6 @@ export interface ChatMessage {
   id: string;
   userId: string;
   name: string;
-  color: string;
   text: string;
   ts: number;
 }
@@ -69,7 +94,15 @@ export interface Question {
   ts: number;
 }
 
-export type StageMode = "slides" | "stream";
+export type StageMode = "slides" | "stream" | "live";
+
+/** Transmisión en vivo del expositor por WebRTC. */
+export interface LiveInfo {
+  video: "screen" | "camera" | null;
+  audio: boolean;
+  /** Cambia cada vez que el expositor cambia lo que transmite; los asistentes se reconectan. */
+  session: number;
+}
 
 export interface Stage {
   mode: StageMode;
@@ -78,28 +111,56 @@ export interface Stage {
   slide: number;
   streamUrl: string | null;
   presenterId: string | null;
+  live: LiveInfo | null;
 }
 
 export interface RoomSnapshot {
   stage: Stage;
   chat: ChatMessage[];
   questions: Question[];
+  /** Asiento asignado, o null si la sala está llena y te quedas de pie. */
+  seat: number | null;
 }
 
-export interface JoinRequest {
-  name: string;
-  title: string;
-  color: string;
-  speakerCode?: string;
+export interface Bubble {
+  userId: string;
+  text: string;
 }
+
+export type RtcSignal =
+  | { kind: "request"; session: number }
+  | { kind: "offer"; session: number; sdp: string }
+  | { kind: "answer"; session: number; sdp: string }
+  | { kind: "ice"; session: number; candidate: RTCIceCandidateInit };
 
 export type Ack<T> = (res: { ok: true; data: T } | { ok: false; error: string }) => void;
 
+export interface Welcome {
+  user: User;
+  account: Account | null;
+  users: User[];
+  venues: VenueSummary[];
+}
+
 export interface ClientToServerEvents {
-  join: (req: JoinRequest, ack: Ack<{ user: User; event: EventInfo; users: User[] }>) => void;
+  hello: (req: { token: string | null }, ack: Ack<Welcome>) => void;
+  /** Inicia o cierra sesión sin perder la posición. */
+  setAccount: (token: string | null, ack: Ack<{ user: User; account: Account | null }>) => void;
+  setLook: (req: { name: string; look: Look }, ack: Ack<{ user: User; account: Account }>) => void;
   move: (pos: { x: number; y: number }) => void;
-  enterRoom: (roomId: string, ack: Ack<RoomSnapshot>) => void;
-  leaveRoom: (ack: Ack<{ x: number; y: number }>) => void;
+  say: (text: string) => void;
+  /** Pedirle a la recepcionista un salón por su número. */
+  requestVenue: (number: string, ack: Ack<{ venue: Venue; user: User; users: User[] }>) => void;
+  leaveVenue: (ack: Ack<{ user: User; users: User[] }>) => void;
+  enterRoom: (roomId: string, ack: Ack<RoomSnapshot & { user: User }>) => void;
+  leaveRoom: (ack: Ack<{ user: User }>) => void;
+  /** Subir o bajar por la escalera. */
+  changeFloor: (floor: number, ack: Ack<{ user: User }>) => void;
+  createRoom: (
+    req: { name: string; topic: string; theme: ThemeId; color: string },
+    ack: Ack<{ venue: Venue; room: Room; speakerCode: string }>,
+  ) => void;
+  claimSpeaker: (code: string, ack: Ack<{ user: User }>) => void;
   chat: (text: string) => void;
   ask: (text: string) => void;
   vote: (questionId: string) => void;
@@ -107,14 +168,20 @@ export interface ClientToServerEvents {
   setSlide: (slide: number) => void;
   setStream: (url: string | null) => void;
   setMode: (mode: StageMode) => void;
+  setLive: (live: { video: LiveInfo["video"]; audio: boolean } | null) => void;
+  rtc: (to: string, signal: RtcSignal) => void;
 }
 
 export interface ServerToClientEvents {
   userJoined: (user: User) => void;
   userLeft: (userId: string) => void;
   userUpdated: (user: User) => void;
+  /** Alguien creó una sala: llega el salón con la lista de salas actualizada. */
+  venueUpdated: (venue: Venue) => void;
   moved: (pos: { id: string; x: number; y: number }) => void;
+  bubble: (bubble: Bubble) => void;
   chat: (msg: ChatMessage) => void;
   questions: (questions: Question[]) => void;
   stage: (stage: Stage) => void;
+  rtc: (from: string, signal: RtcSignal) => void;
 }

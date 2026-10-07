@@ -1,116 +1,135 @@
 import { useState } from "react";
-import type { EventInfo } from "../../shared/types.ts";
-import { AgendaGrid } from "./Agenda.tsx";
-import { AVATAR_COLORS, initials, roomSchedule, type Profile } from "./lib.ts";
+import { RECEPTIONIST_LOOK } from "../../shared/look.ts";
+import { receptionMap } from "../../shared/maps.ts";
+import type { User, VenueSummary } from "../../shared/types.ts";
+import AvatarCanvas from "./AvatarCanvas.tsx";
+import SayBar from "./SayBar.tsx";
+import Scene from "./Scene.tsx";
+
+const MAP = receptionMap();
+
+type Dialog = { step: "ask" } | { step: "checking" } | { step: "error"; text: string; needsLogin: boolean } | { step: "ok"; text: string };
 
 export default function Reception({
-  event,
-  now,
-  initialProfile,
-  busy,
-  error,
-  onJoin,
+  me,
+  users,
+  venues,
+  onRequestVenue,
+  onLogin,
 }: {
-  event: EventInfo | null;
-  now: number;
-  initialProfile: Profile | null;
-  busy: boolean;
-  error: string;
-  onJoin: (profile: Profile) => void;
+  me: User;
+  users: Map<string, User>;
+  venues: VenueSummary[];
+  /** Devuelve el nombre del salón si la recepcionista acepta, o lanza el motivo del rechazo. */
+  onRequestVenue: (number: string) => Promise<string>;
+  onLogin: () => void;
 }) {
-  const [name, setName] = useState(initialProfile?.name ?? "");
-  const [title, setTitle] = useState(initialProfile?.title ?? "");
-  const [color, setColor] = useState(initialProfile?.color ?? AVATAR_COLORS[0]!);
-  const [speakerCode, setSpeakerCode] = useState(initialProfile?.speakerCode ?? "");
-  const [showCode, setShowCode] = useState(Boolean(initialProfile?.speakerCode));
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [number, setNumber] = useState("");
 
-  const liveCount = event ? event.rooms.filter((r) => roomSchedule(event, r.id, now).current).length : 0;
+  const ask = async (value: string) => {
+    if (!value.trim()) return;
+    setDialog({ step: "checking" });
+    try {
+      const name = await onRequestVenue(value.trim());
+      setDialog({ step: "ok", text: `¡Todo en orden! Te acompaño a ${name}.` });
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "No pude revisar esa sala.";
+      setDialog({ step: "error", text, needsLogin: !me.registered && /privada/.test(text) });
+    }
+  };
 
   return (
-    <main className="reception">
-      <section className="reception-hero">
-        <p className="eyebrow">Recepción</p>
-        <h1>{event?.name ?? "Cargando evento…"}</h1>
-        {event && <p className="lead">{event.tagline}</p>}
-        {event && (
-          <p className="live-now">
-            <span className="dot" /> {liveCount} {liveCount === 1 ? "charla en vivo" : "charlas en vivo"} ahora
-          </p>
-        )}
-      </section>
+    <main className="world">
+      <Scene
+        key={me.id}
+        map={MAP}
+        me={me}
+        users={users}
+        inScene={(u) => !u.venueId}
+        camera="follow"
+        names="all"
+        onNpc={() => setDialog({ step: "ask" })}
+        label="Recepción"
+      />
 
-      <form
-        className="card profile-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          onJoin({ name: name.trim(), title: title.trim(), color, speakerCode: showCode ? speakerCode.trim() : "" });
-        }}
-      >
-        <h2>Crea tu credencial</h2>
-        <div className="badge-preview">
-          <span className="avatar lg" style={{ background: color }}>
-            {initials(name) || "?"}
-          </span>
-          <div>
-            <strong>{name || "Tu nombre"}</strong>
-            <span>{title || "Rol u organización"}</span>
+      {dialog ? (
+        <section className="npc-dialog" aria-live="polite">
+          <div className="npc-portrait">
+            <AvatarCanvas look={RECEPTIONIST_LOOK} size={72} head />
           </div>
-        </div>
-
-        <label>
-          Nombre
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required autoFocus placeholder="Ana Pérez" />
-        </label>
-        <label>
-          <span>
-            Rol u organización <span className="optional">(opcional)</span>
-          </span>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} placeholder="Desarrolladora en Acme" />
-        </label>
-        <fieldset className="colors">
-          <legend>Color de tu avatar</legend>
-          {AVATAR_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`swatch ${c === color ? "selected" : ""}`}
-              style={{ background: c }}
-              onClick={() => setColor(c)}
-              aria-label={`Color ${c}`}
-              aria-pressed={c === color}
-            />
-          ))}
-        </fieldset>
-
-        {showCode ? (
-          <label>
-            Código de expositor
-            <input
-              value={speakerCode}
-              onChange={(e) => setSpeakerCode(e.target.value)}
-              maxLength={20}
-              placeholder="Ej. A1B2C3"
-              autoCapitalize="characters"
-            />
-          </label>
-        ) : (
-          <button type="button" className="link" onClick={() => setShowCode(true)}>
-            ¿Vas a presentar? Ingresa tu código de expositor
-          </button>
-        )}
-
-        {error && <p className="error">{error}</p>}
-        <button className="btn primary" disabled={busy || !event || !name.trim()}>
-          {busy ? "Conectando…" : "Entrar al evento"}
-        </button>
-      </form>
-
-      {event && (
-        <section className="reception-agenda">
-          <h2>Agenda de hoy</h2>
-          <AgendaGrid event={event} now={now} />
+          <div className="npc-body">
+            <p className="npc-name">Recepcionista</p>
+            {dialog.step === "ask" && (
+              <>
+                <p>¡Hola, {me.name}! ¿A qué número de sala quieres ir?</p>
+                <form
+                  className="npc-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    ask(number);
+                  }}
+                >
+                  <input
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value.replace(/\D/g, ""))}
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="Ej. 101"
+                    aria-label="Número de sala"
+                    autoFocus
+                  />
+                  <button className="btn primary" disabled={!number}>
+                    Ir
+                  </button>
+                </form>
+                {venues.length > 0 && (
+                  <p className="npc-hint">
+                    Salas abiertas hoy:{" "}
+                    {venues.map((v) => (
+                      <button key={v.id} type="button" className="chip" onClick={() => ask(v.id)}>
+                        {v.id} · {v.name}
+                      </button>
+                    ))}
+                  </p>
+                )}
+                {!me.registered && <p className="npc-hint">Las salas privadas revisan tu correo: inicia sesión antes de pedirlas.</p>}
+              </>
+            )}
+            {dialog.step === "checking" && <p>Déjame revisar la lista…</p>}
+            {dialog.step === "error" && (
+              <>
+                <p>{dialog.text}</p>
+                <div className="npc-actions">
+                  {dialog.needsLogin && (
+                    <button className="btn primary sm" onClick={onLogin}>
+                      Iniciar sesión
+                    </button>
+                  )}
+                  <button className="btn sm" onClick={() => setDialog({ step: "ask" })}>
+                    Probar otro número
+                  </button>
+                </div>
+              </>
+            )}
+            {dialog.step === "ok" && <p>{dialog.text}</p>}
+          </div>
+          {dialog.step !== "ok" && dialog.step !== "checking" && (
+            <button className="btn ghost sm npc-close" onClick={() => setDialog(null)} aria-label="Cerrar">
+              ✕
+            </button>
+          )}
         </section>
+      ) : (
+        <p className="scene-hint">
+          Camina con <kbd>↑</kbd>
+          <kbd>↓</kbd>
+          <kbd>←</kbd>
+          <kbd>→</kbd> o haciendo clic. Acércate a la recepcionista para pedir tu sala.
+        </p>
       )}
+
+      <SayBar />
     </main>
   );
 }

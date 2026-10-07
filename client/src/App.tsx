@@ -1,100 +1,140 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { EventInfo, RoomSnapshot, User } from "../../shared/types.ts";
+import type { Account, Room, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
+import CreateRoom, { RoomCreated } from "./CreateRoom.tsx";
+import AuthDialog from "./AuthDialog.tsx";
+import AvatarCanvas from "./AvatarCanvas.tsx";
+import AvatarEditor from "./AvatarEditor.tsx";
 import Hall from "./Hall.tsx";
+import { loadToken, saveToken, socket } from "./lib.ts";
 import Reception from "./Reception.tsx";
 import RoomView from "./RoomView.tsx";
-import { initials, loadProfile, saveProfile, socket, type Profile } from "./lib.ts";
 
-export interface Session {
-  me: User;
-  event: EventInfo;
-  speakerCode: string;
-}
+type Place =
+  | { kind: "reception" }
+  | { kind: "hall"; venue: Venue }
+  | { kind: "room"; venue: Venue; roomId: string; snapshot: RoomSnapshot; visit: number };
+
+const FADE_MS = 350;
 
 export default function App() {
-  const [publicEvent, setPublicEvent] = useState<EventInfo | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [snapshot, setSnapshot] = useState<{ roomId: string; data: RoomSnapshot } | null>(null);
-  const [joinError, setJoinError] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [me, setMe] = useState<User | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [venues, setVenues] = useState<VenueSummary[]>([]);
+  const [place, setPlace] = useState<Place>({ kind: "reception" });
   const [connected, setConnected] = useState(socket.connected);
+  const [fading, setFading] = useState(false);
+  const [auth, setAuth] = useState<"login" | "register" | null>(null);
+  const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<{ room: Room; speakerCode: string } | null>(null);
   const [now, setNow] = useState(Date.now());
 
-  // Las posiciones cambian muchas veces por segundo: viven en un ref que el mapa
-  // lee en cada frame, y `usersVersion` solo cambia cuando alguien entra, sale o cambia de sala.
+  // Las posiciones cambian muchas veces por segundo: viven en un ref que los mapas
+  // leen en cada frame, y `usersVersion` solo cambia cuando alguien entra, sale o cambia de lugar.
   const usersRef = useRef(new Map<string, User>());
   const [usersVersion, setUsersVersion] = useState(0);
   const bump = () => setUsersVersion((v) => v + 1);
+  const replaceUsers = (list: User[]) => {
+    usersRef.current = new Map(list.map((u) => [u.id, u]));
+    bump();
+  };
 
-  const profileRef = useRef<Profile | null>(null);
-  const roomRef = useRef<string | null>(null);
+  const placeRef = useRef(place);
+  placeRef.current = place;
+  const meRef = useRef(me);
+  meRef.current = me;
+  const speakerCode = useRef<{ room: string; code: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/event")
-      .then((r) => r.json())
-      .then(setPublicEvent)
-      .catch(() => setJoinError("No se pudo cargar el evento. ¿Está corriendo el servidor?"));
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
 
-  const enterRoom = useCallback((roomId: string) => {
-    socket.emit("enterRoom", roomId, (res) => {
-      if (!res.ok) return;
-      roomRef.current = roomId;
-      setSnapshot({ roomId, data: res.data });
-      setSession((s) => (s ? { ...s, me: { ...s.me, roomId } } : s));
-    });
+  const transition = useCallback((change: () => void) => {
+    setFading(true);
+    setTimeout(() => {
+      change();
+      setFading(false);
+    }, FADE_MS);
   }, []);
 
-  const leaveRoom = useCallback(() => {
-    socket.emit("leaveRoom", (res) => {
-      if (!res.ok) return;
-      roomRef.current = null;
-      setSnapshot(null);
-      setSession((s) => (s ? { ...s, me: { ...s.me, roomId: null, x: res.data.x, y: res.data.y } } : s));
-    });
-  }, []);
+  const goToHall = (venue: Venue, user: User, users: User[]) => {
+    setMe(user);
+    replaceUsers(users);
+    setPlace({ kind: "hall", venue });
+  };
 
-  const join = useCallback(
-    (profile: Profile, rejoinRoom: string | null = null) => {
-      setJoining(true);
-      setJoinError("");
-      socket.emit(
-        "join",
-        { name: profile.name, title: profile.title, color: profile.color, speakerCode: profile.speakerCode || undefined },
-        (res) => {
-          setJoining(false);
-          if (!res.ok) return setJoinError(res.error);
-          profileRef.current = profile;
-          saveProfile(profile);
-          usersRef.current = new Map(res.data.users.map((u) => [u.id, u]));
-          bump();
-          setPublicEvent(res.data.event);
-          setSession({ me: res.data.user, event: res.data.event, speakerCode: profile.speakerCode });
-          if (rejoinRoom) enterRoom(rejoinRoom);
-        },
-      );
+  const enterRoom = useCallback(
+    (roomId: string, venue: Venue, instant = false) => {
+      socket.emit("enterRoom", roomId, (res) => {
+        if (!res.ok) return;
+        const go = () => {
+          setMe(res.data.user);
+          setPlace({ kind: "room", venue, roomId, snapshot: res.data, visit: Date.now() });
+        };
+        const code = speakerCode.current;
+        if (code?.room === `${venue.id}/${roomId}` && !res.data.user.speakerFor) {
+          // Tras una reconexión se vuelve a reclamar el atril.
+          socket.emit("claimSpeaker", code.code, (claim) => {
+            if (claim.ok) {
+              // El aviso del cambio de ponente pudo llegar antes de montar la sala: se aplica aquí.
+              res.data.user = claim.data.user;
+              res.data.stage = { ...res.data.stage, presenterId: claim.data.user.id, live: null };
+              res.data.seat = null;
+            }
+            if (instant) go();
+            else transition(go);
+          });
+          return;
+        }
+        if (instant) go();
+        else transition(go);
+      });
     },
-    [enterRoom],
+    [transition],
   );
 
+  // ----- Conexión -----
+
   useEffect(() => {
+    const hello = () => {
+      const token = loadToken();
+      socket.emit("hello", { token }, (res) => {
+        if (!res.ok) return;
+        if (token && !res.data.account) saveToken(null);
+        setMe(res.data.user);
+        setAccount(res.data.account);
+        setVenues(res.data.venues);
+        replaceUsers(res.data.users);
+        // Tras una reconexión el servidor no recuerda dónde estábamos: volvemos solos.
+        const prev = placeRef.current;
+        if (prev.kind === "reception") return;
+        socket.emit("requestVenue", prev.venue.id, (venueRes) => {
+          if (!venueRes.ok) return setPlace({ kind: "reception" });
+          goToHall(venueRes.data.venue, venueRes.data.user, venueRes.data.users);
+          if (prev.kind === "room") enterRoom(prev.roomId, venueRes.data.venue, true);
+        });
+      });
+    };
     const onConnect = () => {
       setConnected(true);
-      // Tras una reconexión el servidor no nos conoce: volvemos a entrar a donde estábamos.
-      if (profileRef.current) join(profileRef.current, roomRef.current);
+      hello();
     };
     const onDisconnect = () => setConnected(false);
-    const onJoined = (u: User) => {
+    const onUpsert = (u: User) => {
       usersRef.current.set(u.id, u);
+      if (u.id === meRef.current?.id) setMe(u);
       bump();
     };
     const onLeft = (id: string) => {
       usersRef.current.delete(id);
       bump();
+    };
+    // Alguien creó una sala: se actualiza el edificio sin mover a nadie.
+    const onVenue = (venue: Venue) => {
+      setPlace((p) => (p.kind !== "reception" && p.venue.id === venue.id ? { ...p, venue } : p));
     };
     const onMoved = ({ id, x, y }: { id: string; x: number; y: number }) => {
       const u = usersRef.current.get(id);
@@ -105,105 +145,252 @@ export default function App() {
     };
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-    socket.on("userJoined", onJoined);
-    socket.on("userUpdated", onJoined);
+    socket.on("userJoined", onUpsert);
+    socket.on("userUpdated", onUpsert);
     socket.on("userLeft", onLeft);
     socket.on("moved", onMoved);
+    socket.on("venueUpdated", onVenue);
     // El socket pudo conectarse antes de registrar los listeners.
-    setConnected(socket.connected);
+    if (socket.connected) onConnect();
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("userJoined", onJoined);
-      socket.off("userUpdated", onJoined);
+      socket.off("userJoined", onUpsert);
+      socket.off("userUpdated", onUpsert);
       socket.off("userLeft", onLeft);
       socket.off("moved", onMoved);
+      socket.off("venueUpdated", onVenue);
     };
-  }, [join]);
+  }, [enterRoom]);
 
-  const leaveEvent = () => {
-    saveProfile(null);
-    location.reload();
+  // ----- Navegación -----
+
+  const requestVenue = (number: string) =>
+    new Promise<string>((resolve, reject) => {
+      socket.emit("requestVenue", number, (res) => {
+        if (!res.ok) return reject(new Error(res.error));
+        resolve(res.data.venue.name);
+        // Se deja leer la respuesta de la recepcionista antes de cambiar de lugar.
+        setTimeout(() => transition(() => goToHall(res.data.venue, res.data.user, res.data.users)), 1100);
+      });
+    });
+
+  const leaveRoom = () => {
+    socket.emit("leaveRoom", (res) => {
+      const p = placeRef.current;
+      if (!res.ok || p.kind !== "room") return;
+      transition(() => {
+        setMe(res.data.user);
+        setPlace({ kind: "hall", venue: p.venue });
+      });
+    });
   };
 
-  if (!session) {
+  const leaveVenue = () => {
+    socket.emit("leaveVenue", (res) => {
+      if (!res.ok) return;
+      speakerCode.current = null;
+      transition(() => {
+        setMe(res.data.user);
+        replaceUsers(res.data.users);
+        setPlace({ kind: "reception" });
+      });
+    });
+  };
+
+  const changeFloor = (floor: number) => {
+    socket.emit("changeFloor", floor, (res) => {
+      if (res.ok) transition(() => setMe(res.data.user));
+    });
+  };
+
+  const claimSpeaker = (code: string) =>
+    new Promise<void>((resolve, reject) => {
+      socket.emit("claimSpeaker", code, (res) => {
+        const p = placeRef.current;
+        if (!res.ok) return reject(new Error(res.error));
+        if (p.kind === "room") speakerCode.current = { room: `${p.venue.id}/${p.roomId}`, code: code.toUpperCase() };
+        setMe(res.data.user);
+        resolve();
+      });
+    });
+
+  // ----- Cuenta -----
+
+  const onAuthDone = ({ token }: { token: string }, created: boolean) => {
+    saveToken(token);
+    socket.emit("setAccount", token, (res) => {
+      if (!res.ok) return;
+      setMe(res.data.user);
+      setAccount(res.data.account);
+      setAuth(null);
+      if (created) setEditor({ welcome: true });
+    });
+  };
+
+  const logout = () => {
+    socket.emit("setAccount", null, (res) => {
+      if (!res.ok) return;
+      saveToken(null);
+      setMe(res.data.user);
+      setAccount(null);
+    });
+  };
+
+  if (!me) {
     return (
-      <Reception
-        event={publicEvent}
-        now={now}
-        initialProfile={loadProfile()}
-        busy={joining || !connected}
-        error={joinError}
-        onJoin={(p) => join(p)}
-      />
+      <div className="splash">
+        <span className="brand-mark" aria-hidden />
+        <p>{connected ? "Entrando a la recepción…" : "Conectando con el servidor…"}</p>
+      </div>
     );
   }
 
-  const { me, event } = session;
-  const room = event.rooms.find((r) => r.id === me.roomId) ?? null;
+  const venue = place.kind === "reception" ? null : place.venue;
+  const room = place.kind === "room" ? place.venue.rooms.find((r) => r.id === place.roomId) ?? null : null;
 
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand" onClick={() => room && leaveRoom()} title="Volver al salón">
+        <div className="brand">
           <span className="brand-mark" aria-hidden />
-          <span>{event.name}</span>
-        </button>
-        <nav className="topbar-nav">
-          <span className="crumb">{room ? room.name : "Salón principal"}</span>
-          <button className="btn ghost" onClick={() => setAgendaOpen(true)}>
-            Agenda
-          </button>
+          <span>MyConferences</span>
+        </div>
+        <nav className="crumbs" aria-label="Dónde estás">
+          <span>Recepción</span>
+          {venue && (
+            <span>
+              Sala {venue.id} · {venue.name}
+            </span>
+          )}
+          {room && <span>{room.name}</span>}
         </nav>
+        <div className="topbar-actions">
+          {venue && (
+            <>
+              <button className="btn ghost sm" onClick={() => setAgendaOpen(true)}>
+                Agenda
+              </button>
+              <button className="btn ghost sm" onClick={leaveVenue}>
+                Volver a recepción
+              </button>
+            </>
+          )}
+        </div>
         <div className="me">
-          <span className="avatar sm" style={{ background: me.color }}>
-            {initials(me.name)}
-          </span>
+          <AvatarCanvas look={me.look} size={34} head />
           <span className="me-name">
             {me.name}
-            {me.speakerFor && <small className="badge">Expositor</small>}
+            {!account && <small className="badge">Invitado</small>}
+            {me.speakerFor && me.speakerFor === room?.id && <small className="badge">Ponente</small>}
           </span>
-          <button className="btn ghost sm" onClick={leaveEvent}>
-            Salir
-          </button>
+          {account && (
+            <button className="btn sm" onClick={() => setEditor({ welcome: false })}>
+              Mi personaje
+            </button>
+          )}
+          {place.kind === "reception" &&
+            (account ? (
+              <button className="btn ghost sm" onClick={logout}>
+                Cerrar sesión
+              </button>
+            ) : (
+              <>
+                <button className="btn ghost sm" onClick={() => setAuth("login")}>
+                  Iniciar sesión
+                </button>
+                <button className="btn primary sm" onClick={() => setAuth("register")}>
+                  Crear cuenta
+                </button>
+              </>
+            ))}
         </div>
       </header>
 
       {!connected && <div className="banner">Conexión perdida. Reconectando…</div>}
 
-      {room && snapshot?.roomId === room.id ? (
-        <RoomView
-          key={room.id}
-          session={session}
-          room={room}
-          snapshot={snapshot.data}
-          users={usersRef.current}
-          usersVersion={usersVersion}
-          now={now}
-          onLeave={leaveRoom}
-          onSwitch={enterRoom}
-        />
-      ) : (
+      {place.kind === "reception" && (
+        <Reception me={me} users={usersRef.current} venues={venues} onRequestVenue={requestVenue} onLogin={() => setAuth("login")} />
+      )}
+      {place.kind === "hall" && (
         <Hall
-          session={session}
+          key={place.venue.id}
+          me={me}
+          venue={place.venue}
           users={usersRef.current}
           usersVersion={usersVersion}
           now={now}
-          onEnterRoom={enterRoom}
+          onEnterRoom={(roomId) => enterRoom(roomId, place.venue)}
+          canCreate={Boolean(account)}
+          onExit={leaveVenue}
+          onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
+          onCreateRoom={() => setCreating(true)}
+        />
+      )}
+      {place.kind === "room" && room && (
+        <RoomView
+          key={place.visit}
+          me={me}
+          venue={place.venue}
+          room={room}
+          snapshot={place.snapshot}
+          users={usersRef.current}
+          usersVersion={usersVersion}
+          now={now}
+          speakerCode={speakerCode.current?.code ?? null}
+          onLeave={leaveRoom}
+          onClaim={claimSpeaker}
         />
       )}
 
-      {agendaOpen && (
+      <div className={`fade ${fading ? "on" : ""}`} aria-hidden />
+
+      {agendaOpen && venue && (
         <Agenda
-          event={event}
+          venue={venue}
           now={now}
           currentRoomId={me.roomId}
           onClose={() => setAgendaOpen(false)}
           onGo={(roomId) => {
             setAgendaOpen(false);
-            enterRoom(roomId);
+            enterRoom(roomId, venue);
           }}
+        />
+      )}
+      {creating && venue && (
+        <CreateRoom
+          venue={venue}
+          onClose={() => setCreating(false)}
+          onCreated={(result) => {
+            setCreating(false);
+            setCreated(result);
+            // Al entrar a su sala, quien la creó queda como ponente automáticamente.
+            speakerCode.current = { room: `${venue.id}/${result.room.id}`, code: result.speakerCode };
+          }}
+        />
+      )}
+      {created && venue && (
+        <RoomCreated
+          room={created.room}
+          speakerCode={created.speakerCode}
+          onClose={() => setCreated(null)}
+          onGo={() => {
+            setCreated(null);
+            enterRoom(created.room.id, venue);
+          }}
+        />
+      )}
+      {auth && <AuthDialog initialMode={auth} onDone={onAuthDone} onClose={() => setAuth(null)} />}
+      {editor && account && (
+        <AvatarEditor
+          account={account}
+          welcome={editor.welcome}
+          onSaved={(acc) => {
+            setAccount(acc);
+            setEditor(null);
+          }}
+          onClose={() => setEditor(null)}
         />
       )}
     </div>

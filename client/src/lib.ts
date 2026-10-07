@@ -1,44 +1,37 @@
 import { io, type Socket } from "socket.io-client";
-import type { ClientToServerEvents, EventInfo, ServerToClientEvents, Talk } from "../../shared/types.ts";
+import type { Account, ClientToServerEvents, ServerToClientEvents, Talk, Venue } from "../../shared/types.ts";
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({ autoConnect: true });
 
-export const AVATAR_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#0ea5e9", "#ef4444", "#8b5cf6", "#14b8a6"];
+const TOKEN_KEY = "myconferences.token";
 
-export interface Profile {
-  name: string;
-  title: string;
-  color: string;
-  speakerCode: string;
-}
-
-const PROFILE_KEY = "myconferences.profile";
-
-export function loadProfile(): Profile | null {
+export function loadToken(): string | null {
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    return raw ? (JSON.parse(raw) as Profile) : null;
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
-export function saveProfile(profile: Profile | null) {
+export function saveToken(token: string | null) {
   try {
-    if (profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    else localStorage.removeItem(PROFILE_KEY);
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
-    // Sin almacenamiento disponible: el perfil solo vive en esta pestaña.
+    // Sin almacenamiento disponible: la sesión solo dura lo que dure la pestaña.
   }
 }
 
-export const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
+export async function authRequest(kind: "login" | "register", body: Record<string, string>) {
+  const res = await fetch(`/api/${kind}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "No se pudo conectar con el servidor");
+  return data as { account: Account; token: string };
+}
 
 export const formatTime = (ts: number) =>
   new Date(ts).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
@@ -48,8 +41,8 @@ export type TalkStatus = "live" | "upcoming" | "past";
 export const talkStatus = (talk: Talk, now: number): TalkStatus =>
   now < talk.start ? "upcoming" : now >= talk.end ? "past" : "live";
 
-export function roomSchedule(event: EventInfo, roomId: string, now: number) {
-  const talks = event.talks.filter((t) => t.roomId === roomId).sort((a, b) => a.start - b.start);
+export function roomSchedule(venue: Venue, roomId: string, now: number) {
+  const talks = venue.talks.filter((t) => t.roomId === roomId).sort((a, b) => a.start - b.start);
   return {
     current: talks.find((t) => talkStatus(t, now) === "live") ?? null,
     next: talks.find((t) => t.start > now) ?? null,
