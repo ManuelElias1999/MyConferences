@@ -1,6 +1,6 @@
 # MyConferences
 
-Plataforma de eventos online que se recorren como un evento real, pensada sobre todo para charlas de tecnología. Las empresas crean sus eventos con la temática que quieran, su agenda y los logos de sus patrocinadores. Los asistentes llegan a una recepción, le dicen a la recepcionista el número del evento y entran a un recinto grande: una plaza abierta con anuncios y gente conversando, el auditorio principal al fondo y ocho edificios de sala a los lados. Para escuchar una charla hay que caminar hasta su sala; al entrar, el personaje se sienta y se ve lo que comparte el ponente.
+Plataforma de eventos online que se recorren como un evento real, pensada sobre todo para charlas de tecnología. Las empresas crean sus eventos con la temática que quieran, su agenda y los logos de sus patrocinadores. Los asistentes llegan a una recepción, le dicen a la recepcionista el número del evento y entran a un recinto grande con pasillos, salas, anuncios y gente conversando, y el auditorio principal con su propia entrada. Cada temática tiene un plano distinto. Para escuchar una charla hay que caminar hasta su sala; al entrar, el personaje se sienta y se ve lo que comparte el ponente.
 
 La estética es de bloques: personajes cuadrados, muebles cuadrados y una interfaz de esquinas rectas.
 
@@ -20,11 +20,13 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 ### Para los asistentes
 
 - **Recepción**: un cowork pequeño; la recepcionista está a pocos pasos. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
-- **Recinto del evento**, decorado con la temática elegida:
-  - una **plaza** grande y despejada, con caminos marcados en el piso, anuncios, directorios y gente conversando (se la puede atravesar);
-  - el **auditorio principal** al fondo, con una entrada distinta a todas: columnas, puertas dobles y una marquesina con luces que dice qué charla está en vivo;
-  - **ocho edificios de sala**, cuatro a cada lado, con el nombre de la sala pintado en el techo;
-  - en la temática **tecnológica**: hologramas que giran, pilares de luz, robots y caminos de neón.
+- **Recinto del evento**: cada temática tiene su propio plano, no el mismo recoloreado:
+  - **Tecnológica — campus futurista**: atrio con hologramas, pasillo central de neón hasta el auditorio, dos laboratorios con robots y pilares de luz, y alas oeste y este con cuatro salas cada una.
+  - **Medieval — castillo**: patio de armas con fuentes, paso al gran salón (el auditorio), galerías y torres a ambos lados.
+  - **Jardín — parque**: plaza de entrada, gran jardín central con el auditorio y dos jardines laterales con fuentes y árboles.
+  - **Minimalista — galería**: hall de entrada, una galería larga con esculturas y las ocho salas, y el auditorio al fondo de un pasillo.
+  - **Rústica — pueblo**: patio de llegada, una calle principal con salas, callejones y una calle alta con el auditorio.
+  - En todas, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces), y hay anuncios, directorios y gente conversando a la que se puede atravesar.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.
 - **Puertas**: cada una muestra el nombre de la sala, la charla en curso o la próxima, y su horario (por ejemplo «10:00–10:45»).
 - **Directorio**: los tótems con **?** (y el botón «Cómo llegar a cada sala») muestran dónde está cada sala y qué charla hay ahora y después. Se puede **marcar el camino en el suelo** o pedir **«Llevarme»** para ir caminando solo.
@@ -121,5 +123,5 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
 - El cobro a las empresas todavía no está integrado: cualquiera puede crear una cuenta de empresa. El siguiente paso es conectar un medio de pago (por ejemplo Stripe) y activar la cuenta al pagar.
-- Cada evento tiene el auditorio y hasta ocho salas. Los edificios sin sala asignada aparecen como «Próximamente».
+- Cada evento tiene el auditorio y hasta ocho salas. Los puestos sin sala asignada muestran un cuadro en el muro.
 - La agenda se genera alrededor de la hora en que arranca el servidor, para que siempre haya algo en vivo durante la demo.

@@ -250,18 +250,22 @@ const STYLES: Record<StyleId, Style> = {
 
 const tileAt = (map: SceneMap, x: number, y: number) => map.tiles[y]?.[x] ?? "#";
 
+/** Muro visto desde arriba: se pinta como el techo claro de la temática, con un borde que marca la pared. */
 function wallCap(ctx: CanvasRenderingContext2D, map: SceneMap, style: Style, x: number, y: number) {
   const px = x * T;
   const py = y * T;
-  ctx.fillStyle = style.cap;
+  // Tono intermedio del techo de la temática: se distingue del piso sin ser una mancha negra.
+  const roof = ROOF[map.style];
+  ctx.fillStyle = shade(roof.base, -0.38);
   ctx.fillRect(px, py, T, T);
-  ctx.fillStyle = shade(style.cap, 0.08);
-  ctx.fillRect(px + 3, py + 3, T - 6, T - 6);
+  ctx.fillStyle = shade(roof.line, -0.45);
+  for (let ly = 7; ly < T; ly += 8) ctx.fillRect(px, py + ly, T, 1);
   const open = (c: string) => c !== "#";
-  ctx.fillStyle = shade(style.cap, -0.25);
-  if (open(tileAt(map, x, y + 1))) ctx.fillRect(px, py + T - 3, T, 3);
-  if (open(tileAt(map, x + 1, y))) ctx.fillRect(px + T - 3, py, 3, T);
-  if (open(tileAt(map, x - 1, y))) ctx.fillRect(px, py, 3, T);
+  ctx.fillStyle = shade(style.cap, -0.1);
+  if (open(tileAt(map, x, y + 1))) ctx.fillRect(px, py + T - 4, T, 4);
+  if (open(tileAt(map, x + 1, y))) ctx.fillRect(px + T - 4, py, 4, T);
+  if (open(tileAt(map, x - 1, y))) ctx.fillRect(px, py, 4, T);
+  if (open(tileAt(map, x, y - 1))) ctx.fillRect(px, py, T, 3);
 }
 
 // ---------- Adornos del muro ----------

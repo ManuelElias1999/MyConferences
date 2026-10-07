@@ -309,9 +309,9 @@ export function receptionMap(): SceneMap {
 
 // ---------- Recinto del evento ----------
 
-const CARPET: Record<ThemeId, string> = { tech: "#1e3a5f", minimal: "#d6d3cd", rustic: "#8e3b2f", medieval: "#9b2335", garden: "#c9b48a" };
+const CARPET: Record<ThemeId, string> = { tech: "#1e3a5f", minimal: "#d6d3cd", rustic: "#8e6a45", medieval: "#9b2335", garden: "#d9c49a" };
 
-/** Objetos de ambiente de cada estilo, que se reparten por rincones libres. */
+/** Objetos de ambiente de cada estilo (también se usan en las salas). */
 const ACCENTS: Record<ThemeId, FurniKind[]> = {
   tech: ["ledpillar", "robot", "rack", "ledpillar"],
   minimal: ["bigplant", "lamp", "sculpture", "bigplant"],
@@ -320,141 +320,511 @@ const ACCENTS: Record<ThemeId, FurniKind[]> = {
   garden: ["tree", "lantern", "tree", "flowerbed"],
 };
 
-/** Pieza central de la plaza según el estilo. */
-const CENTERPIECE: Record<ThemeId, FurniKind> = {
-  tech: "hologram",
-  minimal: "sculpture",
-  rustic: "fountain",
-  medieval: "fountain",
-  garden: "fountain",
-};
-
 export const ROOMS_PER_EVENT = 8;
 /** El auditorio principal más ocho salas. */
 export const MAX_ROOMS = ROOMS_PER_EVENT + 1;
 
-const VENUE_W = 50;
-const VENUE_H = 36;
-const EXIT_X = 24;
-const BLOCK_W = 10;
-const BLOCK_H = 6;
+/** Plano de un recinto: zonas de piso, entrada, auditorio, puertas de sala y decoración. */
+interface Layout {
+  w: number;
+  h: number;
+  floors: Rect[];
+  /** Salida a recepción, en el muro sur (dos baldosas). */
+  exit: Tile;
+  spawn: Tile;
+  /** Puerta del auditorio principal (cuatro baldosas) en la cara de muro de abajo. */
+  main: Tile;
+  /** Puestos de las ocho salas, en el orden en que se llenan. */
+  slots: (Tile & { zone: string })[];
+  decor: Decor[];
+  furni: Furni[];
+  crowd: [x: number, y: number, dir: Dir][];
+  directories: Tile[];
+}
 
-/** Edificios de sala: cuatro a la izquierda y cuatro a la derecha, alternando para repartirlas. */
-const BLOCKS = [3, 11, 19, 27].flatMap((y, row) => [
-  { x: 1, y, zone: `Lado izquierdo · ${row + 1}.ª fila` },
-  { x: VENUE_W - 1 - BLOCK_W, y, zone: `Lado derecho · ${row + 1}.ª fila` },
-]);
+const path = (theme: ThemeId, x: number, y: number, w: number, d: number, neon = "#22d3ee"): Furni =>
+  theme === "tech" ? { kind: "neonpath", x, y, w, d, color: neon } : { kind: "carpet", x, y, w, d, color: CARPET[theme] };
 
-/**
- * El recinto: una gran plaza abierta con el auditorio principal al fondo y ocho
- * edificios de sala a los lados. Cada edificio muestra su nombre en el techo.
- */
+/** Campus futurista: atrio, pasillo central al auditorio, dos laboratorios y dos alas de salas. */
+function techCampus(): Layout {
+  return {
+    w: 60,
+    h: 40,
+    floors: [
+      { x: 22, y: 28, w: 16, h: 10 }, // atrio
+      { x: 26, y: 10, w: 8, h: 18 }, // pasillo central
+      { x: 10, y: 12, w: 16, h: 9 }, // laboratorio oeste
+      { x: 34, y: 12, w: 16, h: 9 }, // laboratorio este
+      { x: 4, y: 31, w: 18, h: 5 }, // ala oeste
+      { x: 38, y: 31, w: 18, h: 5 }, // ala este
+    ],
+    exit: { x: 29, y: 38 },
+    spawn: { x: 29, y: 35 },
+    main: { x: 28, y: 9 },
+    slots: [
+      { x: 18, y: 30, zone: "Ala oeste" },
+      { x: 40, y: 30, zone: "Ala este" },
+      { x: 14, y: 30, zone: "Ala oeste" },
+      { x: 44, y: 30, zone: "Ala este" },
+      { x: 10, y: 30, zone: "Ala oeste" },
+      { x: 48, y: 30, zone: "Ala este" },
+      { x: 6, y: 30, zone: "Ala oeste" },
+      { x: 52, y: 30, zone: "Ala este" },
+    ],
+    decor: [
+      { kind: "sponsors", x: 22, y: 27, w: 4 },
+      { kind: "sponsors", x: 34, y: 27, w: 4 },
+      { kind: "sponsors", x: 11, y: 11, w: 5 },
+      { kind: "sponsors", x: 19, y: 11, w: 5 },
+      { kind: "sponsors", x: 36, y: 11, w: 5 },
+      { kind: "sponsors", x: 44, y: 11, w: 5 },
+      { kind: "neon", x: 26, y: 9, w: 2, text: "AI", color: "#22d3ee" },
+      { kind: "neon", x: 32, y: 9, w: 2, text: "</>", color: "#f472b6" },
+    ],
+    furni: [
+      { kind: "neonpath", x: 29, y: 10, w: 2, d: 28, color: "#22d3ee" },
+      { kind: "neonpath", x: 4, y: 33, w: 18, d: 1, color: "#a78bfa" },
+      { kind: "neonpath", x: 38, y: 33, w: 18, d: 1, color: "#a78bfa" },
+      { kind: "neonpath", x: 10, y: 16, w: 16, d: 1, color: "#a78bfa" },
+      { kind: "neonpath", x: 34, y: 16, w: 16, d: 1, color: "#a78bfa" },
+      { kind: "hologram", x: 23, y: 31, w: 2, d: 2 },
+      { kind: "hologram", x: 35, y: 31, w: 2, d: 2 },
+      { kind: "ledpillar", x: 22, y: 28 },
+      { kind: "ledpillar", x: 37, y: 28 },
+      { kind: "robot", x: 33, y: 34 },
+      { kind: "totem", x: 26, y: 14 },
+      { kind: "totem", x: 33, y: 14 },
+      { kind: "ledpillar", x: 26, y: 22 },
+      { kind: "ledpillar", x: 33, y: 22 },
+      { kind: "hologram", x: 13, y: 13, w: 2, d: 2 },
+      { kind: "hologram", x: 20, y: 18, w: 2, d: 2 },
+      { kind: "hologram", x: 45, y: 13, w: 2, d: 2 },
+      { kind: "hologram", x: 38, y: 18, w: 2, d: 2 },
+      { kind: "robot", x: 11, y: 19 },
+      { kind: "robot", x: 48, y: 19 },
+      { kind: "arcade", x: 25, y: 12 },
+      { kind: "arcade", x: 34, y: 12 },
+      { kind: "rack", x: 10, y: 12 },
+      { kind: "rack", x: 49, y: 12 },
+      { kind: "ledpillar", x: 4, y: 35 },
+      { kind: "ledpillar", x: 55, y: 35 },
+    ],
+    crowd: [
+      [25, 36, "right"],
+      [26, 36, "left"],
+      [33, 29, "right"],
+      [34, 29, "left"],
+      [16, 14, "right"],
+      [17, 14, "left"],
+      [41, 19, "right"],
+      [42, 19, "left"],
+      [12, 34, "right"],
+      [13, 34, "left"],
+      [47, 34, "right"],
+      [48, 34, "left"],
+      [27, 25, "right"],
+      [28, 25, "left"],
+    ],
+    directories: [
+      { x: 24, y: 36 },
+      { x: 35, y: 36 },
+      { x: 17, y: 20 },
+      { x: 42, y: 13 },
+    ],
+  };
+}
+
+/** Castillo: patio de armas con fuentes, el gran salón al norte y galerías y torres a los lados. */
+function castle(): Layout {
+  return {
+    w: 56,
+    h: 42,
+    floors: [
+      { x: 14, y: 18, w: 28, h: 18 }, // patio de armas
+      { x: 24, y: 10, w: 8, h: 8 }, // paso al gran salón
+      { x: 4, y: 12, w: 12, h: 4 }, // torre oeste
+      { x: 14, y: 16, w: 2, h: 2 },
+      { x: 2, y: 24, w: 12, h: 6 }, // galería oeste
+      { x: 40, y: 12, w: 12, h: 4 }, // torre este
+      { x: 40, y: 16, w: 2, h: 2 },
+      { x: 42, y: 24, w: 12, h: 6 }, // galería este
+    ],
+    exit: { x: 27, y: 36 },
+    spawn: { x: 27, y: 33 },
+    main: { x: 26, y: 9 },
+    slots: [
+      { x: 8, y: 23, zone: "Galería oeste" },
+      { x: 45, y: 23, zone: "Galería este" },
+      { x: 11, y: 11, zone: "Torre oeste" },
+      { x: 43, y: 11, zone: "Torre este" },
+      { x: 3, y: 23, zone: "Galería oeste" },
+      { x: 50, y: 23, zone: "Galería este" },
+      { x: 6, y: 11, zone: "Torre oeste" },
+      { x: 48, y: 11, zone: "Torre este" },
+    ],
+    decor: [
+      { kind: "sponsors", x: 16, y: 17, w: 5 },
+      { kind: "sponsors", x: 35, y: 17, w: 5 },
+      { kind: "banner", x: 21, y: 17, color: "#9b2335" },
+      { kind: "torch", x: 22, y: 17 },
+      { kind: "torch", x: 33, y: 17 },
+      { kind: "banner", x: 34, y: 17, color: "#9b2335" },
+      { kind: "torch", x: 24, y: 9 },
+      { kind: "banner", x: 25, y: 9, color: "#d4a73c" },
+      { kind: "banner", x: 30, y: 9, color: "#d4a73c" },
+      { kind: "torch", x: 31, y: 9 },
+      { kind: "torch", x: 6, y: 23 },
+      { kind: "torch", x: 11, y: 23 },
+      { kind: "torch", x: 48, y: 23 },
+      { kind: "torch", x: 53, y: 23 },
+      { kind: "window", x: 4, y: 11, w: 2 },
+      { kind: "window", x: 50, y: 11, w: 2 },
+    ],
+    furni: [
+      { kind: "carpet", x: 27, y: 10, w: 2, d: 26, color: "#9b2335" },
+      { kind: "carpet", x: 2, y: 27, w: 52, d: 1, color: "#9b2335" },
+      { kind: "fountain", x: 19, y: 22, w: 2, d: 2 },
+      { kind: "fountain", x: 35, y: 22, w: 2, d: 2 },
+      { kind: "armor", x: 24, y: 11 },
+      { kind: "armor", x: 31, y: 11 },
+      { kind: "candelabra", x: 24, y: 15 },
+      { kind: "candelabra", x: 31, y: 15 },
+      { kind: "pillar", x: 17, y: 31 },
+      { kind: "pillar", x: 38, y: 31 },
+      { kind: "pillar", x: 17, y: 20 },
+      { kind: "pillar", x: 38, y: 20 },
+      { kind: "totem", x: 22, y: 30 },
+      { kind: "totem", x: 33, y: 30 },
+      { kind: "armor", x: 2, y: 24 },
+      { kind: "armor", x: 53, y: 24 },
+      { kind: "candelabra", x: 2, y: 29 },
+      { kind: "candelabra", x: 53, y: 29 },
+      { kind: "barrel", x: 4, y: 15 },
+      { kind: "barrel", x: 51, y: 15 },
+    ],
+    crowd: [
+      [23, 26, "right"],
+      [24, 26, "left"],
+      [31, 26, "right"],
+      [32, 26, "left"],
+      [20, 33, "right"],
+      [21, 33, "left"],
+      [35, 33, "right"],
+      [36, 33, "left"],
+      [6, 26, "right"],
+      [7, 26, "left"],
+      [47, 28, "right"],
+      [48, 28, "left"],
+      [9, 13, "right"],
+      [10, 13, "left"],
+    ],
+    directories: [
+      { x: 24, y: 33 },
+      { x: 31, y: 33 },
+    ],
+  };
+}
+
+/** Parque: plaza de entrada, un gran jardín central y dos jardines laterales. */
+function park(): Layout {
+  return {
+    w: 58,
+    h: 40,
+    floors: [
+      { x: 24, y: 30, w: 10, h: 7 }, // plaza de entrada
+      { x: 26, y: 28, w: 6, h: 2 },
+      { x: 14, y: 16, w: 30, h: 12 }, // jardín central
+      { x: 2, y: 20, w: 12, h: 14 }, // jardín oeste
+      { x: 44, y: 20, w: 12, h: 14 }, // jardín este
+    ],
+    exit: { x: 28, y: 37 },
+    spawn: { x: 28, y: 34 },
+    main: { x: 27, y: 15 },
+    slots: [
+      { x: 21, y: 15, zone: "Jardín central" },
+      { x: 35, y: 15, zone: "Jardín central" },
+      { x: 9, y: 19, zone: "Jardín oeste" },
+      { x: 46, y: 19, zone: "Jardín este" },
+      { x: 16, y: 15, zone: "Jardín central" },
+      { x: 40, y: 15, zone: "Jardín central" },
+      { x: 4, y: 19, zone: "Jardín oeste" },
+      { x: 51, y: 19, zone: "Jardín este" },
+    ],
+    decor: [
+      { kind: "sponsors", x: 24, y: 29, w: 2 },
+      { kind: "sponsors", x: 32, y: 29, w: 2 },
+      { kind: "ivy", x: 2, y: 19, w: 2 },
+      { kind: "ivy", x: 12, y: 19, w: 2 },
+      { kind: "ivy", x: 44, y: 19, w: 2 },
+      { kind: "ivy", x: 54, y: 19, w: 2 },
+      { kind: "ivy", x: 25, y: 15, w: 2 },
+      { kind: "ivy", x: 31, y: 15, w: 2 },
+    ],
+    furni: [
+      { kind: "carpet", x: 28, y: 16, w: 2, d: 21, color: "#d9c49a" },
+      { kind: "carpet", x: 2, y: 25, w: 54, d: 1, color: "#d9c49a" },
+      { kind: "fountain", x: 23, y: 19, w: 2, d: 2 },
+      { kind: "fountain", x: 33, y: 19, w: 2, d: 2 },
+      { kind: "fountain", x: 6, y: 29, w: 2, d: 2 },
+      { kind: "fountain", x: 49, y: 29, w: 2, d: 2 },
+      { kind: "tree", x: 14, y: 18 },
+      { kind: "tree", x: 43, y: 18 },
+      { kind: "tree", x: 14, y: 27 },
+      { kind: "tree", x: 43, y: 27 },
+      { kind: "flowerbed", x: 18, y: 22, w: 3 },
+      { kind: "flowerbed", x: 37, y: 22, w: 3 },
+      { kind: "totem", x: 20, y: 26 },
+      { kind: "totem", x: 37, y: 26 },
+      { kind: "lantern", x: 26, y: 23 },
+      { kind: "lantern", x: 31, y: 23 },
+      { kind: "tree", x: 2, y: 33 },
+      { kind: "tree", x: 13, y: 33 },
+      { kind: "tree", x: 44, y: 33 },
+      { kind: "tree", x: 55, y: 33 },
+      { kind: "flowerbed", x: 2, y: 21, d: 2 },
+      { kind: "flowerbed", x: 55, y: 21, d: 2 },
+      { kind: "lantern", x: 24, y: 30 },
+      { kind: "lantern", x: 33, y: 30 },
+    ],
+    crowd: [
+      [21, 25, "right"],
+      [22, 25, "left"],
+      [35, 24, "right"],
+      [36, 24, "left"],
+      [17, 17, "right"],
+      [18, 17, "left"],
+      [9, 23, "right"],
+      [10, 23, "left"],
+      [47, 23, "right"],
+      [48, 23, "left"],
+      [30, 33, "right"],
+      [31, 33, "left"],
+    ],
+    directories: [
+      { x: 25, y: 33 },
+      { x: 32, y: 33 },
+    ],
+  };
+}
+
+/** Galería tipo museo: hall de entrada, una galería larga con salas y el auditorio al fondo de un pasillo. */
+function gallery(): Layout {
+  return {
+    w: 56,
+    h: 40,
+    floors: [
+      { x: 22, y: 30, w: 12, h: 7 }, // hall de entrada
+      { x: 25, y: 28, w: 6, h: 2 },
+      { x: 4, y: 22, w: 48, h: 6 }, // galería
+      { x: 24, y: 10, w: 8, h: 12 }, // pasillo al auditorio
+    ],
+    exit: { x: 27, y: 37 },
+    spawn: { x: 27, y: 34 },
+    main: { x: 26, y: 9 },
+    slots: [
+      { x: 20, y: 21, zone: "Galería oeste" },
+      { x: 34, y: 21, zone: "Galería este" },
+      { x: 15, y: 21, zone: "Galería oeste" },
+      { x: 39, y: 21, zone: "Galería este" },
+      { x: 10, y: 21, zone: "Galería oeste" },
+      { x: 44, y: 21, zone: "Galería este" },
+      { x: 5, y: 21, zone: "Galería oeste" },
+      { x: 49, y: 21, zone: "Galería este" },
+    ],
+    decor: [
+      { kind: "sponsors", x: 22, y: 29, w: 3 },
+      { kind: "sponsors", x: 31, y: 29, w: 3 },
+      { kind: "sponsors", x: 24, y: 9, w: 2 },
+      { kind: "sponsors", x: 30, y: 9, w: 2 },
+    ],
+    furni: [
+      { kind: "carpet", x: 27, y: 10, w: 2, d: 27, color: "#d6d3cd" },
+      { kind: "carpet", x: 4, y: 25, w: 48, d: 1, color: "#d6d3cd" },
+      { kind: "sculpture", x: 9, y: 27 },
+      { kind: "sculpture", x: 18, y: 27 },
+      { kind: "sculpture", x: 37, y: 27 },
+      { kind: "sculpture", x: 46, y: 27 },
+      { kind: "bigplant", x: 4, y: 27 },
+      { kind: "bigplant", x: 51, y: 27 },
+      { kind: "totem", x: 22, y: 26 },
+      { kind: "totem", x: 33, y: 26 },
+      { kind: "lamp", x: 24, y: 12 },
+      { kind: "lamp", x: 31, y: 12 },
+      { kind: "sculpture", x: 24, y: 17 },
+      { kind: "sculpture", x: 31, y: 17 },
+      { kind: "bigplant", x: 22, y: 36 },
+      { kind: "bigplant", x: 33, y: 36 },
+    ],
+    crowd: [
+      [12, 23, "right"],
+      [13, 23, "left"],
+      [41, 26, "right"],
+      [42, 26, "left"],
+      [29, 31, "right"],
+      [30, 31, "left"],
+      [26, 15, "right"],
+      [27, 15, "left"],
+      [6, 26, "right"],
+      [7, 26, "left"],
+    ],
+    directories: [
+      { x: 24, y: 33 },
+      { x: 31, y: 33 },
+    ],
+  };
+}
+
+/** Pueblo: patio de llegada, una calle principal con salas y una calle alta con el auditorio. */
+function village(): Layout {
+  return {
+    w: 56,
+    h: 42,
+    floors: [
+      { x: 22, y: 31, w: 12, h: 8 }, // patio de llegada
+      { x: 25, y: 30, w: 6, h: 1 },
+      { x: 2, y: 24, w: 52, h: 6 }, // calle principal
+      { x: 10, y: 18, w: 3, h: 6 }, // callejón oeste
+      { x: 43, y: 18, w: 3, h: 6 }, // callejón este
+      { x: 8, y: 12, w: 40, h: 6 }, // calle alta
+    ],
+    exit: { x: 27, y: 39 },
+    spawn: { x: 27, y: 36 },
+    main: { x: 26, y: 11 },
+    slots: [
+      { x: 20, y: 23, zone: "Calle principal" },
+      { x: 33, y: 23, zone: "Calle principal" },
+      { x: 14, y: 11, zone: "Calle alta" },
+      { x: 38, y: 11, zone: "Calle alta" },
+      { x: 15, y: 23, zone: "Calle principal" },
+      { x: 38, y: 23, zone: "Calle principal" },
+      { x: 4, y: 23, zone: "Calle principal" },
+      { x: 48, y: 23, zone: "Calle principal" },
+    ],
+    decor: [
+      { kind: "sponsors", x: 18, y: 11, w: 5 },
+      { kind: "sponsors", x: 32, y: 11, w: 5 },
+      { kind: "sponsors", x: 24, y: 23, w: 6 },
+      { kind: "window", x: 7, y: 23, w: 2 },
+      { kind: "window", x: 51, y: 23, w: 2 },
+      { kind: "shelf", x: 9, y: 11, w: 2 },
+      { kind: "window", x: 44, y: 11, w: 2 },
+      { kind: "fireplace", x: 41, y: 11, w: 2 },
+    ],
+    furni: [
+      { kind: "carpet", x: 27, y: 30, w: 2, d: 9, color: "#8e6a45" },
+      { kind: "carpet", x: 2, y: 27, w: 52, d: 1, color: "#8e6a45" },
+      { kind: "carpet", x: 8, y: 15, w: 40, d: 1, color: "#8e6a45" },
+      { kind: "carpet", x: 11, y: 16, w: 1, d: 11, color: "#8e6a45" },
+      { kind: "carpet", x: 44, y: 16, w: 1, d: 11, color: "#8e6a45" },
+      { kind: "barrel", x: 2, y: 24 },
+      { kind: "barrel", x: 53, y: 24 },
+      { kind: "lantern", x: 9, y: 29 },
+      { kind: "lantern", x: 46, y: 29 },
+      { kind: "lantern", x: 24, y: 17 },
+      { kind: "lantern", x: 31, y: 17 },
+      { kind: "table", x: 17, y: 29, w: 2 },
+      { kind: "table", x: 37, y: 29, w: 2 },
+      { kind: "totem", x: 22, y: 31 },
+      { kind: "totem", x: 33, y: 31 },
+      { kind: "plant", x: 8, y: 17 },
+      { kind: "plant", x: 47, y: 17 },
+      { kind: "barrel", x: 22, y: 38 },
+      { kind: "barrel", x: 33, y: 38 },
+      { kind: "bookshelf", x: 20, y: 12 },
+      { kind: "bookshelf", x: 35, y: 12 },
+    ],
+    crowd: [
+      [13, 26, "right"],
+      [14, 26, "left"],
+      [40, 26, "right"],
+      [41, 26, "left"],
+      [18, 14, "right"],
+      [19, 14, "left"],
+      [36, 16, "right"],
+      [37, 16, "left"],
+      [25, 34, "right"],
+      [26, 34, "left"],
+      [5, 28, "right"],
+      [6, 28, "left"],
+    ],
+    directories: [
+      { x: 24, y: 35 },
+      { x: 31, y: 35 },
+    ],
+  };
+}
+
+const LAYOUTS_BY_THEME: Record<ThemeId, () => Layout> = {
+  tech: techCampus,
+  medieval: castle,
+  garden: park,
+  minimal: gallery,
+  rustic: village,
+};
+
+/** El recinto del evento: cada temática tiene su propio plano. */
 export function venueMap(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color" | "main">[]): SceneMap {
+  const L = LAYOUTS_BY_THEME[theme]();
   const main = rooms.find((r) => r.main) ?? rooms[0];
   const others = rooms.filter((r) => r !== main).slice(0, ROOMS_PER_EVENT);
-
-  const grid = Array.from({ length: VENUE_H }, (_, y) =>
-    Array.from({ length: VENUE_W }, (_, x) => (x >= 1 && x <= VENUE_W - 2 && y >= 3 && y <= VENUE_H - 2 ? "." : "#")),
-  );
-  const auditorium = { x: 15, y: 3, w: 20, h: 8 };
-  for (const b of [auditorium, ...BLOCKS.map((b) => ({ ...b, w: BLOCK_W, h: BLOCK_H }))]) {
-    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) grid[y]![x] = "#";
-  }
-  const tiles = carve(
-    VENUE_W,
-    VENUE_H,
-    [],
-    grid.map((r) => r.join("")),
-  );
-
   const doors: Door[] = [];
-  const roofs: Roof[] = [];
-  if (main) {
-    roofs.push({ x: auditorium.x, y: auditorium.y, w: auditorium.w, h: auditorium.h - 2, label: main.name, color: main.color, open: true });
-    doors.push({ side: "top", x: 23, y: auditorium.y + auditorium.h - 1, w: 4, id: main.id, label: main.name, color: main.color, theme, zone: "Al fondo de la plaza", main: true });
-  }
-  const decor: Decor[] = [];
-  BLOCKS.forEach((b, i) => {
+  if (main) doors.push({ side: "top", x: L.main.x, y: L.main.y, w: 4, id: main.id, label: main.name, color: main.color, theme, zone: "Auditorio principal", main: true });
+  L.slots.forEach((slot, i) => {
     const room = others[i];
-    const facade = b.y + BLOCK_H - 1;
-    roofs.push({ x: b.x, y: b.y, w: BLOCK_W, h: BLOCK_H - 2, label: room?.name ?? "Próximamente", color: room?.color ?? "#9aa5b1", open: Boolean(room) });
-    if (room) doors.push({ side: "top", x: b.x + 4, y: facade, w: 2, id: room.id, label: room.name, color: room.color, theme, zone: b.zone, main: false });
-    // Ventanas a los lados de la puerta para que la fachada no quede vacía.
-    decor.push({ kind: room ? "window" : "art", x: b.x + 1, y: facade, w: 2, color: "#9aa5b1" }, { kind: room ? "window" : "art", x: b.x + 7, y: facade, w: 2, color: "#9aa5b1" });
+    if (room) doors.push({ side: "top", x: slot.x, y: slot.y, w: 2, id: room.id, label: room.name, color: room.color, theme, zone: slot.zone, main: false });
   });
-  decor.push(
-    { kind: "sponsors", x: 16, y: 10, w: 5 },
-    { kind: "sponsors", x: 29, y: 10, w: 5 },
-    { kind: "entrance", x: EXIT_X, y: VENUE_H - 1, w: 2 },
-  );
-
-  const accents = ACCENTS[theme];
-  const furni: Furni[] = [
-    // Camino de la entrada al auditorio: de luz en el estilo tecnológico, alfombra en los demás.
-    theme === "tech"
-      ? { kind: "neonpath", x: EXIT_X, y: 11, w: 2, d: VENUE_H - 12, color: "#22d3ee" }
-      : { kind: "carpet", x: EXIT_X, y: 11, w: 2, d: VENUE_H - 12, color: CARPET[theme] },
-    // Caminos transversales hacia las salas de cada lado.
-    ...[
-      { x: 11, y: 9, w: 4 },
-      { x: 35, y: 9, w: 4 },
-      { x: 11, y: 17, w: 28 },
-      { x: 11, y: 25, w: 28 },
-      { x: 11, y: 33, w: 28 },
-    ].map((l): Furni =>
-      theme === "tech" ? { kind: "neonpath", ...l, d: 1, color: "#a78bfa" } : { kind: "carpet", ...l, d: 1, color: CARPET[theme] },
-    ),
-    { kind: CENTERPIECE[theme], x: 18, y: 20, w: 2, d: 2 },
-    { kind: CENTERPIECE[theme], x: 30, y: 20, w: 2, d: 2 },
-    { kind: "directory", x: 21, y: 30 },
-    { kind: "directory", x: 28, y: 30 },
-    { kind: "totem", x: 13, y: 13 },
-    { kind: "totem", x: 36, y: 13 },
-    { kind: "totem", x: 13, y: 29 },
-    { kind: "totem", x: 36, y: 29 },
-    { kind: accents[0]!, x: 12, y: 11 },
-    { kind: accents[0]!, x: 37, y: 11 },
-    { kind: accents[1]!, x: 12, y: 21 },
-    { kind: accents[1]!, x: 37, y: 21 },
-    { kind: accents[2]!, x: 16, y: 34 },
-    { kind: accents[2]!, x: 33, y: 34 },
-  ];
-  if (theme === "tech") furni.push({ kind: "robot", x: 22, y: 24 }, { kind: "robot", x: 27, y: 16 });
-
-  // Gente conversando en la plaza (se la puede atravesar).
-  const crowd: Npc[] = [
-    attendee(0, 16, 26, "right"),
-    attendee(1, 17, 26, "left"),
-    attendee(2, 32, 26, "right"),
-    attendee(3, 33, 26, "left"),
-    attendee(4, 20, 14, "down"),
-    attendee(5, 20, 15, "up"),
-    attendee(6, 29, 14, "right"),
-    attendee(7, 30, 14, "left"),
-    attendee(8, 13, 18, "right"),
-    attendee(9, 14, 18, "left"),
-    attendee(10, 35, 18, "right"),
-    attendee(11, 36, 18, "left"),
-  ];
-
+  // Los puestos sin sala muestran un cuadro en el muro.
+  const free = L.slots.slice(others.length).map((s): Decor => ({ kind: "art", x: s.x, y: s.y, w: 2, color: "#9aa5b1" }));
   return finish({
     ...empty,
-    w: VENUE_W,
-    h: VENUE_H,
-    tiles,
+    w: L.w,
+    h: L.h,
+    tiles: carve(L.w, L.h, L.floors),
     style: theme,
-    spawn: { x: EXIT_X, y: VENUE_H - 3 },
-    furni,
-    decor,
+    spawn: L.spawn,
+    furni: [...L.furni, ...L.directories.map((d): Furni => ({ kind: "directory", x: d.x, y: d.y }))],
+    decor: [...L.decor, ...free, { kind: "entrance", x: L.exit.x, y: L.exit.y, w: 2 }],
     doors,
-    crowd,
-    roofs,
-    exit: { side: "bottom", x: EXIT_X, y: VENUE_H - 1, w: 2 },
-    directories: [
-      { x: 21, y: 30 },
-      { x: 28, y: 30 },
-    ],
+    crowd: L.crowd.map(([x, y, dir], i) => attendee(i, x, y, dir)),
+    exit: { side: "bottom", x: L.exit.x, y: L.exit.y, w: 2 },
+    directories: L.directories,
   });
+}
+
+/** Lista de comprobaciones del plano, para las pruebas: puertas alcanzables y libres. */
+export function checkVenue(map: SceneMap) {
+  const problems: string[] = [];
+  const seen = new Set<string>([`${map.spawn.x},${map.spawn.y}`]);
+  const queue: Tile[] = [map.spawn];
+  while (queue.length) {
+    const t = queue.shift()!;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const n = { x: t.x + dx!, y: t.y + dy! };
+      const k = `${n.x},${n.y}`;
+      if (!seen.has(k) && isWalkable(map, n.x, n.y)) {
+        seen.add(k);
+        queue.push(n);
+      }
+    }
+  }
+  for (const d of map.doors) {
+    for (const t of spanTiles(d)) if (!seen.has(`${t.x},${t.y}`)) problems.push(`puerta ${d.label} no alcanzable en ${t.x},${t.y}`);
+    if (map.tiles[d.y]?.[d.x] !== "=" || map.tiles[d.y - 1]?.[d.x] !== "=" || map.tiles[d.y + 1]?.[d.x] !== ".") problems.push(`puerta ${d.label} fuera de una cara de muro`);
+    if (map.tiles[d.y - 2]?.[d.x] !== "#") problems.push(`puerta ${d.label} sin muro arriba para su cartel`);
+  }
+  if (map.exit && !seen.has(`${map.exit.x},${map.exit.y}`)) problems.push("salida no alcanzable");
+  for (const d of map.directories) if (![[0, 1], [1, 0], [-1, 0], [0, -1]].some(([dx, dy]) => seen.has(`${d.x + dx!},${d.y + dy!}`))) problems.push(`directorio ${d.x},${d.y} inaccesible`);
+  for (const d of map.decor) {
+    if (d.kind === "entrance") continue;
+    for (let x = d.x; x < d.x + (d.w ?? 1); x++) if (map.tiles[d.y]?.[x] !== "=" && !map.doors.some((door) => door.y === d.y && x >= door.x && x < door.x + door.w)) problems.push(`adorno ${d.kind} en ${x},${d.y} fuera de una cara de muro`);
+    if (map.doors.some((door) => door.y === d.y && d.x < door.x + door.w && d.x + (d.w ?? 1) > door.x)) problems.push(`adorno ${d.kind} encima de una puerta`);
+  }
+  return problems;
 }
 
 // ---------- Salas de charla ----------
