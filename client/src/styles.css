@@ -2047,3 +2047,25 @@ textarea {
   max-height: 112px;
   overflow-y: auto;
 }
+
+.capacity-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.capacity-options .chip {
+  cursor: pointer;
+}
+
+.capacity-options .chip.selected {
+  border-color: var(--primary);
+  background: #fff1ec;
+}
+
+.capacity-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}

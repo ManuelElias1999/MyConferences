@@ -38,6 +38,7 @@ import type {
   User,
   Venue,
 } from "../../shared/types.ts";
+import { HACKATHON_CAPACITIES } from "../../shared/types.ts";
 import { AccountError, createAccountStore } from "./accounts.ts";
 import { createEventStore, type StoredEvent } from "./events.ts";
 import { createVenues } from "./seed.ts";
@@ -95,7 +96,7 @@ function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<s
   const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
   for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
   for (const id of rooms.keys()) if (!venue.rooms.some((r) => r.id === id)) rooms.delete(id);
-  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms), rooms, ownerId });
+  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms, [], venue.capacity), rooms, ownerId });
   for (const r of venue.rooms) {
     const key = `${venue.id}/${r.id}`;
     const code = codes[r.id] ?? speakerCodes.get(key) ?? randomBytes(3).toString("hex").toUpperCase();
@@ -302,6 +303,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     tagline: clean(body.tagline, 120),
     theme: body.theme,
     private: body.private !== false,
+    capacity: body.theme === "hackathon" ? (HACKATHON_CAPACITIES.includes(Number(body.capacity)) ? Number(body.capacity) : 100) : undefined,
     whitelist,
     rooms,
     talks,
@@ -367,6 +369,7 @@ app.post("/api/company/events", json, async (req, res) => {
     tagline: input.tagline,
     private: input.private,
     theme: input.theme,
+    capacity: input.capacity,
     organizer: account.company!.name,
     logoUrl: null,
     rooms: input.rooms,
@@ -395,6 +398,7 @@ app.put("/api/company/events/:id", json, async (req, res) => {
     tagline: input.tagline,
     private: input.private,
     theme: input.theme,
+    capacity: input.capacity,
     rooms: input.rooms,
     talks: input.talks,
   };

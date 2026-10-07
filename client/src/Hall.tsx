@@ -49,7 +49,7 @@ export default function Hall({
     ],
     [venue],
   );
-  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, stands), [venue, stands]);
+  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, stands, venue.capacity), [venue, stands]);
   const [stand, setStand] = useState<number | null>(null);
   const standSponsor = stand !== null ? stands[stand] : undefined;
   const isOrganizer = standSponsor?.id === "organizador";

@@ -20,7 +20,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 ### Para los asistentes
 
-- **Recepción**: un cowork moderno y amplio, con aire entre cada espacio: escritorios con gente trabajando, una sala de estar, una sala de reuniones vidriada con una reunión en curso, el café y un rincón de lectura. La recepcionista está a dos pasos de la entrada. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
+- **Recepción**: un cowork moderno y amplio. Al fondo está el gran mostrador con **dos recepcionistas** bajo el letrero «RECEPCIÓN» y kioscos de check-in a los lados; alrededor, escritorios con gente trabajando, una sala de reuniones vidriada, una sala de estar y el café. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
 - **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
   - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
   - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
@@ -28,7 +28,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
-  - **Hackathon (maker space)**: una zona de equipos con seis **mesas de hasta 6 personas**. Cada mesa es un rectángulo marcado en el piso: al entrar te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro; al salir, la dejas. Hay bulevar con las salas (presentación de proyectos, charlas, talleres…), mentorías y snacks, y café.
+  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta, pantallas con la cuenta regresiva y una avenida con las salas de charla (presentación de proyectos, talleres, mentorías…). Los equipos trabajan en **salas de equipos de 100 personas**, cada una con 28 mesas: 5 de 6 personas, 12 de 4 y 11 de 2. Cada mesa es un rectángulo marcado en el piso: al entrar te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro. Al crear el hackathon se elige el cupo (100, 200, 300, 400 o 500): se habilita una sala de equipos por cada 100 personas (las dos primeras en la planta baja y las otras tres arriba) y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren.
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
   - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.
@@ -59,7 +59,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 | 202 | Stellar Builders Day (auditorio + 8 salas) | Medieval | Privado |
 | 303 | Demo Day · Inversores (auditorio + 8 salas) | Minimalista | Privado |
 | 404 | Stellar Hub LatAm (auditorio + 8 salas) | Stellar | Abierto |
-| 505 | Hack Night LatAm (auditorio + 8 salas y 6 mesas de equipo) | Hackathon | Abierto |
+| 505 | Hack Night LatAm (auditorio + 8 salas, cupo de 200: dos salas de equipos con 56 mesas) | Hackathon | Abierto |
 
 Se definen en `server/src/seed.ts`. Sus patrocinadores son marcas ficticias con logos de ejemplo en `server/assets/logos`. La gente que conversa en los pasillos es decorativa: da ambiente y no son personas conectadas.
 

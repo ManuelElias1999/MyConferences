@@ -75,7 +75,12 @@ export interface Venue extends VenueSummary {
   rooms: Room[];
   talks: Talk[];
   sponsors: Sponsor[];
+  /** Hackathon: cuántos participantes espera (100 a 500). Cada 100 se habilita una sala de equipos. */
+  capacity?: number;
 }
+
+/** Cupos que se pueden elegir para un hackathon. */
+export const HACKATHON_CAPACITIES = [100, 200, 300, 400, 500];
 
 /** Lo que la empresa ve y edita de su evento en el panel. */
 export interface CompanyEvent {
@@ -91,6 +96,8 @@ export interface EventInput {
   theme: ThemeId;
   private: boolean;
   whitelist: string[];
+  /** Solo en hackathons: participantes esperados (100 a 500). */
+  capacity?: number;
   /** La primera es el auditorio principal. Salas existentes llevan su id; las nuevas, no. */
   rooms: { id?: string; name: string; topic: string; color: string; theme?: ThemeId | null; talks: TalkInput[] }[];
 }

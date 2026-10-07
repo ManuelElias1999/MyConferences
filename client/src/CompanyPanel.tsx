@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MAX_ROOMS, MIN_ROOMS, ROOMS_PER_FLOOR, venueFloors } from "../../shared/maps.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
-import type { Account, CompanyEvent, EventInput, TalkInput } from "../../shared/types.ts";
+import { HACKATHON_CAPACITIES, type Account, type CompanyEvent, type EventInput, type TalkInput } from "../../shared/types.ts";
 import { companyApi, loadToken } from "./lib.ts";
 import Modal from "./Modal.tsx";
 import { furniDrawables, renderStatic, T } from "./world.ts";
@@ -109,6 +109,7 @@ function EventEditor({
   const [name, setName] = useState(v?.name ?? "");
   const [tagline, setTagline] = useState(v?.tagline ?? "");
   const [theme, setTheme] = useState<ThemeId>(v?.theme ?? "tech");
+  const [capacity, setCapacity] = useState(v?.capacity ?? 100);
   const [isPrivate, setPrivate] = useState(v?.private ?? true);
   const [whitelist, setWhitelist] = useState((initial?.whitelist ?? []).join("\n"));
   const draftsFrom = (ev: CompanyEvent): RoomDraft[] =>
@@ -142,6 +143,7 @@ function EventEditor({
       name,
       tagline,
       theme,
+      capacity: theme === "hackathon" ? capacity : undefined,
       private: isPrivate,
       whitelist: whitelist.split(/[\s,;]+/).filter(Boolean),
       rooms,
@@ -207,6 +209,23 @@ function EventEditor({
             </button>
           ))}
         </fieldset>
+
+        {theme === "hackathon" && (
+          <fieldset className="capacity">
+            <legend>Participantes del hackathon</legend>
+            <p className="muted small">
+              Cada sala de equipos tiene lugar para 100 personas, en mesas de 6, 4 y 2. Según el cupo se habilitan más salas; las demás quedan cerradas.
+            </p>
+            <div className="capacity-options">
+              {HACKATHON_CAPACITIES.map((c) => (
+                <label key={c} className={`chip ${capacity === c ? "selected" : ""}`}>
+                  <input type="radio" name="capacity" checked={capacity === c} onChange={() => setCapacity(c)} />
+                  {c} · {c / 100} {c === 100 ? "sala" : "salas"}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         <fieldset className="access">
           <legend>Acceso</legend>

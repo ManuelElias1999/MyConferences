@@ -71,6 +71,10 @@ export type FurniKind =
   | "constellation"
   /** Mampara de vidrio, como la de una sala de reuniones. */
   | "partition"
+  /** Gran mostrador de recepción, con su nombre al frente y una línea de luz. */
+  | "frontdesk"
+  /** Pantalla gigante con la cuenta regresiva del hackathon. */
+  | "countdown"
   | "rug"
   | "carpet";
 
@@ -236,6 +240,8 @@ export interface SceneMap {
   floorName: string;
   /** Mesas de equipo con conversación propia. */
   zones: Zone[];
+  /** Salas que todavía no se habilitan (por ejemplo, salas de equipos de un hackathon con menos cupo). */
+  closed: (Rect & { label: string })[];
   blocked: boolean[];
   /** Baldosas con muebles: se pueden atravesar, pero los caminos automáticos los rodean. */
   soft: boolean[];
@@ -355,6 +361,7 @@ const empty = {
   stairs: [],
   areas: [],
   zones: [],
+  closed: [],
   floorName: "",
 };
 
@@ -383,16 +390,17 @@ function attendee(i: number, x: number, y: number, dir: Dir): Npc {
 export const RECEPTIONIST_ID = "npc-recepcion";
 
 /**
- * Recepción: un cowork moderno y amplio. Cada espacio tiene aire alrededor:
- * escritorios a la izquierda, sala de estar al centro, sala de reuniones
- * vidriada a la derecha y el café abajo. La recepcionista está a dos pasos de
- * la entrada.
+ * Recepción: un cowork moderno. Al fondo, el gran mostrador con dos
+ * recepcionistas bajo el letrero «RECEPCIÓN»; a los costados, escritorios,
+ * una sala de reuniones vidriada, una sala de estar y el café, cada uno con
+ * aire alrededor.
  */
 export function receptionMap(): SceneMap {
   const w = 32;
-  const h = 19;
+  const h = 20;
   const sit = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker", sit: true });
   const stand = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker" });
+  const front = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((x) => ({ x, y: 7 }));
   return finish(
     {
       ...empty,
@@ -400,73 +408,74 @@ export function receptionMap(): SceneMap {
       h,
       tiles: enclosure(w, h),
       style: "cowork",
-      spawn: { x: 15, y: 16 },
+      spawn: { x: 15, y: 17 },
       furni: [
-        // Mostrador de recepción, frente a la entrada.
-        ...[13, 14, 15, 16, 17].map((x) => ({ kind: "counter" as const, x, y: 13 })),
-        { kind: "bigplant", x: 11, y: 13 },
-        { kind: "bigplant", x: 19, y: 13 },
-        // Escritorios: dos islas con aire entre ellas.
-        { kind: "workdesk", x: 2, y: 5, w: 3 },
-        { kind: "workdesk", x: 2, y: 10, w: 3 },
-        ...[2, 3, 4].flatMap((x) => [6, 11].map((y) => ({ kind: "officechair" as const, x, y }))),
-        { kind: "workdesk", x: 7, y: 5, w: 2 },
-        { kind: "officechair", x: 7, y: 6 },
-        { kind: "officechair", x: 8, y: 6 },
-        { kind: "bigplant", x: 9, y: 10 },
-        // Sala de estar al centro.
-        { kind: "sofa", x: 13, y: 5, w: 3, color: "#2f6bff", dir: "down" },
-        { kind: "armchair", x: 17, y: 5, color: "#ffb703" },
-        { kind: "coffeetable", x: 14, y: 7, w: 2 },
-        { kind: "bigplant", x: 12, y: 3 },
-        { kind: "bigplant", x: 18, y: 3 },
-        // Sala de reuniones vidriada.
-        { kind: "partition", x: 22, y: 3, d: 6 },
-        { kind: "partition", x: 22, y: 9, w: 3 },
-        { kind: "partition", x: 27, y: 9, w: 3 },
-        { kind: "table", x: 24, y: 5, w: 4 },
-        ...[24, 25, 26, 27].map((x) => ({ kind: "officechair" as const, x, y: 6 })),
-        { kind: "officechair", x: 23, y: 5 },
-        { kind: "officechair", x: 28, y: 5 },
-        // Café, abajo a la derecha.
-        { kind: "coffeebar", x: 25, y: 12, w: 4 },
-        { kind: "vending", x: 29, y: 12 },
-        { kind: "cafetable", x: 25, y: 16, w: 2 },
-        // Rincón de lectura, abajo a la izquierda.
-        { kind: "bookshelf", x: 1, y: 14 },
-        { kind: "bookshelf", x: 2, y: 14 },
-        { kind: "beanbag", x: 4, y: 16, color: "#ffb703" },
-        { kind: "beanbag", x: 6, y: 16, color: "#ef476f" },
-        { kind: "bigplant", x: 30, y: 16 },
+        // Gran mostrador de recepción al fondo, con kioscos de check-in a los lados.
+        { kind: "frontdesk", x: 10, y: 6, w: 12 },
+        { kind: "bigplant", x: 10, y: 3 },
+        { kind: "bigplant", x: 21, y: 3 },
+        { kind: "kiosk", x: 8, y: 8 },
+        { kind: "kiosk", x: 23, y: 8 },
+        { kind: "ledpillar", x: 9, y: 3 },
+        { kind: "ledpillar", x: 22, y: 3 },
+        // Escritorios a la izquierda.
+        { kind: "workdesk", x: 1, y: 5, w: 3 },
+        { kind: "workdesk", x: 1, y: 10, w: 3 },
+        ...[1, 2, 3].flatMap((x) => [6, 11].map((y) => ({ kind: "officechair" as const, x, y }))),
+        // Sala de reuniones vidriada a la derecha.
+        { kind: "partition", x: 24, y: 3, d: 6 },
+        { kind: "partition", x: 24, y: 9, w: 2 },
+        { kind: "partition", x: 28, y: 9, w: 3 },
+        { kind: "table", x: 26, y: 5, w: 3 },
+        ...[26, 27, 28].map((x) => ({ kind: "officechair" as const, x, y: 6 })),
+        { kind: "officechair", x: 25, y: 5 },
+        { kind: "officechair", x: 29, y: 5 },
+        // Sala de estar abajo a la izquierda.
+        { kind: "sofa", x: 2, y: 14, w: 3, color: "#2f6bff", dir: "down" },
+        { kind: "armchair", x: 6, y: 14, color: "#ffb703" },
+        { kind: "coffeetable", x: 3, y: 16, w: 2 },
+        // Café abajo a la derecha.
+        { kind: "coffeebar", x: 24, y: 13, w: 4 },
+        { kind: "vending", x: 29, y: 13 },
+        { kind: "cafetable", x: 27, y: 17, w: 2 },
+        { kind: "bigplant", x: 1, y: 18 },
+        { kind: "bigplant", x: 30, y: 18 },
+        { kind: "bench", x: 10, y: 12, w: 3 },
+        { kind: "bench", x: 19, y: 12, w: 3 },
       ],
       decor: [
         { kind: "window", x: 2, y: 2, w: 3 },
-        { kind: "window", x: 6, y: 2, w: 3 },
-        { kind: "neon", x: 12, y: 2, w: 7, text: "MyConferences", color: "#ff5c39" },
-        { kind: "whiteboard", x: 24, y: 2, w: 3 },
-        { kind: "clock", x: 28, y: 2 },
+        { kind: "neon", x: 12, y: 2, w: 8, text: "RECEPCIÓN", color: "#22d3ee" },
+        { kind: "whiteboard", x: 26, y: 2, w: 3 },
+        { kind: "clock", x: 6, y: 2 },
         { kind: "entrance", x: 15, y: h - 1, w: 2 },
       ],
       crowd: [
-        // Trabajando.
-        sit(1, 2, 6, "up"),
-        sit(2, 4, 6, "up"),
-        sit(3, 3, 11, "up"),
-        sit(4, 8, 6, "up"),
-        // En reunión.
-        sit(5, 24, 6, "up"),
-        sit(6, 26, 6, "up"),
-        sit(7, 23, 5, "right"),
-        sit(8, 28, 5, "left"),
-        // Charlando en la sala de estar.
-        sit(9, 13, 5, "down"),
-        sit(10, 15, 5, "down"),
-        // Tomando un café.
-        stand(11, 25, 14, "right"),
-        stand(12, 26, 14, "left"),
+        sit(1, 1, 6, "up"),
+        sit(2, 3, 6, "up"),
+        sit(3, 2, 11, "up"),
+        sit(4, 26, 6, "up"),
+        sit(5, 28, 6, "up"),
+        sit(6, 25, 5, "right"),
+        sit(7, 29, 5, "left"),
+        sit(8, 2, 14, "down"),
+        sit(9, 4, 14, "down"),
+        stand(10, 24, 15, "right"),
+        stand(11, 25, 15, "left"),
       ],
-      npcs: [{ id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 15, y: 12, dir: "down", talkFrom: [14, 15, 16].map((x) => ({ x, y: 14 })) }],
-      desk: [14, 15, 16].map((x) => ({ x, y: 14 })),
+      npcs: [
+        { id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 13, y: 5, dir: "down", talkFrom: front },
+        {
+          id: `${RECEPTIONIST_ID}-2`,
+          name: "Recepcionista",
+          look: { ...RECEPTIONIST_LOOK, hair: "short", hairColor: HAIR_COLORS[3]!, skin: SKINS[4]!, shirt: "#2f6bff" },
+          x: 18,
+          y: 5,
+          dir: "down",
+          talkFrom: front,
+        },
+      ],
+      desk: front,
     },
     true,
   );
@@ -524,6 +533,7 @@ interface Level {
   /** Stands de patrocinadores (esquina superior izquierda, 3×2, pegados a una pared de frente). */
   stands?: Tile[];
   zones?: Zone[];
+  closed?: (Rect & { label: string })[];
   stairs: Stairs[];
   decor: Decor[];
   furni: Furni[];
@@ -1211,117 +1221,194 @@ function stellarGround(): Level {
   };
 }
 
-// ----- Hackathon: zona de equipos con mesas, bulevar con salas, mentorías y café -----
+// ----- Hackathon: salas de equipos de 100 personas, avenida de salas de charla y lobby -----
 
-/** Mesa de equipo de 5×5: una mesa con tres sillas a cada lado, adentro de su rectángulo. */
-function teamTable(n: number, x: number, y: number): { zone: Zone; furni: Furni[] } {
-  const colors = ["#ff7a1a", "#2f6bff", "#10b981", "#a78bfa", "#ef476f", "#f59e0b"];
+const TEAM_COLORS = ["#22d3ee", "#a78bfa", "#f472b6", "#34d399", "#fbbf24"];
+
+/** Mesa de equipo: una mesa con sus sillas a los dos lados, adentro de su rectángulo (5 de alto). */
+function teamTable(n: number, seats: 6 | 4 | 2, x: number, y: number, color: string): { zone: Zone; furni: Furni[] } {
+  const cols = seats / 2;
+  const w = cols + 2;
   return {
-    zone: { id: `mesa-${n}`, label: `Mesa ${n}`, x, y, w: 5, h: 5, color: colors[(n - 1) % colors.length]!, seats: 6 },
+    zone: { id: `mesa-${n}`, label: `Mesa ${n}`, x, y, w, h: 5, color, seats },
     furni: [
-      { kind: "table", x: x + 1, y: y + 2, w: 3 },
-      ...[1, 2, 3].flatMap((dx) => [
-        { kind: "officechair" as const, x: x + dx, y: y + 1 },
-        { kind: "officechair" as const, x: x + dx, y: y + 3 },
-      ]),
+      { kind: "table", x: x + 1, y: y + 2, w: cols },
+      ...Array.from({ length: cols }, (_, i) => [
+        { kind: "officechair" as const, x: x + 1 + i, y: y + 1 },
+        { kind: "officechair" as const, x: x + 1 + i, y: y + 3 },
+      ]).flat(),
     ],
   };
 }
 
-function hackathonGround(): Level {
-  const tables = [
-    [3, 13],
-    [11, 13],
-    [19, 13],
-    [3, 21],
-    [11, 21],
-    [19, 21],
-  ].map(([x, y], i) => teamTable(i + 1, x!, y!));
+/**
+ * Sala de equipos para 100 personas (31×31): 5 mesas de 6, 12 de 4 y 11 de 2,
+ * en filas con pasillos entre ellas.
+ */
+function teamHall(hall: number, x0: number, y0: number) {
+  const color = TEAM_COLORS[(hall - 1) % TEAM_COLORS.length]!;
+  let n = (hall - 1) * 28;
+  const rows: [seats: 6 | 4 | 2, count: number, x: number, step: number][] = [
+    [6, 5, x0 + 1, 6],
+    [4, 6, x0 + 1, 5],
+    [4, 6, x0 + 1, 5],
+    [2, 7, x0 + 2, 4],
+    [2, 4, x0 + 8, 4],
+  ];
+  const tables = rows.flatMap(([seats, count, x, step], r) => Array.from({ length: count }, (_, i) => teamTable(++n, seats, x + i * step, y0 + 1 + r * 6, color)));
+  return { zones: tables.map((t) => t.zone), furni: tables.flatMap((t) => t.furni) };
+}
+
+/** Datos de las salas de equipos de un piso: dónde está cada una y su entrada desde la avenida. */
+interface HallSpot {
+  hall: number;
+  x: number;
+  /** Entrada: columna del vano de 5 baldosas en la pared de arriba. */
+  door: number;
+}
+
+/**
+ * Arma las salas de equipos de un piso. Las que superan el cupo quedan
+ * cerradas: sin entrada, sin mesas activas y con un cartel que dice cuándo se
+ * habilitan.
+ */
+function teamHalls(spots: HallSpot[], capacity: number, top: number) {
+  const floors: Rect[] = [];
+  const zones: Zone[] = [];
+  const furni: Furni[] = [];
+  const decor: Decor[] = [];
+  const closed: (Rect & { label: string })[] = [];
+  for (const s of spots) {
+    const rect = { x: s.x, y: top, w: 31, h: 31 };
+    const t = teamHall(s.hall, s.x, top);
+    floors.push(rect);
+    furni.push(...t.furni);
+    const open = capacity >= s.hall * 100;
+    if (open) {
+      floors.push({ x: s.door, y: top - 3, w: 5, h: 3 });
+      zones.push(...t.zones);
+      decor.push({ kind: "portal", x: s.door, y: top - 1, w: 5, text: `SALA DE EQUIPOS ${s.hall} · 100` });
+    } else {
+      closed.push({ ...rect, label: `Sala de equipos ${s.hall} · se habilita con ${s.hall * 100} participantes` });
+      decor.push({ kind: "sign", x: s.door, y: top - 1, w: 5, text: `SALA ${s.hall} · CERRADA` });
+    }
+  }
+  return { floors, zones, furni, decor, closed };
+}
+
+function hackathonGround(capacity: number): Level {
+  const halls = teamHalls(
+    [
+      { hall: 1, x: 7, door: 20 },
+      { hall: 2, x: 50, door: 63 },
+    ],
+    capacity,
+    22,
+  );
   return {
     name: "Planta baja",
-    w: 64,
-    h: 52,
+    w: 88,
+    h: 58,
     floors: [
-      { x: 6, y: 32, w: 52, h: 9 }, // bulevar
-      { x: 28, y: 12, w: 8, h: 20 }, // pasillo del auditorio
-      { x: 2, y: 12, w: 24, h: 16 }, // zona de equipos
-      { x: 10, y: 28, w: 8, h: 4 },
-      { x: 42, y: 12, w: 20, h: 12 }, // mentorías y snacks
-      { x: 49, y: 24, w: 4, h: 8 },
-      { x: 44, y: 41, w: 4, h: 3 },
-      { x: 38, y: 44, w: 18, h: 6 }, // café
+      { x: 7, y: 10, w: 74, h: 9 }, // avenida de salas
+      { x: 39, y: 19, w: 10, h: 37 }, // lobby central
+      ...halls.floors,
     ],
-    areas: [{ x: 38, y: 44, w: 18, h: 6, floor: "wood" }],
-    exit: { x: 31, y: 41 },
-    spawn: { x: 31, y: 38 },
-    main: { x: 30, y: 11, roof: { x: 24, y: 3, w: 16, h: 7 } },
-    slots: [...pairH(38, 31, "Bulevar este"), ...pairV(5, 32, "left", "Bulevar oeste"), ...pairV(36, 13, "right", "Pasillo del auditorio"), ...pairV(58, 32, "right", "Fondo del bulevar")],
-    zones: tables.map((t) => t.zone),
+    exit: { x: 43, y: 56 },
+    spawn: { x: 43, y: 53 },
+    main: { x: 42, y: 9, roof: { x: 37, y: 2, w: 14, h: 6 } },
+    slots: [...pairH(14, 9, "Avenida oeste"), ...pairV(6, 10, "left", "Fondo oeste"), ...pairH(65, 9, "Avenida este"), ...pairV(81, 10, "right", "Fondo este")],
+    zones: halls.zones,
+    closed: halls.closed,
     stands: [
-      { x: 54, y: 32 },
-      { x: 44, y: 12 },
-      { x: 39, y: 44 },
-      { x: 50, y: 12 },
-      { x: 50, y: 44 },
-      { x: 56, y: 12 },
+      { x: 25, y: 10 },
+      { x: 55, y: 10 },
+      { x: 34, y: 10 },
+      { x: 59, y: 10 },
     ],
-    stairs: [{ x: 22, y: 31, w: 2, dir: "up", to: 1, label: "Subir al piso 1" }],
+    stairs: [{ x: 30, y: 9, w: 2, dir: "up", to: 1, label: "Subir a las salas 3 a 5" }],
     decor: [
-      { kind: "neon", x: 3, y: 11, w: 5, text: "HACK ZONE", color: "#ff7a1a" },
-      { kind: "whiteboard", x: 10, y: 11, w: 3 },
-      { kind: "sponsors", x: 15, y: 11, w: 4 },
-      { kind: "whiteboard", x: 20, y: 11, w: 3 },
-      { kind: "portal", x: 10, y: 31, w: 8, text: "ZONA DE EQUIPOS" },
-      { kind: "portal", x: 49, y: 31, w: 4, text: "MENTORÍAS Y SNACKS" },
-      { kind: "portal", x: 44, y: 43, w: 4, text: "CAFÉ" },
+      { kind: "neon", x: 8, y: 9, w: 4, text: "HACK", color: "#22d3ee" },
+      { kind: "neon", x: 76, y: 9, w: 4, text: "</>", color: "#f472b6" },
+      ...halls.decor,
     ],
     furni: [
-      ...tables.flatMap((t) => t.furni),
-      { kind: "eventscreen", x: 28, y: 34, w: 6 },
-      { kind: "bigplant", x: 6, y: 40 },
-      { kind: "bigplant", x: 57, y: 40 },
-      { kind: "robot", x: 40, y: 37 },
-      { kind: "ledpillar", x: 28, y: 12 },
-      { kind: "ledpillar", x: 35, y: 12 },
-      { kind: "rack", x: 2, y: 27 },
-      { kind: "rack", x: 25, y: 27 },
-      ...lounge(43, 17, "#ff7a1a"),
-      { kind: "beanbag", x: 55, y: 17, color: "#22d3ee" },
-      { kind: "beanbag", x: 57, y: 17, color: "#ff7a1a" },
-      { kind: "vending", x: 61, y: 20 },
-      { kind: "cooler", x: 61, y: 22 },
-      { kind: "coffeebar", x: 52, y: 47, w: 3 },
-      { kind: "cafetable", x: 40, y: 47, w: 2 },
-      { kind: "cafetable", x: 44, y: 48, w: 2 },
+      ...halls.furni,
+      { kind: "countdown", x: 40, y: 22, w: 8 },
+      { kind: "eventscreen", x: 41, y: 46, w: 6 },
+      { kind: "hologram", x: 40, y: 30, w: 2, d: 2 },
+      { kind: "robot", x: 47, y: 31 },
+      { kind: "ledpillar", x: 39, y: 19 },
+      { kind: "ledpillar", x: 48, y: 19 },
+      { kind: "ledpillar", x: 39, y: 55 },
+      { kind: "ledpillar", x: 48, y: 55 },
+      // Snacks y café para el equipo, en el lobby.
+      { kind: "coffeebar", x: 39, y: 36, w: 3 },
+      { kind: "vending", x: 48, y: 36 },
+      { kind: "cooler", x: 47, y: 36 },
+      { kind: "beanbag", x: 40, y: 40, color: "#22d3ee" },
+      { kind: "beanbag", x: 47, y: 40, color: "#f472b6" },
+      { kind: "rack", x: 7, y: 18 },
+      { kind: "rack", x: 80, y: 18 },
     ],
     crowd: [
-      // Equipos ya trabajando en algunas mesas.
-      [4, 14, "down", true],
-      [6, 14, "down", true],
-      [5, 16, "up", true],
-      [12, 22, "down", true],
-      [14, 24, "up", true],
-      [20, 14, "down", true],
-      ...chat(24, 36),
-      ...chat(45, 20),
-      ...chat(42, 47),
-      ...chat(31, 18),
+      [9, 24, "down", true],
+      [11, 24, "down", true],
+      [10, 26, "up", true],
+      [15, 30, "down", true],
+      [16, 32, "up", true],
+      ...chat(42, 27),
+      ...chat(44, 50),
+      ...chat(45, 14),
     ],
     directories: [
-      { x: 25, y: 38 },
-      { x: 37, y: 38 },
+      { x: 40, y: 50 },
+      { x: 47, y: 50 },
     ],
   };
 }
 
-const LEVELS: Record<ThemeId, () => Level[]> = {
+/** Piso alto del hackathon: otra avenida con salas de charla y las salas de equipos 3, 4 y 5. */
+function hackathonUpper(capacity: number): Level {
+  const halls = teamHalls(
+    [
+      { hall: 3, x: 7, door: 20 },
+      { hall: 4, x: 45, door: 58 },
+      { hall: 5, x: 83, door: 96 },
+    ],
+    capacity,
+    22,
+  );
+  return {
+    name: "Piso 1",
+    w: 120,
+    h: 56,
+    floors: [{ x: 7, y: 10, w: 106, h: 9 }, ...halls.floors],
+    spawn: { x: 50, y: 12 },
+    slots: [...pairH(14, 9, "Piso 1 · avenida oeste"), ...pairV(6, 10, "left", "Piso 1 · fondo oeste"), ...pairH(97, 9, "Piso 1 · avenida este"), ...pairV(113, 10, "right", "Piso 1 · fondo este")],
+    zones: halls.zones,
+    closed: halls.closed,
+    stands: [
+      { x: 30, y: 10 },
+      { x: 70, y: 10 },
+      { x: 80, y: 10 },
+    ],
+    stairs: [{ x: 50, y: 9, w: 2, dir: "down", to: 0, label: "Bajar al lobby" }],
+    decor: [{ kind: "neon", x: 40, y: 9, w: 4, text: "HACK", color: "#22d3ee" }, { kind: "neon", x: 58, y: 9, w: 4, text: "BUILD", color: "#f472b6" }, ...halls.decor],
+    furni: [...halls.furni, { kind: "countdown", x: 61, y: 12, w: 8 }, { kind: "ledpillar", x: 7, y: 18 }, { kind: "ledpillar", x: 112, y: 18 }],
+    crowd: [...chat(44, 15), ...chat(88, 14)],
+    directories: [{ x: 54, y: 16 }],
+  };
+}
+
+const LEVELS: Record<ThemeId, (capacity: number) => Level[]> = {
   tech: () => [techGround(), upperFloor("tech")],
   medieval: () => [castleGround(), upperFloor("medieval")],
   garden: () => [parkGround(), upperFloor("garden")],
   minimal: () => [galleryGround(), upperFloor("minimal")],
   rustic: () => [villageGround(), upperFloor("rustic")],
   stellar: () => [stellarGround(), upperFloor("stellar")],
-  hackathon: () => [hackathonGround(), upperFloor("hackathon")],
+  hackathon: (capacity) => [hackathonGround(capacity), hackathonUpper(capacity)],
 };
 
 /** Lo que el plano necesita saber de un patrocinador: su nombre, para el representante del stand. */
@@ -1377,6 +1464,7 @@ function buildLevel(
     npcs: reps,
     stairs: L.stairs,
     zones: L.zones ?? [],
+    closed: L.closed ?? [],
     areas: L.areas ?? [],
     crowd: L.crowd.map(([x, y, dir, sit], i) => ({ ...attendee(i, x, y, dir), sit })),
     exit: L.exit ? { side: "bottom", x: L.exit.x, y: L.exit.y, w: 2 } : null,
@@ -1388,10 +1476,15 @@ function buildLevel(
  * Los pisos del recinto: planta baja con el auditorio y ocho salas, y un piso
  * alto con ocho salas más. Los patrocinadores reciben un stand en cada piso.
  */
-export function venueFloors(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color" | "main" | "theme">[], sponsors: StandSponsor[] = []): SceneMap[] {
+export function venueFloors(
+  theme: ThemeId,
+  rooms: Pick<Room, "id" | "name" | "color" | "main" | "theme">[],
+  sponsors: StandSponsor[] = [],
+  capacity = 100,
+): SceneMap[] {
   const main = rooms.find((r) => r.main) ?? rooms[0] ?? null;
   const others = rooms.filter((r) => r !== main);
-  return LEVELS[theme]().map((L, i) => buildLevel(theme, L, i === 0 ? main : null, others.slice(i * ROOMS_PER_FLOOR, (i + 1) * ROOMS_PER_FLOOR), sponsors));
+  return LEVELS[theme](capacity).map((L, i) => buildLevel(theme, L, i === 0 ? main : null, others.slice(i * ROOMS_PER_FLOOR, (i + 1) * ROOMS_PER_FLOOR), sponsors));
 }
 
 export const floorOfRoom = (floors: SceneMap[], roomId: string) => Math.max(0, floors.findIndex((m) => m.doors.some((d) => d.id === roomId)));

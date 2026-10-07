@@ -17,6 +17,7 @@ interface VenueSeed {
   sponsors: Sponsor[];
   rooms: Room[];
   program: Program;
+  capacity?: number;
 }
 
 /** Lo que cuenta el representante de cada patrocinador de ejemplo en su stand. */
@@ -272,6 +273,7 @@ const seeds: VenueSeed[] = [
     tagline: "48 horas para construir: mesas de equipo, mentorías y demo day.",
     private: false,
     theme: "hackathon",
+    capacity: 200,
     organizer: "MyConferences",
     sponsors: [logo("devforge", "DevForge"), logo("orbit-cloud", "Orbit Cloud"), logo("novapay", "NovaPay")],
     rooms: [
@@ -356,6 +358,7 @@ export function createVenues(dataDir: string, now = Date.now()) {
       rooms: seed.rooms,
       talks: buildTalks(seed, now),
       sponsors: seed.sponsors,
+      capacity: seed.capacity,
     } satisfies Venue,
     whitelist: seed.private ? (whitelists.get(seed.id) ?? new Set<string>()) : null,
   }));

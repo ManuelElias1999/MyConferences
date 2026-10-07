@@ -182,15 +182,20 @@ const stellarPanels: FacePainter = (ctx, px, py, row) => {
   }
 };
 
-/** Paneles verde petróleo con una línea naranja: un maker space. */
+/** Paneles azul noche con tiras de luz cian y magenta: un hackathon tecnológico. */
 const hackPanels: FacePainter = (ctx, px, py, row) => {
-  ctx.fillStyle = row === 1 ? "#1e4b48" : "#25605b";
+  ctx.fillStyle = row === 1 ? "#141b2d" : "#1b2440";
   ctx.fillRect(px, py, T, T);
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
   ctx.fillRect(px + T - 1, py, 1, T);
   if (row === 0) {
-    ctx.fillStyle = "#ff7a1a";
-    ctx.fillRect(px, py + 10, T, 2);
+    ctx.fillStyle = "#22d3ee";
+    ctx.fillRect(px, py + 8, T, 2);
+    ctx.fillStyle = "rgba(34,211,238,0.25)";
+    ctx.fillRect(px, py + 10, T, 3);
+  } else {
+    ctx.fillStyle = "#f472b6";
+    ctx.fillRect(px, py + 24, T, 1);
   }
 };
 
@@ -214,7 +219,7 @@ const STYLES: Record<StyleId, Style> = {
   medieval: { floor: flat("#e0dbcf"), face: bricks(["#8f899e", "#878196", "#958fa4", "#827c91"], "#6b6579"), cap: "#433e55", base: "#3a3548", outside: "#a7b892" },
   garden: { floor: flat("#f1e8d2"), face: hedge, cap: "#2c5a28", base: "#24481f", outside: "#a7d084" },
   stellar: { floor: flat("#fbfaf5"), face: stellarPanels, cap: "#0f0f14", base: "#fdda24", outside: "#d6d1ef" },
-  hackathon: { floor: flat("#eeece6"), face: hackPanels, cap: "#10302d", base: "#ff7a1a", outside: "#cbd7d4" },
+  hackathon: { floor: flat("#eef1f6"), face: hackPanels, cap: "#0b1020", base: "#22d3ee", outside: "#c5ccda" },
 };
 
 const tileAt = (map: SceneMap, x: number, y: number) => map.tiles[y]?.[x] ?? "#";
@@ -668,7 +673,7 @@ const STEP: Record<StyleId, { tread: string; rail: string }> = {
   garden: { tread: "#d9cfb6", rail: "#6b4a2f" },
   cowork: { tread: "#d5dde9", rail: "#4b5563" },
   stellar: { tread: "#e8e6dd", rail: "#fdda24" },
-  hackathon: { tread: "#d9d5cc", rail: "#ff7a1a" },
+  hackathon: { tread: "#d9dee8", rail: "#22d3ee" },
 };
 
 /** Ascensor en la pared: puertas de acero, un visor con la flecha y el botón de llamada. */
@@ -864,7 +869,7 @@ const ROOF: Record<StyleId, { base: string; line: string }> = {
   garden: { base: "#d39a6a", line: "#bd8456" },
   cowork: { base: "#dbe3ee", line: "#c3cedd" },
   stellar: { base: "#2a2a33", line: "#34343f" },
-  hackathon: { base: "#dcd8cf", line: "#cbc6bb" },
+  hackathon: { base: "#1e2638", line: "#263049" },
 };
 
 /** Techo de un edificio de sala: claro, con el color de la sala y su nombre bien grande. */
@@ -886,6 +891,13 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
       ctx.fillStyle = "#4f74b3";
       ctx.fillRect(px + 1, y + 9, 10, 5);
     }
+  }
+  if (style === "hackathon") {
+    // Techo oscuro con una grilla de luces.
+    ctx.fillStyle = "rgba(34,211,238,0.5)";
+    for (let lx = x + 12; lx < x + w - 8; lx += 24) ctx.fillRect(lx, y + 6, 2, h - 14);
+    ctx.fillStyle = "#f472b6";
+    ctx.fillRect(x, y + 4, w, 2);
   }
   if (style === "stellar") {
     // Techo oscuro con estrellas y una franja amarilla.
@@ -1184,7 +1196,7 @@ const CHAIR: Record<StyleId, { frame: string; seat: string }> = {
   garden: { frame: "#8a5a32", seat: "#c8e6a0" },
   cowork: { frame: "#2f3440", seat: "#2f6bff" },
   stellar: { frame: "#16161d", seat: "#fdda24" },
-  hackathon: { frame: "#1f2937", seat: "#ff7a1a" },
+  hackathon: { frame: "#1f2937", seat: "#22d3ee" },
 };
 
 export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
@@ -1762,6 +1774,58 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fillRect(sx, sy + ih - 3, iw, 3);
         });
         break;
+      case "frontdesk":
+        // Mostrador de recepción: cubierta blanca, frente grafito con una línea de luz y el nombre.
+        add(y + 1, (ctx) => {
+          const dw = w * T;
+          shadowUnder(ctx, px + dw / 2, py + T + 2, dw / 2);
+          box(ctx, px, py - 2, dw, 12, 24, "#2b2f3a", "#f4f4f5");
+          ctx.fillStyle = "#22d3ee";
+          ctx.fillRect(px + 4, py + 30, dw - 8, 2);
+          ctx.fillStyle = "rgba(34,211,238,0.25)";
+          ctx.fillRect(px + 4, py + 26, dw - 8, 4);
+          ctx.font = `700 11px ${FONT}`;
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.fillText("MyConferences · Recepción", px + dw / 2, py + 21);
+          ctx.textAlign = "left";
+          // Monitores sobre la cubierta.
+          for (const mx of [px + dw * 0.3, px + dw * 0.7]) {
+            frame(ctx, mx - 9, py - 14, 18, 11, "#1f2433");
+            ctx.fillStyle = "#7dd3fc";
+            ctx.fillRect(mx - 7, py - 12, 14, 7);
+          }
+        });
+        break;
+      case "countdown":
+        // Pantalla gigante con la cuenta regresiva del hackathon.
+        add(y + 1, (ctx, t) => {
+          const sw = w * T;
+          shadowUnder(ctx, cx, base - 3, sw / 2 - 6);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(px + 16, base - 18, 6, 15);
+          ctx.fillRect(px + sw - 22, base - 18, 6, 15);
+          frame(ctx, px, base - 96, sw, 80, "#0b1020");
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(px + 5, base - 91, sw - 10, 70);
+          ctx.fillStyle = "#22d3ee";
+          ctx.fillRect(px + 5, base - 91, sw - 10, 2);
+          ctx.fillStyle = "#f472b6";
+          ctx.fillRect(px + 5, base - 23, sw - 10, 2);
+          const left = Math.max(0, 48 * 3600 - Math.floor(t / 1000) % (48 * 3600));
+          const hh = String(Math.floor(left / 3600)).padStart(2, "0");
+          const mm = String(Math.floor((left % 3600) / 60)).padStart(2, "0");
+          const ss = String(left % 60).padStart(2, "0");
+          ctx.textAlign = "center";
+          ctx.font = `700 9px ${FONT}`;
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillText("TIEMPO RESTANTE", cx, base - 74);
+          ctx.font = `700 26px ${FONT}`;
+          ctx.fillStyle = "#22d3ee";
+          ctx.fillText(`${hh}:${mm}:${ss}`, cx, base - 44);
+          ctx.textAlign = "left";
+        });
+        break;
       case "rocket":
         // Cohete a escala sobre un pedestal.
         add(y + 1, (ctx) => {
@@ -2053,6 +2117,23 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
     if (door.side === "top") doorPlate(ctx, (door.x + door.w / 2) * T, (door.y - 2) * T - 4, door, s, door.id === hovered);
     else if (door.side === "bottom") doorPlate(ctx, (door.x + door.w / 2) * T, (door.y + 1) * T + 1, door, s, door.id === hovered);
     else doorPlate(ctx, (door.side === "left" ? door.x - 2.5 : door.x + 3.5) * T, (door.y + 3) * T - 36, door, s, door.id === hovered);
+  }
+  // Salas todavía cerradas: oscurecidas, con un cartel que dice cuándo se habilitan.
+  for (const c of map.closed) {
+    ctx.fillStyle = "rgba(15,23,42,0.55)";
+    ctx.fillRect(c.x * T, (c.y - 2) * T, c.w * T, (c.h + 2) * T);
+    ctx.font = `700 13px ${FONT}`;
+    const width = ctx.measureText(c.label).width + 28;
+    const cx = (c.x + c.w / 2) * T;
+    const cy = (c.y + c.h / 2) * T;
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(cx - width / 2, cy - 18, width, 36);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(cx - width / 2, cy - 18, width, 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText(`🔒 ${c.label}`, cx, cy + 5);
+    ctx.textAlign = "left";
   }
   // Cartel de cada mesa de equipo, en su esquina.
   for (const z of map.zones) {
