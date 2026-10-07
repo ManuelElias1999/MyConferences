@@ -1,6 +1,6 @@
 // Estilos que una empresa elige para el lugar de su evento.
 
-export type ThemeId = "tech" | "minimal" | "rustic" | "medieval" | "garden" | "stellar";
+export type ThemeId = "tech" | "minimal" | "rustic" | "medieval" | "garden" | "stellar" | "hackathon";
 
 export const THEMES: { id: ThemeId; label: string; description: string; color: string }[] = [
   { id: "tech", label: "Tecnológica", description: "Paneles con luces LED, racks de servidores y pantallas.", color: "#3b82f6" },
@@ -9,6 +9,7 @@ export const THEMES: { id: ThemeId; label: string; description: string; color: s
   { id: "medieval", label: "Medieval", description: "Piedra, estandartes, antorchas y armaduras.", color: "#9b2335" },
   { id: "garden", label: "Jardín", description: "Pasto, árboles, flores y una fuente.", color: "#16a34a" },
   { id: "stellar", label: "Stellar", description: "Inspirada en el ecosistema Stellar: negro, blanco y amarillo, estrellas, cohetes y nodos de la red.", color: "#fdda24" },
+  { id: "hackathon", label: "Hackathon", description: "Mesas de equipo con voz, cámara y pantalla compartida solo para su rectángulo, sala de presentación de proyectos y salas de charlas.", color: "#ff7a1a" },
 ];
 
 export const isTheme = (value: unknown): value is ThemeId => THEMES.some((t) => t.id === value);

@@ -619,8 +619,7 @@ export default function Scene(props: SceneProps) {
     if (vertical(s)) return wy >= s.y * T && wy < (s.y + s.w) * T;
     return s.side === "top" ? wy >= (s.y - 1) * T && wy < (s.y + 1) * T : wy >= (s.y - 0.5) * T && wy < (s.y + 1) * T;
   };
-  const stairsHit = (s: Stairs, wx: number, wy: number) =>
-    wx >= s.x * T && wx < (s.x + s.w) * T && wy >= (s.y - (s.dir === "up" ? 2 : 0)) * T && wy < (s.y + s.h) * T;
+  const stairsHit = (s: Stairs, wx: number, wy: number) => wx >= s.x * T && wx < (s.x + s.w) * T && wy >= (s.y - 1) * T && wy < (s.y + 1) * T;
   const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy));
   const hitStairs = (wx: number, wy: number) => map.stairs.find((st) => stairsHit(st, wx, wy));
   const hitDirectory = (wx: number, wy: number) =>

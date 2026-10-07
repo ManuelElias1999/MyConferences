@@ -230,7 +230,7 @@ function EventEditor({
           <legend>Salas y agenda</legend>
           <p className="muted small">
             Mínimo {MIN_ROOMS - 1} salas más el auditorio principal, y hasta {MAX_ROOMS - 1}. Las primeras {ROOMS_PER_FLOOR} van en la planta baja; las
-            siguientes, en el piso de arriba. Cada sala tiene una forma distinta: aula, taller con mesas, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
+            siguientes, en el piso de arriba. Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
           </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>

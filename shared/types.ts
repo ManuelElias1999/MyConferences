@@ -186,6 +186,15 @@ export type RtcSignal =
 export interface CallInfo {
   id: string;
   members: User[];
+  /** Nombre de la mesa de equipo si es la conversación de una mesa (hackathon). */
+  zone: string | null;
+  /** Quién tiene la cámara o la pantalla compartida. */
+  media: Record<string, CallMedia>;
+}
+
+export interface CallMedia {
+  cam: boolean;
+  screen: boolean;
 }
 
 export interface CallInvite {
@@ -237,6 +246,7 @@ export interface ClientToServerEvents {
   callRespond: (callId: string, accept: boolean, ack: Ack<CallInfo | null>) => void;
   callLeave: () => void;
   callSignal: (to: string, signal: CallSignal) => void;
+  callMedia: (media: CallMedia) => void;
 }
 
 export interface ServerToClientEvents {
@@ -261,4 +271,6 @@ export interface ServerToClientEvents {
   /** La invitación ya no vale (la charla terminó). */
   callCancelled: (callId: string) => void;
   callSignal: (from: string, signal: CallSignal) => void;
+  /** Aviso sobre las charlas (por ejemplo, una mesa llena). */
+  callNotice: (text: string) => void;
 }

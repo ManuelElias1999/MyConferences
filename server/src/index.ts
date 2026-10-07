@@ -10,6 +10,7 @@ import { DEFAULT_LOOK } from "../../shared/look.ts";
 import {
   floorOfRoom,
   inFront,
+  inZone,
   interiorFor,
   isWalkable,
   MAX_ROOMS,
@@ -23,6 +24,7 @@ import {
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   CallInfo,
+  CallMedia,
   Account,
   ChatMessage,
   ClientToServerEvents,
@@ -524,6 +526,9 @@ interface PrivateCall {
   venueId: string;
   members: Set<string>;
   invited: Set<string>;
+  /** Si es la conversación de una mesa de equipo: su nombre y cuántos caben. */
+  zone?: { label: string; seats: number };
+  media: Map<string, CallMedia>;
 }
 const calls = new Map<string, PrivateCall>();
 const callOfUser = new Map<string, string>();
@@ -531,6 +536,8 @@ const MAX_CALL = 8;
 
 const callInfo = (call: PrivateCall): CallInfo => ({
   id: call.id,
+  zone: call.zone?.label ?? null,
+  media: Object.fromEntries(call.media),
   members: [...call.members].flatMap((id) => {
     const user = connections.get(id)?.user;
     return user ? [user] : [];
@@ -564,11 +571,51 @@ function leaveCall(userId: string) {
   const call = calls.get(callOfUser.get(userId) ?? "");
   if (!call) return;
   call.members.delete(userId);
+  call.media.delete(userId);
   callOfUser.delete(userId);
   setInCall(userId, false);
   io.to(userId).emit("callUpdated", null);
-  if (call.members.size < 2 && call.invited.size === 0) endCall(call);
+  // La mesa sigue abierta mientras quede alguien sentado.
+  if (call.zone) {
+    if (call.members.size === 0) calls.delete(call.id);
+    else emitCall(call);
+  } else if (call.members.size < 2 && call.invited.size === 0) endCall(call);
   else emitCall(call);
+}
+
+/** Mesa en la que alguien quedó fuera a propósito (salió de la charla sin levantarse). */
+const zoneOptOut = new Map<string, string>();
+
+/**
+ * Mesas de equipo: al entrar al rectángulo de una mesa te sumas a su
+ * conversación, y al salir la dejas. Solo se escucha y se ve a quienes están
+ * en el mismo rectángulo.
+ */
+function syncZone(u: User) {
+  const state = u.venueId ? venues.get(u.venueId) : undefined;
+  const map = state && !u.roomId ? state.floors[u.floor] : undefined;
+  const here = { x: Math.round(u.x), y: Math.round(u.y) };
+  const zone = map?.zones.find((z) => inZone(here, z));
+  const key = zone ? `zone:${u.venueId}:${u.floor}:${zone.id}` : null;
+  const current = callOfUser.get(u.id);
+  if (zoneOptOut.has(u.id) && zoneOptOut.get(u.id) !== key) zoneOptOut.delete(u.id);
+  if (current?.startsWith("zone:") && current !== key) leaveCall(u.id);
+  if (!key || !zone || callOfUser.get(u.id) === key || zoneOptOut.get(u.id) === key) return;
+  let call = calls.get(key);
+  if (call && call.members.size >= zone.seats) {
+    io.to(u.id).emit("callNotice", `${zone.label} está completa (${zone.seats} personas). Prueba otra mesa.`);
+    zoneOptOut.set(u.id, key);
+    return;
+  }
+  if (callOfUser.has(u.id)) leaveCall(u.id);
+  if (!call) {
+    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats }, media: new Map() };
+    calls.set(key, call);
+  }
+  call.members.add(u.id);
+  callOfUser.set(u.id, key);
+  setInCall(u.id, true);
+  emitCall(call);
 }
 
 io.on("connection", (socket) => {
@@ -657,6 +704,7 @@ io.on("connection", (socket) => {
     u.x = Math.max(0, Math.min(map.w - 1, Math.round(x * 100) / 100));
     u.y = Math.max(0, Math.min(map.h - 1, Math.round(y * 100) / 100));
     socket.to(sceneChannel(u)).volatile.emit("moved", { id: u.id, x: u.x, y: u.y });
+    syncZone(u);
   });
 
   socket.on("say", (text) => {
@@ -738,6 +786,7 @@ io.on("connection", (socket) => {
       socket.leave(hallChannel(u.venueId, u.floor));
       socket.join(roomChannel(u.venueId, roomId));
       u.roomId = roomId;
+      syncZone(u);
       const interior = interiorOf(venues.get(u.venueId)!.venue, roomId);
       u.x = interior.spawn.x;
       u.y = interior.spawn.y;
@@ -770,6 +819,7 @@ io.on("connection", (socket) => {
     Object.assign(u, { floor, x: spot.x, y: spot.y });
     socket.join(hallChannel(u.venueId, floor));
     io.to(venueChannel(u.venueId)).emit("userUpdated", u);
+    syncZone(u);
     ack({ ok: true, data: { user: u } });
   });
 
@@ -793,6 +843,7 @@ io.on("connection", (socket) => {
     Object.assign(u, { floor: target, x: spot.x, y: spot.y });
     socket.join(hallChannel(u.venueId, target));
     io.to(venueChannel(u.venueId)).emit("userUpdated", u);
+    syncZone(u);
     ack({ ok: true, data: { user: u } });
   });
 
@@ -911,10 +962,11 @@ io.on("connection", (socket) => {
     if (!me?.venueId) return ack({ ok: false, error: "Entra a un evento para charlar" });
     if (!target || target.venueId !== me.venueId || target.id === me.id) return ack({ ok: false, error: "Esa persona ya no está en el evento" });
     let call = calls.get(callOfUser.get(me.id) ?? "");
+    if (call?.zone) return ack({ ok: false, error: "En una mesa de equipo la gente se suma acercándose a la mesa" });
     if (call?.members.has(target.id)) return ack({ ok: false, error: `${target.name} ya está en tu charla` });
     if (call && call.members.size + call.invited.size >= MAX_CALL) return ack({ ok: false, error: `Una charla privada es de hasta ${MAX_CALL} personas` });
     if (!call) {
-      call = { id: randomUUID(), venueId: me.venueId, members: new Set([me.id]), invited: new Set() };
+      call = { id: randomUUID(), venueId: me.venueId, members: new Set([me.id]), invited: new Set(), media: new Map() };
       calls.set(call.id, call);
       callOfUser.set(me.id, call.id);
       setInCall(me.id, true);
@@ -936,7 +988,9 @@ io.on("connection", (socket) => {
       if (call.members.size < 2 && call.invited.size === 0) endCall(call);
       return ack({ ok: true, data: null });
     }
-    if (callOfUser.has(me.id)) leaveCall(me.id);
+    const previous = callOfUser.get(me.id);
+    if (previous?.startsWith("zone:")) zoneOptOut.set(me.id, previous);
+    if (previous) leaveCall(me.id);
     if (!calls.has(call.id)) return ack({ ok: false, error: "Esa charla ya terminó" });
     call.members.add(me.id);
     callOfUser.set(me.id, call.id);
@@ -946,7 +1000,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("callLeave", () => {
-    if (conn) leaveCall(conn.user.id);
+    if (!conn) return;
+    const current = callOfUser.get(conn.user.id);
+    // Quien sale de la charla de una mesa sin levantarse no vuelve a entrar hasta que se mueva a otra.
+    if (current?.startsWith("zone:")) zoneOptOut.set(conn.user.id, current);
+    leaveCall(conn.user.id);
+  });
+
+  socket.on("callMedia", (media) => {
+    if (!conn) return;
+    const call = calls.get(callOfUser.get(conn.user.id) ?? "");
+    if (!call) return;
+    call.media.set(conn.user.id, { cam: Boolean(media?.cam), screen: Boolean(media?.screen) });
+    emitCall(call);
   });
 
   socket.on("callSignal", (to, signal) => {
@@ -961,6 +1027,7 @@ io.on("connection", (socket) => {
     if (!conn) return;
     const u = conn.user;
     leaveCall(u.id);
+    zoneOptOut.delete(u.id);
     for (const call of calls.values()) if (call.invited.delete(u.id) && call.members.size < 2 && call.invited.size === 0) endCall(call);
     leaveCurrentRoom();
     connections.delete(socket.id);

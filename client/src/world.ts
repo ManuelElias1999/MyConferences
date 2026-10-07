@@ -182,6 +182,18 @@ const stellarPanels: FacePainter = (ctx, px, py, row) => {
   }
 };
 
+/** Paneles verde petróleo con una línea naranja: un maker space. */
+const hackPanels: FacePainter = (ctx, px, py, row) => {
+  ctx.fillStyle = row === 1 ? "#1e4b48" : "#25605b";
+  ctx.fillRect(px, py, T, T);
+  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  ctx.fillRect(px + T - 1, py, 1, T);
+  if (row === 0) {
+    ctx.fillStyle = "#ff7a1a";
+    ctx.fillRect(px, py + 10, T, 2);
+  }
+};
+
 interface Style {
   floor: Painter;
   face: FacePainter;
@@ -194,13 +206,15 @@ interface Style {
 }
 
 const STYLES: Record<StyleId, Style> = {
-  cowork: { floor: flat("#e6cba3"), face: bricks(["#c96f52", "#bf654a", "#d0785a", "#c46a4e"], "#ead8c8"), cap: "#4a4e5c", base: "#6b4232", outside: "#c9ccd4" },
+  // Cowork moderno: roble claro, paredes grafito con una línea de bronce.
+  cowork: { floor: flat("#eee5d6"), face: plaster("#3b404c", "#333844", "#c8a46a"), cap: "#22252d", base: "#c8a46a", outside: "#cfd3da" },
   tech: { floor: flat("#f3f6fa"), face: panels, cap: "#2b3448", base: "#22d3ee", outside: "#c6cfdc" },
   minimal: { floor: flat("#f7f3ec"), face: plaster("#b9aa94", "#a8987f", "#8a7a63"), cap: "#5e5244", base: "#6f604c", outside: "#ddd5c7" },
   rustic: { floor: flat("#e7cda6"), face: logs, cap: "#4a3220", base: "#3e2a18", outside: "#b6a27f" },
   medieval: { floor: flat("#e0dbcf"), face: bricks(["#8f899e", "#878196", "#958fa4", "#827c91"], "#6b6579"), cap: "#433e55", base: "#3a3548", outside: "#a7b892" },
   garden: { floor: flat("#f1e8d2"), face: hedge, cap: "#2c5a28", base: "#24481f", outside: "#a7d084" },
   stellar: { floor: flat("#fbfaf5"), face: stellarPanels, cap: "#0f0f14", base: "#fdda24", outside: "#d6d1ef" },
+  hackathon: { floor: flat("#eeece6"), face: hackPanels, cap: "#10302d", base: "#ff7a1a", outside: "#cbd7d4" },
 };
 
 const tileAt = (map: SceneMap, x: number, y: number) => map.tiles[y]?.[x] ?? "#";
@@ -480,6 +494,7 @@ function topDoor(ctx: CanvasRenderingContext2D, door: Door) {
   const bottom = 3 * T;
   const h = bottom - top;
   switch (door.theme) {
+    case "hackathon":
     case "tech": {
       frame(ctx, x, top, w, h, "#334155");
       ctx.fillStyle = "#bde8fb";
@@ -653,100 +668,96 @@ const STEP: Record<StyleId, { tread: string; rail: string }> = {
   garden: { tread: "#d9cfb6", rail: "#6b4a2f" },
   cowork: { tread: "#d5dde9", rail: "#4b5563" },
   stellar: { tread: "#e8e6dd", rail: "#fdda24" },
+  hackathon: { tread: "#d9d5cc", rail: "#ff7a1a" },
 };
 
-/**
- * Escalera que sube: peldaños anchos que nacen en el piso y se meten en el
- * muro, cada vez más oscuros, con barandas a los lados y una flecha.
- */
-function stairsUp(ctx: CanvasRenderingContext2D, style: StyleId, s: Stairs) {
-  const c = STEP[style];
-  const x = s.x * T;
-  const w = s.w * T;
-  const top = (s.y - 2) * T;
-  const bottom = (s.y + s.h) * T;
-  // Hueco en el muro por donde sigue la escalera.
-  ctx.fillStyle = "#2a2a35";
-  ctx.fillRect(x - 6, top, w + 12, bottom - top);
-  const steps = (s.h + 2) * 2;
-  const stepH = (bottom - top) / steps;
-  for (let i = 0; i < steps; i++) {
-    const y = bottom - (i + 1) * stepH;
-    const k = i / steps;
-    const inset = k * 6;
-    ctx.fillStyle = shade(c.tread, -k * 0.45);
-    ctx.fillRect(x + inset, y, w - inset * 2, stepH);
-    ctx.fillStyle = shade(c.tread, -0.25 - k * 0.4);
-    ctx.fillRect(x + inset, y + stepH - 3, w - inset * 2, 3);
-  }
-  // Barandas con postes.
-  ctx.fillStyle = c.rail;
-  ctx.fillRect(x - 6, top + 4, 6, bottom - top - 4);
-  ctx.fillRect(x + w, top + 4, 6, bottom - top - 4);
-  ctx.fillStyle = shade(c.rail, -0.3);
-  for (let y = bottom - 8; y > top + 8; y -= 24) {
-    ctx.fillRect(x - 7, y, 8, 6);
-    ctx.fillRect(x + w - 1, y, 8, 6);
-  }
-  // Flecha hacia arriba en el primer peldaño.
-  const cx = x + w / 2;
-  const ay = bottom - 26;
-  ctx.fillStyle = "rgba(22,22,29,0.55)";
+/** Ascensor en la pared: puertas de acero, un visor con la flecha y el botón de llamada. */
+function elevator(ctx: CanvasRenderingContext2D, s: Stairs) {
+  const x = s.x * T + 2;
+  const w = s.w * T - 4;
+  const top = T + 2;
+  const bottom = 3 * T;
+  frame(ctx, x - 3, top - 2, w + 6, bottom - top + 2, "#8b93a3");
+  ctx.fillStyle = "#c9d0da";
+  ctx.fillRect(x, top + 12, w / 2 - 1, bottom - top - 12);
+  ctx.fillRect(x + w / 2 + 1, top + 12, w / 2 - 1, bottom - top - 12);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillRect(x + 4, top + 16, 2, bottom - top - 20);
+  ctx.fillRect(x + w / 2 + 5, top + 16, 2, bottom - top - 20);
+  ctx.fillStyle = "#5b6475";
+  ctx.fillRect(x + w / 2 - 1, top + 12, 2, bottom - top - 12);
+  // Visor con la flecha.
+  ctx.fillStyle = "#16161d";
+  ctx.fillRect(x + w / 2 - 12, top + 1, 24, 10);
+  ctx.fillStyle = "#ffb703";
   ctx.beginPath();
-  ctx.moveTo(cx, ay - 10);
-  ctx.lineTo(cx + 10, ay + 2);
-  ctx.lineTo(cx + 4, ay + 2);
-  ctx.lineTo(cx + 4, ay + 10);
-  ctx.lineTo(cx - 4, ay + 10);
-  ctx.lineTo(cx - 4, ay + 2);
-  ctx.lineTo(cx - 10, ay + 2);
+  if (s.dir === "up") {
+    ctx.moveTo(x + w / 2, top + 3);
+    ctx.lineTo(x + w / 2 + 5, top + 9);
+    ctx.lineTo(x + w / 2 - 5, top + 9);
+  } else {
+    ctx.moveTo(x + w / 2, top + 9);
+    ctx.lineTo(x + w / 2 + 5, top + 3);
+    ctx.lineTo(x + w / 2 - 5, top + 3);
+  }
   ctx.closePath();
   ctx.fill();
+  // Botonera.
+  frame(ctx, x + w + 4, top + 22, 6, 12, "#3a3f4d");
+  ctx.fillStyle = "#ffb703";
+  ctx.fillRect(x + w + 6, top + 25, 2, 2);
+  ctx.fillRect(x + w + 6, top + 29, 2, 2);
 }
 
-/**
- * Escalera que baja: un hueco en el piso con baranda en tres lados; los
- * peldaños se oscurecen a medida que bajan. Se entra por arriba.
- */
-function stairsDown(ctx: CanvasRenderingContext2D, style: StyleId, s: Stairs) {
+/** Escalera angosta dentro de un arco: se ven los peldaños que suben (o bajan) por dentro del muro. */
+function stairwell(ctx: CanvasRenderingContext2D, style: StyleId, s: Stairs) {
   const c = STEP[style];
-  const x = s.x * T;
-  const y = s.y * T;
-  const w = s.w * T;
-  const h = s.h * T;
-  ctx.fillStyle = "#2a2a35";
-  ctx.fillRect(x - 6, y, w + 12, h + 6);
-  const steps = s.h * 2;
-  const stepH = h / steps;
-  for (let i = 0; i < steps; i++) {
-    const k = i / steps;
-    const inset = k * 6;
-    ctx.fillStyle = shade(c.tread, -k * 0.55);
-    ctx.fillRect(x + inset, y + i * stepH, w - inset * 2, stepH);
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.fillRect(x + inset, y + i * stepH, w - inset * 2, 2);
-  }
-  ctx.fillStyle = c.rail;
-  ctx.fillRect(x - 6, y, 6, h + 6);
-  ctx.fillRect(x + w, y, 6, h + 6);
-  ctx.fillRect(x - 6, y + h, w + 12, 6);
-  ctx.fillStyle = shade(c.rail, -0.3);
-  for (const py of [y, y + h - 2]) {
-    ctx.fillRect(x - 7, py, 8, 8);
-    ctx.fillRect(x + w - 1, py, 8, 8);
-  }
-  // Flecha hacia abajo en el primer peldaño.
-  const cx = x + w / 2;
-  const ay = y + 14;
-  ctx.fillStyle = "rgba(22,22,29,0.5)";
+  const x = s.x * T + 4;
+  const w = s.w * T - 8;
+  const top = T + 2;
+  const bottom = 3 * T;
+  const r = w / 2;
+  ctx.fillStyle = shade(c.rail, -0.2);
   ctx.beginPath();
-  ctx.moveTo(cx, ay + 10);
-  ctx.lineTo(cx + 10, ay - 2);
-  ctx.lineTo(cx + 4, ay - 2);
-  ctx.lineTo(cx + 4, ay - 10);
-  ctx.lineTo(cx - 4, ay - 10);
-  ctx.lineTo(cx - 4, ay - 2);
-  ctx.lineTo(cx - 10, ay - 2);
+  ctx.moveTo(x - 4, bottom);
+  ctx.lineTo(x - 4, top + r);
+  ctx.arc(x + r, top + r, r + 4, Math.PI, 0);
+  ctx.lineTo(x + w + 4, bottom);
+  ctx.closePath();
+  ctx.fill();
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, bottom);
+  ctx.lineTo(x, top + r);
+  ctx.arc(x + r, top + r, r, Math.PI, 0);
+  ctx.lineTo(x + w, bottom);
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = "#1f1d26";
+  ctx.fillRect(x, top, w, bottom - top);
+  const steps = 7;
+  const stepH = (bottom - top) / steps;
+  for (let i = 0; i < steps; i++) {
+    // Al subir, los peldaños de arriba quedan más lejos y oscuros; al bajar, al revés.
+    const k = s.dir === "up" ? i / steps : 1 - i / steps;
+    const y = bottom - (i + 1) * stepH;
+    ctx.fillStyle = shade(c.tread, -k * 0.6);
+    ctx.fillRect(x + 2, y, w - 4, stepH - 1);
+  }
+  ctx.restore();
+  // Flecha sobre el arco.
+  ctx.fillStyle = "#ffb703";
+  ctx.beginPath();
+  const ax = x + r;
+  if (s.dir === "up") {
+    ctx.moveTo(ax, top - 8);
+    ctx.lineTo(ax + 5, top - 2);
+    ctx.lineTo(ax - 5, top - 2);
+  } else {
+    ctx.moveTo(ax, top - 2);
+    ctx.lineTo(ax + 5, top - 8);
+    ctx.lineTo(ax - 5, top - 8);
+  }
   ctx.closePath();
   ctx.fill();
 }
@@ -853,6 +864,7 @@ const ROOF: Record<StyleId, { base: string; line: string }> = {
   garden: { base: "#d39a6a", line: "#bd8456" },
   cowork: { base: "#dbe3ee", line: "#c3cedd" },
   stellar: { base: "#2a2a33", line: "#34343f" },
+  hackathon: { base: "#dcd8cf", line: "#cbc6bb" },
 };
 
 /** Techo de un edificio de sala: claro, con el color de la sala y su nombre bien grande. */
@@ -897,7 +909,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
   ctx.fillRect(x, y + h - 6, w, 6);
   // Nombre pintado sobre un cartel en el techo.
   ctx.font = `700 ${roof.w > 12 ? 16 : 12}px ${FONT}`;
-  const label = roof.label.toUpperCase();
+  const label = roof.open ? `🎤 ${roof.label.toUpperCase()}` : roof.label.toUpperCase();
   const tw = Math.min(w - 16, ctx.measureText(label).width + 18);
   const ty = y + Math.round(h * 0.38);
   ctx.fillStyle = roof.open ? "#16161d" : "rgba(22,22,29,0.35)";
@@ -921,6 +933,20 @@ export function renderStatic(map: SceneMap, scale: number) {
   style.floor(ctx, 0, 0, map.w * T, map.h * T);
   const outside = outsideTiles(map);
   for (const area of map.areas) AREA_FLOOR[area.floor](ctx, area.x * T, area.y * T, (area.x + area.w) * T, (area.y + area.h) * T);
+  // Mesas de equipo: un rectángulo de color suave con borde, para que se vea hasta dónde llega la conversación.
+  for (const z of map.zones) {
+    const x = z.x * T + 2;
+    const y = z.y * T + 2;
+    const w = z.w * T - 4;
+    const h = z.h * T - 4;
+    ctx.fillStyle = `rgba(${hexRgb(z.color)},0.12)`;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = z.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 5]);
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.setLineDash([]);
+  }
   for (let y = 0; y < map.h; y++) {
     for (let x = 0; x < map.w; x++) {
       const c = tileAt(map, x, y);
@@ -1022,6 +1048,7 @@ export function renderStatic(map: SceneMap, scale: number) {
             garden: "#8a5a32",
             cowork: "#2f3440",
             stellar: "#16161d",
+            hackathon: "#1f2937",
           };
           frame(ctx, x - 4, T + 2, w + 8, 2 * T - 6, frameColor[map.style]);
           break;
@@ -1034,10 +1061,9 @@ export function renderStatic(map: SceneMap, scale: number) {
     else if (door.side === "bottom") bottomOpening(ctx, map, door, door.color);
     else sideDoor(ctx, map.style, door);
   }
-  for (const st of map.stairs) {
-    if (st.dir === "up") stairsUp(ctx, map.style, st);
-    else stairsDown(ctx, map.style, st);
-  }
+  // Ascensor en los estilos modernos; escalera bajo un arco en los clásicos.
+  const classic = map.style === "rustic" || map.style === "medieval" || map.style === "garden";
+  for (const st of map.stairs) atRow(ctx, st.y, () => (classic ? stairwell(ctx, map.style, st) : elevator(ctx, st)));
   if (map.exit && !map.decor.some((d) => d.kind === "entrance")) bottomOpening(ctx, map, map.exit, "#ff5c39");
   return canvas;
 }
@@ -1158,6 +1184,7 @@ const CHAIR: Record<StyleId, { frame: string; seat: string }> = {
   garden: { frame: "#8a5a32", seat: "#c8e6a0" },
   cowork: { frame: "#2f3440", seat: "#2f6bff" },
   stellar: { frame: "#16161d", seat: "#fdda24" },
+  hackathon: { frame: "#1f2937", seat: "#ff7a1a" },
 };
 
 export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
@@ -1963,7 +1990,8 @@ function doorPlate(ctx: CanvasRenderingContext2D, cx: number, y: number, door: D
   ctx.fillRect(x, y, 4, h);
   ctx.font = `700 9px ${FONT}`;
   ctx.fillStyle = "#ffffff";
-  let name = door.label;
+  // 🎤: es una sala de charlas, no un espacio para pasar el rato.
+  let name = `🎤 ${door.label}`;
   if (s?.count) name += ` · ${s.count}`;
   ctx.fillText(truncate(ctx, name, width - (s?.live ? 34 : 12)), x + 8, y + 11);
   if (s?.live) {
@@ -2026,10 +2054,22 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
     else if (door.side === "bottom") doorPlate(ctx, (door.x + door.w / 2) * T, (door.y + 1) * T + 1, door, s, door.id === hovered);
     else doorPlate(ctx, (door.side === "left" ? door.x - 2.5 : door.x + 3.5) * T, (door.y + 3) * T - 36, door, s, door.id === hovered);
   }
+  // Cartel de cada mesa de equipo, en su esquina.
+  for (const z of map.zones) {
+    ctx.font = `700 9px ${FONT}`;
+    const text = `${z.label} · hasta ${z.seats}`;
+    const width = ctx.measureText(text).width + 12;
+    const x = z.x * T + 6;
+    const y = z.y * T + 6;
+    ctx.fillStyle = z.color;
+    ctx.fillRect(x, y, width, 14);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, x + 6, y + 10);
+  }
   const exits: { cx: number; y: number; label: string }[] = [
     ...map.stairs.map((st) => ({
       cx: (st.x + st.w / 2) * T,
-      y: st.dir === "up" ? (st.y - 2) * T - 15 : (st.y + st.h) * T + 9,
+      y: (st.y - 2) * T - 15,
       label: `${st.dir === "up" ? "▲" : "▼"} ${st.label}`,
     })),
     ...[...(map.exit ? [{ ...map.exit, label: "Salida a recepción" }] : []), ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" }))].map((e) => {

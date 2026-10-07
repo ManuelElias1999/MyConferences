@@ -11,16 +11,16 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 - El botón **＋ Crear evento** está siempre arriba. Si no tienes cuenta, te registra como empresa. Si tienes una cuenta personal, la convierte en cuenta de empresa. Luego abre el panel en «Nuevo evento».
 - En el panel (**Mis eventos**) se configura cada evento:
   - nombre y descripción;
-  - **temática** del recinto: tecnológica, minimalista, rústica, medieval, jardín o **Stellar**, con vista previa del recinto completo;
+  - **temática** del recinto: tecnológica, minimalista, rústica, medieval, jardín, **Stellar** o **Hackathon**, con vista previa del recinto completo;
   - **acceso**: privado (solo los correos de la lista) o abierto;
-  - **salas y agenda**: el **auditorio principal** y entre **8 y 16 salas** (las primeras ocho van en la planta baja y las demás en el piso de arriba), cada una con su color, su **código de ponente** y sus charlas (título, ponente, hora de inicio y duración). Cada sala tiene una distribución distinta: aula, taller con mesas, anfiteatro en U o sala ancha, y puede tener **su propia temática** (por ejemplo, una sala Stellar dentro de un evento tecnológico);
+  - **salas y agenda**: el **auditorio principal** y entre **8 y 16 salas** (las primeras ocho van en la planta baja y las demás en el piso de arriba), cada una con su color, su **código de ponente** y sus charlas (título, ponente, hora de inicio y duración). Cada sala tiene una distribución distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener **su propia temática** (por ejemplo, una sala Stellar dentro de un evento tecnológico);
   - **logo del evento**: aparece en la pantalla gigante del lobby (si no hay logo, se muestra el nombre);
   - **patrocinadores**: logos en PNG, JPG o WebP con su sitio web opcional y un texto corto sobre lo que ofrecen. Rotan en las pantallas del recinto y de cada sala, y cada uno tiene su **stand**.
 - Cada evento recibe un **número** para compartir con los invitados. La empresa siempre puede entrar a su propio evento con «Visitar mi evento», y también puede cerrarlo: quien esté dentro vuelve a recepción.
 
 ### Para los asistentes
 
-- **Recepción**: un cowork con vida: gente trabajando en los escritorios, una reunión en la sala vidriada, otros tomando café o charlando en el sofá. La recepcionista está a tres pasos de la entrada. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
+- **Recepción**: un cowork moderno y amplio, con aire entre cada espacio: escritorios con gente trabajando, una sala de estar, una sala de reuniones vidriada con una reunión en curso, el café y un rincón de lectura. La recepcionista está a dos pasos de la entrada. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
 - **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
   - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
   - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
@@ -28,15 +28,17 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
+  - **Hackathon (maker space)**: una zona de equipos con seis **mesas de hasta 6 personas**. Cada mesa es un rectángulo marcado en el piso: al entrar te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro; al salir, la dejas. Hay bulevar con las salas (presentación de proyectos, charlas, talleres…), mentorías y snacks, y café.
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
   - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.
   - Ninguna sala queda escondida: todas dan al lobby, al bulevar o al pasillo del auditorio, y se ven apenas llegas. Cafetería, juegos y patios quedan a un costado, detrás de portales.
   - Entre una zona y otra hay **portales con el nombre de la zona** o carteles con flecha («← CAFETERÍA», «JUEGOS →»).
   - Las paredes tienen un color bien distinto al piso, y el piso es liso, sin dibujos.
-  - Las **escaleras** son anchas, con barandas y una flecha: la que sube se mete en el muro y la que baja es un hueco con baranda. Basta pisarlas para cambiar de piso.
+  - Las **escaleras** están en la pared, como una puerta, y no ocupan lugar en el piso: un ascensor en las temáticas modernas y una escalera bajo un arco en las clásicas. Siempre quedan separadas de salas y stands.
+  - Las salas de charla se reconocen enseguida: su puerta y su techo llevan 🎤, y por dentro tienen escenario, pantalla y filas de asientos (aula, teatro en abanico, anfiteatro en U o sala ancha).
 - **Stands**: todos los eventos tienen: uno por patrocinador y uno del organizador (con la agenda). Están pegados a las paredes para no estorbar, con panel, roll-ups, mostrador con el logo y alguien que atiende e invita a acercarse. Al hablarle (X o clic) cuenta lo que hace la marca y ofrece ir a su sitio.
-- **Charla privada por micrófono**: haz clic en una persona (o en 🎙 en la lista «En el evento») e invítala. Si acepta, solo ustedes se escuchan y el resto del evento queda en silencio, incluido el ponente si estás en una sala. Con «＋ Añadir» se suman más personas (hasta 8). Quien está en una charla lleva 🎧 sobre su nombre.
+- **Charla privada por micrófono**: haz clic en una persona (o en 🎙 en la lista «En el evento») e invítala. Si acepta, solo ustedes se escuchan y el resto del evento queda en silencio, incluido el ponente si estás en una sala. Con «＋ Añadir» se suman más personas (hasta 8). En la charla puedes prender la cámara y compartir tu pantalla. Quien está en una charla lleva 🎧 sobre su nombre.
 - **Sin choques**: solo las paredes cortan el paso. Muebles y personas se pueden atravesar, aunque los caminos automáticos rodean los muebles.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.
 - **Puertas**: cada una muestra el nombre de la sala, la charla en curso o la próxima, y su horario (por ejemplo «10:00–10:45»).
@@ -57,6 +59,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 | 202 | Stellar Builders Day (auditorio + 8 salas) | Medieval | Privado |
 | 303 | Demo Day · Inversores (auditorio + 8 salas) | Minimalista | Privado |
 | 404 | Stellar Hub LatAm (auditorio + 8 salas) | Stellar | Abierto |
+| 505 | Hack Night LatAm (auditorio + 8 salas y 6 mesas de equipo) | Hackathon | Abierto |
 
 Se definen en `server/src/seed.ts`. Sus patrocinadores son marcas ficticias con logos de ejemplo en `server/assets/logos`. La gente que conversa en los pasillos es decorativa: da ambiente y no son personas conectadas.
 

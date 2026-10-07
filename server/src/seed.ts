@@ -266,6 +266,43 @@ const seeds: VenueSeed[] = [
       ],
     },
   },
+  {
+    id: "505",
+    name: "Hack Night LatAm",
+    tagline: "48 horas para construir: mesas de equipo, mentorías y demo day.",
+    private: false,
+    theme: "hackathon",
+    organizer: "MyConferences",
+    sponsors: [logo("devforge", "DevForge"), logo("orbit-cloud", "Orbit Cloud"), logo("novapay", "NovaPay")],
+    rooms: [
+      { id: "auditorio", name: "Auditorio principal", topic: "Apertura, keynotes y premios", color: "#ff7a1a", main: true },
+      { id: "demos", name: "Presentación de proyectos", topic: "Demo day de los equipos", color: "#ef4444", main: false },
+      { id: "charlas", name: "Charlas técnicas", topic: "Herramientas para el hackathon", color: "#2f6bff", main: false },
+      { id: "ia", name: "Taller de IA", topic: "Agentes y APIs de modelos", color: "#10b981", main: false },
+      { id: "web3", name: "Sala Web3", topic: "Contratos y pagos", color: "#6366f1", main: false, theme: "stellar" },
+      { id: "diseno", name: "Diseño y producto", topic: "Del problema al prototipo", color: "#ec4899", main: false },
+      { id: "pitch", name: "Práctica de pitch", topic: "Cómo presentar en 3 minutos", color: "#f59e0b", main: false },
+      { id: "mentorias", name: "Mentorías", topic: "Pregúntale a un mentor", color: "#14b8a6", main: false },
+      { id: "relampago", name: "Charlas relámpago", topic: "5 minutos por charla", color: "#8b5cf6", main: false },
+    ],
+    program: {
+      auditorio: [
+        ["Apertura y reglas del hackathon", "Equipo organizador", "Tiempos, premios, mesas de equipo y cómo pedir ayuda."],
+        ["Keynote: construir rápido sin romper todo", "Laura Méndez", "Cómo priorizar en 48 horas."],
+        ["Premios", "Jurado", "Los equipos ganadores y sus proyectos."],
+      ],
+      demos: [
+        ["Demo day: ronda 1", "Equipos 1 a 6", "Cada equipo presenta su proyecto en 3 minutos."],
+        ["Demo day: ronda 2", "Equipos 7 a 12", "Más proyectos, preguntas del jurado."],
+      ],
+      charlas: [
+        ["Deploy en 10 minutos", "Martín Silva", "Llevar tu proyecto a producción sin sufrir."],
+        ["Bases de datos para hackathons", "Ana Ruiz", "Qué usar cuando no hay tiempo."],
+      ],
+      ia: [["Tu primer agente", "Andrés Ríos", "Herramientas, memoria y límites."]],
+      pitch: [["El pitch de 3 minutos", "Carla Méndez", "Problema, demo y pedido."]],
+    },
+  },
 ];
 
 /**

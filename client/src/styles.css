@@ -1996,3 +1996,54 @@ textarea {
   font-size: 1.4rem;
   font-weight: 700;
 }
+
+.call-panel.with-video {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.call-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.call-tile {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #16161d;
+}
+
+.call-tile.wide {
+  grid-column: 1 / -1;
+}
+
+.call-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.call-tile video.mirror {
+  transform: scaleX(-1);
+}
+
+.call-tile figcaption {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: rgb(22 22 29 / 0.75);
+  color: #fff;
+  font-size: 0.72rem;
+}
+
+/* Si hay muchos eventos abiertos, la lista se desplaza en vez de agrandar el diálogo. */
+.npc-hint {
+  max-height: 112px;
+  overflow-y: auto;
+}
