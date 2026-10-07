@@ -31,6 +31,8 @@ export interface Room {
   color: string;
   /** El auditorio principal: todo evento tiene uno, es más grande y tiene entrada propia. */
   main: boolean;
+  /** Temática propia de la sala (su puerta y su interior); si no tiene, usa la del evento. */
+  theme?: ThemeId | null;
 }
 
 /** Patrocinador de un evento: su logo rota en las pantallas del lugar. */
@@ -90,7 +92,7 @@ export interface EventInput {
   private: boolean;
   whitelist: string[];
   /** La primera es el auditorio principal. Salas existentes llevan su id; las nuevas, no. */
-  rooms: { id?: string; name: string; topic: string; color: string; talks: TalkInput[] }[];
+  rooms: { id?: string; name: string; topic: string; color: string; theme?: ThemeId | null; talks: TalkInput[] }[];
 }
 
 /** Charla de la agenda tal como la carga la empresa. */

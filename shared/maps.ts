@@ -65,6 +65,12 @@ export type FurniKind =
   | "chess"
   /** Stand de un patrocinador: mostrador con su logo, roll-ups y un panel en la pared. */
   | "booth"
+  /** Cohete a escala sobre un pedestal (temática Stellar). */
+  | "rocket"
+  /** Columna con nodos de luz unidos como una constelación (temática Stellar). */
+  | "constellation"
+  /** Mampara de vidrio, como la de una sala de reuniones. */
+  | "partition"
   | "rug"
   | "carpet";
 
@@ -168,6 +174,8 @@ export interface Npc {
   talkFrom?: Tile[];
   /** Si atiende un stand: la posición del patrocinador en la lista. */
   sponsor?: number;
+  /** Está sentado (trabajando en un escritorio, en una reunión o en un sofá). */
+  sit?: boolean;
 }
 
 export interface Seat extends Tile {
@@ -352,52 +360,101 @@ function attendee(i: number, x: number, y: number, dir: Dir): Npc {
 
 export const RECEPTIONIST_ID = "npc-recepcion";
 
+/**
+ * Recepción: un cowork tecnológico con vida. Hay gente trabajando en los
+ * escritorios, una reunión en la sala vidriada, otros tomando café y
+ * charlando en el sofá. La recepcionista está a pocos pasos de la entrada.
+ */
 export function receptionMap(): SceneMap {
-  const w = 16;
-  const h = 11;
-  return finish({
-    ...empty,
-    w,
-    h,
-    tiles: enclosure(w, h),
-    style: "cowork",
-    spawn: { x: 7, y: 8 },
-    furni: [
-      // Mostrador en U: la recepcionista queda adentro, a tres pasos de la entrada.
-      ...[5, 6, 7, 8, 9, 10].map((x) => ({ kind: "counter" as const, x, y: 4 })),
-      { kind: "counter", x: 5, y: 3 },
-      { kind: "counter", x: 10, y: 3 },
-      { kind: "bigplant", x: 9, y: 3 },
-      { kind: "bookshelf", x: 1, y: 3 },
-      { kind: "cooler", x: 3, y: 3 },
-      { kind: "workdesk", x: 1, y: 6, w: 3 },
-      { kind: "officechair", x: 1, y: 7 },
-      { kind: "officechair", x: 2, y: 7 },
-      { kind: "officechair", x: 3, y: 7 },
-      { kind: "bigplant", x: 1, y: 9 },
-      { kind: "arcade", x: 4, y: 9 },
-      { kind: "coffeebar", x: 11, y: 3, w: 3 },
-      { kind: "vending", x: 14, y: 3 },
-      { kind: "sofa", x: 11, y: 5, w: 3, color: "#2f6bff", dir: "down" },
-      { kind: "coffeetable", x: 11, y: 7, w: 2 },
-      { kind: "beanbag", x: 14, y: 7, color: "#ffb703" },
-      { kind: "bigplant", x: 14, y: 9 },
-    ],
-    decor: [
-      { kind: "window", x: 1, y: 2, w: 3 },
-      { kind: "neon", x: 5, y: 2, w: 6, text: "MyConferences", color: "#ff5c39" },
-      { kind: "clock", x: 11, y: 2 },
-      { kind: "art", x: 12, y: 2, w: 2, color: "#2f6bff" },
-      { kind: "entrance", x: 7, y: h - 1, w: 2 },
-    ],
-    npcs: [{ id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 7, y: 3, dir: "down", talkFrom: [6, 7, 8, 9].map((x) => ({ x, y: 5 })) }],
-    desk: [6, 7, 8, 9].map((x) => ({ x, y: 5 })),
-  }, true);
+  const w = 24;
+  const h = 15;
+  const sit = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker", sit: true });
+  const stand = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker" });
+  return finish(
+    {
+      ...empty,
+      w,
+      h,
+      tiles: enclosure(w, h),
+      style: "cowork",
+      spawn: { x: 11, y: 12 },
+      furni: [
+        // Mostrador de recepción, en el centro y a tres pasos de la entrada.
+        ...[9, 10, 11, 12, 13, 14].map((x) => ({ kind: "counter" as const, x, y: 9 })),
+        { kind: "counter", x: 9, y: 8 },
+        { kind: "counter", x: 14, y: 8 },
+        { kind: "bigplant", x: 13, y: 7 },
+        // Escritorios compartidos, con gente trabajando.
+        { kind: "workdesk", x: 1, y: 3, w: 3 },
+        { kind: "workdesk", x: 5, y: 3, w: 3 },
+        ...[1, 2, 3, 5, 6, 7].map((x) => ({ kind: "officechair" as const, x, y: 4 })),
+        { kind: "workdesk", x: 1, y: 6, w: 3 },
+        { kind: "workdesk", x: 5, y: 6, w: 3 },
+        ...[1, 2, 3, 5, 6, 7].map((x) => ({ kind: "officechair" as const, x, y: 7 })),
+        // Sala de reuniones vidriada.
+        { kind: "partition", x: 15, y: 3, d: 4 },
+        { kind: "partition", x: 15, y: 7, w: 3 },
+        { kind: "partition", x: 20, y: 7, w: 3 },
+        { kind: "table", x: 17, y: 4, w: 4 },
+        ...[17, 18, 19, 20].map((x) => ({ kind: "officechair" as const, x, y: 5 })),
+        { kind: "officechair", x: 16, y: 4 },
+        { kind: "officechair", x: 21, y: 4 },
+        // Rincón del café.
+        { kind: "coffeebar", x: 18, y: 9, w: 4 },
+        { kind: "vending", x: 22, y: 9 },
+        { kind: "cafetable", x: 19, y: 12, w: 2 },
+        // Sofá para charlar.
+        { kind: "sofa", x: 1, y: 10, w: 3, color: "#2f6bff", dir: "down" },
+        { kind: "coffeetable", x: 1, y: 12, w: 2 },
+        { kind: "armchair", x: 5, y: 10, color: "#ffb703" },
+        { kind: "bookshelf", x: 9, y: 3 },
+        { kind: "bookshelf", x: 10, y: 3 },
+        { kind: "cooler", x: 12, y: 3 },
+        { kind: "bigplant", x: 22, y: 13 },
+        { kind: "bigplant", x: 1, y: 13 },
+        { kind: "arcade", x: 7, y: 13 },
+      ],
+      decor: [
+        { kind: "window", x: 1, y: 2, w: 3 },
+        { kind: "window", x: 5, y: 2, w: 3 },
+        { kind: "neon", x: 9, y: 2, w: 6, text: "MyConferences", color: "#ff5c39" },
+        { kind: "whiteboard", x: 17, y: 2, w: 3 },
+        { kind: "clock", x: 21, y: 2 },
+        { kind: "entrance", x: 11, y: h - 1, w: 2 },
+      ],
+      crowd: [
+        // Trabajando.
+        sit(1, 1, 4, "up"),
+        sit(2, 3, 4, "up"),
+        sit(3, 6, 4, "up"),
+        sit(4, 2, 7, "up"),
+        sit(5, 5, 7, "up"),
+        sit(6, 7, 7, "up"),
+        // En reunión.
+        sit(7, 17, 5, "up"),
+        sit(8, 19, 5, "up"),
+        sit(9, 20, 5, "up"),
+        sit(10, 16, 4, "right"),
+        sit(11, 21, 4, "left"),
+        // Tomando un café.
+        stand(12, 18, 11, "right"),
+        stand(13, 19, 11, "left"),
+        stand(14, 21, 11, "left"),
+        // Charlando en el sofá.
+        sit(15, 1, 10, "down"),
+        sit(16, 2, 10, "down"),
+        sit(17, 5, 10, "left"),
+      ],
+      npcs: [{ id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 11, y: 8, dir: "down", talkFrom: [10, 11, 12, 13].map((x) => ({ x, y: 10 })) }],
+      desk: [10, 11, 12, 13].map((x) => ({ x, y: 10 })),
+    },
+    true,
+  );
 }
 
 // ---------- Recinto del evento ----------
 
-const SOFA: Record<ThemeId, string> = { tech: "#2f6bff", minimal: "#9aa5b1", rustic: "#a0522d", medieval: "#7a2a3a", garden: "#5a8f3e" };
+const SOFA: Record<ThemeId, string> = { tech: "#2f6bff", minimal: "#9aa5b1", rustic: "#a0522d", medieval: "#7a2a3a", garden: "#5a8f3e", stellar: "#2a2a33" };
 
 /** Objetos de ambiente de cada estilo (también se usan en las salas). */
 const ACCENTS: Record<ThemeId, FurniKind[]> = {
@@ -406,6 +463,7 @@ const ACCENTS: Record<ThemeId, FurniKind[]> = {
   rustic: ["barrel", "lantern", "bookshelf", "plant"],
   medieval: ["armor", "candelabra", "pillar", "armor"],
   garden: ["tree", "lantern", "tree", "flowerbed"],
+  stellar: ["constellation", "rocket", "bigplant", "constellation"],
 };
 
 /** Salas por piso. Todo evento tiene al menos ocho más el auditorio; las siguientes van al piso de arriba. */
@@ -569,15 +627,15 @@ const UPPER: Record<ThemeId, UpperTheme> = {
     terrace: "SKY LOUNGE",
     chill: "ZONA CHILL",
     bar: "BARRA",
-    zones: ["Piso 1 · ala oeste", "Piso 1 · pasillo norte", "Piso 1 · ala este", "Piso 1 · ala noreste"],
+    zones: ["Piso 1 · pasillo oeste", "Piso 1 · fondo oeste", "Piso 1 · pasillo este", "Piso 1 · fondo este"],
     stairs: "Bajar a la planta baja",
     terraceFloor: "deck",
     extra: [
-      { kind: "hologram", x: 27, y: 4, w: 2, d: 2 },
+      { kind: "hologram", x: 28, y: 5, w: 2, d: 2 },
       { kind: "ledpillar", x: 16, y: 3 },
-      { kind: "ledpillar", x: 39, y: 3 },
-      { kind: "arcade", x: 16, y: 32 },
-      { kind: "robot", x: 49, y: 35 },
+      { kind: "ledpillar", x: 41, y: 3 },
+      { kind: "arcade", x: 8, y: 34 },
+      { kind: "robot", x: 52, y: 36 },
     ],
     decor: [{ kind: "neon", x: 26, y: 2, w: 4, text: "SKY", color: "#22d3ee" }],
   },
@@ -586,15 +644,15 @@ const UPPER: Record<ThemeId, UpperTheme> = {
     terrace: "MIRADOR",
     chill: "INVERNADERO",
     bar: "JUGUERÍA",
-    zones: ["Mirador · sendero oeste", "Mirador · pérgola", "Mirador · sendero este", "Mirador · glorieta"],
+    zones: ["Mirador · pérgola oeste", "Mirador · glorieta oeste", "Mirador · pérgola este", "Mirador · glorieta este"],
     stairs: "Bajar al parque",
     terraceFloor: "grass",
     extra: [
       { kind: "tree", x: 16, y: 3 },
-      { kind: "tree", x: 39, y: 3 },
-      { kind: "fountain", x: 27, y: 4, w: 2, d: 2 },
-      { kind: "flowerbed", x: 3, y: 35, w: 3 },
-      { kind: "lantern", x: 49, y: 35 },
+      { kind: "tree", x: 41, y: 3 },
+      { kind: "fountain", x: 28, y: 5, w: 2, d: 2 },
+      { kind: "flowerbed", x: 8, y: 37, w: 3 },
+      { kind: "lantern", x: 52, y: 36 },
     ],
     decor: [{ kind: "ivy", x: 26, y: 2, w: 4 }],
   },
@@ -603,16 +661,16 @@ const UPPER: Record<ThemeId, UpperTheme> = {
     terrace: "TERRAZA",
     chill: "BIBLIOTECA",
     bar: "CAFÉ",
-    zones: ["Piso 1 · galería oeste", "Piso 1 · pasillo norte", "Piso 1 · galería este", "Piso 1 · ala noreste"],
+    zones: ["Piso 1 · galería oeste", "Piso 1 · fondo oeste", "Piso 1 · galería este", "Piso 1 · fondo este"],
     stairs: "Bajar a la planta baja",
     terraceFloor: "deck",
     extra: [
-      { kind: "sculpture", x: 27, y: 4 },
+      { kind: "sculpture", x: 28, y: 5 },
       { kind: "bigplant", x: 16, y: 3 },
-      { kind: "bigplant", x: 39, y: 3 },
-      { kind: "bookshelf", x: 3, y: 32 },
-      { kind: "bookshelf", x: 4, y: 32 },
-      { kind: "lamp", x: 49, y: 35 },
+      { kind: "bigplant", x: 41, y: 3 },
+      { kind: "bookshelf", x: 8, y: 34 },
+      { kind: "bookshelf", x: 9, y: 34 },
+      { kind: "lamp", x: 52, y: 36 },
     ],
     decor: [{ kind: "art", x: 26, y: 2, w: 3, color: "#e9b8a4" }],
   },
@@ -621,33 +679,33 @@ const UPPER: Record<ThemeId, UpperTheme> = {
     terrace: "TERRAZA",
     chill: "RINCÓN DE LECTURA",
     bar: "BODEGA",
-    zones: ["Altillo · ala oeste", "Altillo · pasillo norte", "Altillo · ala este", "Altillo · granero"],
+    zones: ["Altillo · pasillo oeste", "Altillo · granero oeste", "Altillo · pasillo este", "Altillo · granero este"],
     stairs: "Bajar al pueblo",
     terraceFloor: "wood",
     extra: [
       { kind: "barrel", x: 16, y: 3 },
-      { kind: "barrel", x: 39, y: 3 },
-      { kind: "lantern", x: 27, y: 4 },
-      { kind: "bookshelf", x: 3, y: 32 },
-      { kind: "barrel", x: 49, y: 35 },
+      { kind: "barrel", x: 41, y: 3 },
+      { kind: "lantern", x: 28, y: 5 },
+      { kind: "bookshelf", x: 8, y: 34 },
+      { kind: "barrel", x: 52, y: 36 },
     ],
-    decor: [{ kind: "fireplace", x: 4, y: 31, w: 3 }],
+    decor: [{ kind: "fireplace", x: 17, y: 33, w: 3 }],
   },
   medieval: {
     name: "Azotea",
     terrace: "ALMENAS",
     chill: "JARDÍN DE LA TORRE",
     bar: "TABERNA ALTA",
-    zones: ["Azotea · torre oeste", "Azotea · torre del homenaje", "Azotea · torre este", "Azotea · torre norte"],
+    zones: ["Azotea · torre oeste", "Azotea · torreón oeste", "Azotea · torre este", "Azotea · torreón este"],
     stairs: "Bajar al patio de armas",
     terraceFloor: "stone",
     extra: [
-      ...[17, 20, 23, 32, 35, 38].map((x): Furni => ({ kind: "crenel", x, y: 3 })),
-      { kind: "telescope", x: 16, y: 7 },
-      { kind: "telescope", x: 39, y: 7 },
-      { kind: "candelabra", x: 27, y: 4 },
-      { kind: "flowerbed", x: 3, y: 35, w: 3 },
-      { kind: "barrel", x: 49, y: 35 },
+      ...[17, 20, 23, 34, 37, 40].map((x): Furni => ({ kind: "crenel", x, y: 3 })),
+      { kind: "telescope", x: 16, y: 10 },
+      { kind: "telescope", x: 41, y: 10 },
+      { kind: "candelabra", x: 28, y: 5 },
+      { kind: "flowerbed", x: 8, y: 37, w: 3 },
+      { kind: "barrel", x: 52, y: 36 },
     ],
     decor: [
       { kind: "banner", x: 26, y: 2, color: "#9b2335" },
@@ -655,59 +713,83 @@ const UPPER: Record<ThemeId, UpperTheme> = {
       { kind: "banner", x: 29, y: 2, color: "#2f6bff" },
     ],
   },
+  stellar: {
+    name: "Estación orbital",
+    terrace: "MIRADOR ESTELAR",
+    chill: "ZONA DE DESCANSO",
+    bar: "BARRA LUMEN",
+    zones: ["Estación · módulo oeste", "Estación · fondo oeste", "Estación · módulo este", "Estación · fondo este"],
+    stairs: "Bajar al hub",
+    terraceFloor: "deck",
+    extra: [
+      { kind: "rocket", x: 28, y: 5 },
+      { kind: "constellation", x: 16, y: 3 },
+      { kind: "constellation", x: 41, y: 3 },
+      { kind: "telescope", x: 16, y: 10 },
+      { kind: "arcade", x: 8, y: 34 },
+      { kind: "constellation", x: 52, y: 36 },
+    ],
+    decor: [{ kind: "neon", x: 26, y: 2, w: 4, text: "✦ STELLAR", color: "#fdda24" }],
+  },
 };
 
+/**
+ * Piso alto: un gran pasillo con la escalera al medio. Las salas dan todas a
+ * ese pasillo (dos de frente a cada lado y dos al fondo de cada punta), y los
+ * stands van contra la pared. La terraza, el rincón tranquilo y la barra quedan
+ * detrás de portales.
+ */
 function upperFloor(theme: ThemeId): Level {
   const u = UPPER[theme];
   return {
     name: u.name,
-    w: 59,
-    h: 38,
+    w: 62,
+    h: 40,
     floors: [
-      { x: 16, y: 3, w: 24, h: 6 }, // terraza
-      { x: 24, y: 9, w: 8, h: 13 }, // pasillo norte
-      { x: 19, y: 22, w: 18, h: 9 }, // descanso de la escalera
-      { x: 3, y: 24, w: 16, h: 5 }, // ala oeste
-      { x: 37, y: 24, w: 15, h: 5 }, // ala este
-      { x: 47, y: 10, w: 5, h: 14 }, // ala noreste
-      { x: 8, y: 29, w: 4, h: 3 },
-      { x: 3, y: 32, w: 14, h: 4 }, // rincón tranquilo
-      { x: 42, y: 29, w: 4, h: 3 },
-      { x: 38, y: 32, w: 12, h: 4 }, // barra
+      { x: 16, y: 3, w: 26, h: 9 }, // terraza
+      { x: 25, y: 12, w: 8, h: 10 }, // paso a la terraza
+      { x: 6, y: 22, w: 49, h: 9 }, // gran pasillo
+      { x: 12, y: 31, w: 4, h: 3 },
+      { x: 8, y: 34, w: 14, h: 4 }, // rincón tranquilo
+      { x: 44, y: 31, w: 4, h: 3 },
+      { x: 40, y: 34, w: 14, h: 4 }, // barra
     ],
-    areas: [{ x: 16, y: 3, w: 24, h: 6, floor: u.terraceFloor }],
-    spawn: { x: 27, y: 24 },
-    slots: [...pairH(5, 23, u.zones[0]), ...pairV(23, 10, "left", u.zones[1]), ...pairH(37, 23, u.zones[2]), ...pairV(52, 12, "right", u.zones[3])],
+    areas: [{ x: 16, y: 3, w: 26, h: 9, floor: u.terraceFloor }],
+    spawn: { x: 29, y: 24 },
+    slots: [...pairH(16, 21, u.zones[0]), ...pairV(5, 22, "left", u.zones[1]), ...pairH(33, 21, u.zones[2]), ...pairV(55, 22, "right", u.zones[3])],
     stands: [
-      { x: 20, y: 22 },
-      { x: 33, y: 22 },
+      { x: 8, y: 22 },
+      { x: 44, y: 22 },
+      { x: 12, y: 22 },
+      { x: 49, y: 22 },
     ],
-    stairs: [{ x: 26, y: 26, w: 3, h: 3, dir: "down", to: 0, label: u.stairs }],
+    stairs: [{ x: 28, y: 26, w: 3, h: 3, dir: "down", to: 0, label: u.stairs }],
     decor: [
       { kind: "sponsors", x: 18, y: 2, w: 4 },
-      { kind: "sponsors", x: 34, y: 2, w: 4 },
-      { kind: "window", x: 15, y: 23, w: 3 },
-      { kind: "portal", x: 8, y: 31, w: 4, text: u.chill },
-      { kind: "portal", x: 42, y: 31, w: 4, text: u.bar },
+      { kind: "sponsors", x: 36, y: 2, w: 4 },
+      { kind: "window", x: 19, y: 21, w: 2 },
+      { kind: "window", x: 36, y: 21, w: 2 },
+      { kind: "portal", x: 12, y: 33, w: 4, text: u.chill },
+      { kind: "portal", x: 44, y: 33, w: 4, text: u.bar },
       ...u.decor,
     ],
     furni: [
-      { kind: "parasol", x: 19, y: 5, w: 2 },
-      { kind: "parasol", x: 35, y: 5, w: 2 },
-      { kind: "bench", x: 21, y: 8, w: 3 },
-      { kind: "bench", x: 33, y: 8, w: 3 },
-      ...lounge(3, 33, SOFA[theme]),
-      { kind: "beanbag", x: 13, y: 34, color: "#ffb703" },
-      { kind: "beanbag", x: 15, y: 34, color: "#ef476f" },
-      { kind: "coffeebar", x: 38, y: 32, w: 3 },
-      { kind: "cafetable", x: 46, y: 33, w: 2 },
-      { kind: "cafetable", x: 39, y: 35, w: 2 },
-      { kind: "plant", x: 19, y: 30 },
-      { kind: "plant", x: 36, y: 30 },
+      { kind: "parasol", x: 19, y: 6, w: 2 },
+      { kind: "parasol", x: 37, y: 6, w: 2 },
+      { kind: "bench", x: 21, y: 10, w: 3 },
+      { kind: "bench", x: 34, y: 10, w: 3 },
+      ...lounge(16, 34, SOFA[theme]),
+      { kind: "beanbag", x: 10, y: 36, color: "#ffb703" },
+      { kind: "beanbag", x: 12, y: 37, color: "#ef476f" },
+      { kind: "coffeebar", x: 40, y: 34, w: 3 },
+      { kind: "cafetable", x: 49, y: 35, w: 2 },
+      { kind: "cafetable", x: 41, y: 37, w: 2 },
+      { kind: "plant", x: 6, y: 30 },
+      { kind: "plant", x: 54, y: 30 },
       ...u.extra,
     ],
-    crowd: [...chat(28, 6), ...chat(6, 35), ...chat(43, 34), ...chat(21, 26), ...chat(14, 26), ...chat(48, 17)],
-    directories: [{ x: 31, y: 28 }],
+    crowd: [...chat(23, 8), ...chat(14, 35), ...chat(45, 36), ...chat(20, 26), ...chat(37, 27), ...chat(28, 16)],
+    directories: [{ x: 32, y: 27 }],
   };
 }
 
@@ -1014,12 +1096,95 @@ function villageGround(): Level {
   };
 }
 
+// ----- Stellar: un hub con módulos alrededor, observatorio y lounge -----
+
+function stellarGround(): Level {
+  return {
+    name: "Hub",
+    w: 60,
+    h: 50,
+    floors: [
+      { x: 18, y: 24, w: 24, h: 14 }, // hub central
+      { x: 27, y: 10, w: 6, h: 14 }, // pasarela al auditorio
+      { x: 3, y: 8, w: 19, h: 7 }, // observatorio
+      { x: 22, y: 10, w: 5, h: 3 },
+      { x: 38, y: 8, w: 19, h: 7 }, // nodo de juegos
+      { x: 33, y: 10, w: 5, h: 3 },
+      { x: 20, y: 38, w: 4, h: 2 },
+      { x: 8, y: 40, w: 18, h: 8 }, // café
+      { x: 36, y: 38, w: 4, h: 2 },
+      { x: 34, y: 40, w: 18, h: 8 }, // lounge
+    ],
+    areas: [
+      { x: 8, y: 40, w: 18, h: 8, floor: "deck" },
+      { x: 3, y: 8, w: 19, h: 7, floor: "tiles" },
+    ],
+    exit: { x: 29, y: 38 },
+    spawn: { x: 29, y: 35 },
+    main: { x: 28, y: 9, roof: { x: 22, y: 1, w: 16, h: 7 } },
+    slots: [...pairH(18, 23, "Hub (oeste)"), ...pairV(17, 26, "left", "Módulo Soroban"), ...pairH(33, 23, "Hub (este)"), ...pairV(42, 26, "right", "Módulo Horizon")],
+    stands: [
+      { x: 21, y: 24 },
+      { x: 36, y: 24 },
+      { x: 13, y: 40 },
+      { x: 45, y: 40 },
+      { x: 14, y: 8 },
+      { x: 45, y: 8 },
+    ],
+    stairs: [{ x: 8, y: 8, w: 3, h: 3, dir: "up", to: 1, label: "Subir a la estación" }],
+    decor: [
+      { kind: "neon", x: 3, y: 7, w: 4, text: "OBSERVATORIO", color: "#fdda24" },
+      { kind: "window", x: 18, y: 7, w: 3 },
+      { kind: "neon", x: 38, y: 7, w: 3, text: "NODO", color: "#b7ace8" },
+      { kind: "sponsors", x: 50, y: 7, w: 4 },
+      { kind: "sign", x: 23, y: 9, w: 4, text: "← OBSERVATORIO" },
+      { kind: "sign", x: 33, y: 9, w: 4, text: "JUEGOS →" },
+      { kind: "portal", x: 20, y: 39, w: 4, text: "CAFÉ ANCLA" },
+      { kind: "portal", x: 36, y: 39, w: 4, text: "GALAXY LOUNGE" },
+      { kind: "neon", x: 48, y: 39, w: 4, text: "✦ LOUNGE", color: "#fdda24" },
+    ],
+    furni: [
+      { kind: "eventscreen", x: 27, y: 29, w: 6 },
+      { kind: "rocket", x: 40, y: 31 },
+      { kind: "constellation", x: 19, y: 31 },
+      { kind: "constellation", x: 41, y: 36 },
+      { kind: "bigplant", x: 18, y: 37 },
+      { kind: "telescope", x: 5, y: 12 },
+      { kind: "telescope", x: 20, y: 12 },
+      { kind: "bench", x: 12, y: 13, w: 3 },
+      { kind: "constellation", x: 17, y: 9 },
+      { kind: "arcade", x: 54, y: 8 },
+      { kind: "arcade", x: 55, y: 8 },
+      { kind: "arcade", x: 56, y: 8 },
+      { kind: "pingpong", x: 39, y: 11, w: 3 },
+      { kind: "foosball", x: 49, y: 12, w: 2 },
+      { kind: "beanbag", x: 53, y: 13, color: "#fdda24" },
+      { kind: "beanbag", x: 55, y: 13, color: "#b7ace8" },
+      { kind: "coffeebar", x: 8, y: 40, w: 3 },
+      { kind: "cafetable", x: 9, y: 44, w: 2 },
+      { kind: "cafetable", x: 13, y: 45, w: 2 },
+      { kind: "cafetable", x: 21, y: 44, w: 2 },
+      { kind: "bigplant", x: 25, y: 47 },
+      ...lounge(41, 43, "#fdda24"),
+      { kind: "beanbag", x: 49, y: 45, color: "#b7ace8" },
+      { kind: "beanbag", x: 50, y: 46, color: "#fdda24" },
+      { kind: "rocket", x: 34, y: 46 },
+    ],
+    crowd: [...chat(24, 32), ...chat(33, 33), ...chat(4, 11), ...chat(44, 12), ...chat(17, 44), ...chat(38, 45), ...chat(29, 15)],
+    directories: [
+      { x: 23, y: 35 },
+      { x: 36, y: 35 },
+    ],
+  };
+}
+
 const LEVELS: Record<ThemeId, () => Level[]> = {
   tech: () => [techGround(), upperFloor("tech")],
   medieval: () => [castleGround(), upperFloor("medieval")],
   garden: () => [parkGround(), upperFloor("garden")],
   minimal: () => [galleryGround(), upperFloor("minimal")],
   rustic: () => [villageGround(), upperFloor("rustic")],
+  stellar: () => [stellarGround(), upperFloor("stellar")],
 };
 
 /** Lo que el plano necesita saber de un patrocinador: su nombre, para el representante del stand. */
@@ -1028,21 +1193,22 @@ type StandSponsor = { name: string };
 function buildLevel(
   theme: ThemeId,
   L: Level,
-  main: Pick<Room, "id" | "name" | "color"> | null,
-  rooms: Pick<Room, "id" | "name" | "color">[],
+  main: Pick<Room, "id" | "name" | "color" | "theme"> | null,
+  rooms: Pick<Room, "id" | "name" | "color" | "theme">[],
   sponsors: StandSponsor[],
 ): SceneMap {
   const doors: Door[] = [];
   const roofs: Roof[] = [];
   if (main && L.main) {
-    doors.push({ side: "top", x: L.main.x, y: L.main.y, w: 4, id: main.id, label: main.name, color: main.color, theme, zone: "Auditorio principal", main: true });
+    doors.push({ side: "top", x: L.main.x, y: L.main.y, w: 4, id: main.id, label: main.name, color: main.color, theme: main.theme ?? theme, zone: "Auditorio principal", main: true });
     roofs.push({ ...L.main.roof, label: main.name, color: main.color, open: true });
   }
   const decor = [...L.decor];
   L.slots.forEach((slot, i) => {
     const room = rooms[i];
     roofs.push({ ...slot.roof, label: room?.name ?? "", color: room?.color ?? "", open: Boolean(room) });
-    if (room) doors.push({ ...slot.door, w: 2, id: room.id, label: room.name, color: room.color, theme, zone: slot.zone, main: false });
+    // La puerta lleva la temática de la sala si tiene una propia (por ejemplo, una sala Stellar en un evento tecnológico).
+    if (room) doors.push({ ...slot.door, w: 2, id: room.id, label: room.name, color: room.color, theme: room.theme ?? theme, zone: slot.zone, main: false });
     // Los puestos sin sala de los muros de frente muestran un cuadro.
     else if (slot.door.side === "top") decor.push({ kind: "art", x: slot.door.x, y: slot.door.y, w: 2, color: "#9aa5b1" });
   });
@@ -1084,7 +1250,7 @@ function buildLevel(
  * Los pisos del recinto: planta baja con el auditorio y ocho salas, y un piso
  * alto con ocho salas más. Los patrocinadores reciben un stand en cada piso.
  */
-export function venueFloors(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color" | "main">[], sponsors: StandSponsor[] = []): SceneMap[] {
+export function venueFloors(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color" | "main" | "theme">[], sponsors: StandSponsor[] = []): SceneMap[] {
   const main = rooms.find((r) => r.main) ?? rooms[0] ?? null;
   const others = rooms.filter((r) => r !== main);
   return LEVELS[theme]().map((L, i) => buildLevel(theme, L, i === 0 ? main : null, others.slice(i * ROOMS_PER_FLOOR, (i + 1) * ROOMS_PER_FLOOR), sponsors));
@@ -1200,10 +1366,11 @@ function themedCorners(theme: ThemeId, w: number, h: number, color: string): { f
   if (theme === "rustic") decor.push({ kind: "shelf", x: 1, y: 2, w: 2 }, { kind: "window", x: w - 3, y: 2, w: 2 });
   if (theme === "medieval") decor.push({ kind: "torch", x: 1, y: 2 }, { kind: "banner", x: 2, y: 2, color }, { kind: "banner", x: w - 3, y: 2, color }, { kind: "torch", x: w - 2, y: 2 });
   if (theme === "garden") decor.push({ kind: "ivy", x: 1, y: 2, w: 2 }, { kind: "ivy", x: w - 3, y: 2, w: 2 });
+  if (theme === "stellar") decor.push({ kind: "neon", x: 1, y: 2, w: 2, text: "✦", color: "#fdda24" }, { kind: "neon", x: w - 3, y: 2, w: 2, text: "XLM", color: "#b7ace8" });
   return { furni, decor };
 }
 
-const STAGE_RUG: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4" };
+const STAGE_RUG: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4", stellar: "#2a2a33" };
 
 interface InteriorSpec {
   w: number;
@@ -1350,8 +1517,9 @@ export const auditoriumMap = (theme: ThemeId, color: string) =>
 const LAYOUTS = [classroom, workshop, arena, wideHall];
 
 /** Mapa interior de una sala: el auditorio, o una de cuatro distribuciones según su lugar en el evento. */
-export function interiorFor(theme: ThemeId, rooms: Pick<Room, "id" | "color" | "main">[], roomId: string): SceneMap {
+export function interiorFor(venueTheme: ThemeId, rooms: Pick<Room, "id" | "color" | "main" | "theme">[], roomId: string): SceneMap {
   const room = rooms.find((r) => r.id === roomId);
+  const theme = room?.theme ?? venueTheme;
   if (!room || room.main) return auditoriumMap(theme, room?.color ?? "#5b5bf0");
   const index = rooms.filter((r) => !r.main).findIndex((r) => r.id === roomId);
   return LAYOUTS[Math.max(0, index) % LAYOUTS.length]!(theme, room.color);

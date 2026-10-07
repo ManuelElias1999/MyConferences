@@ -1,6 +1,6 @@
 // Estilos que una empresa elige para el lugar de su evento.
 
-export type ThemeId = "tech" | "minimal" | "rustic" | "medieval" | "garden";
+export type ThemeId = "tech" | "minimal" | "rustic" | "medieval" | "garden" | "stellar";
 
 export const THEMES: { id: ThemeId; label: string; description: string; color: string }[] = [
   { id: "tech", label: "Tecnológica", description: "Paneles con luces LED, racks de servidores y pantallas.", color: "#3b82f6" },
@@ -8,6 +8,7 @@ export const THEMES: { id: ThemeId; label: string; description: string; color: s
   { id: "rustic", label: "Rústica", description: "Troncos, chimenea, barriles y faroles.", color: "#b45309" },
   { id: "medieval", label: "Medieval", description: "Piedra, estandartes, antorchas y armaduras.", color: "#9b2335" },
   { id: "garden", label: "Jardín", description: "Pasto, árboles, flores y una fuente.", color: "#16a34a" },
+  { id: "stellar", label: "Stellar", description: "Inspirada en el ecosistema Stellar: negro, blanco y amarillo, estrellas, cohetes y nodos de la red.", color: "#fdda24" },
 ];
 
 export const isTheme = (value: unknown): value is ThemeId => THEMES.some((t) => t.id === value);

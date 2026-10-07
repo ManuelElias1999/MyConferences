@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { stairsEntry, venueFloors, type Door, type Tile } from "../../shared/maps.ts";
 import { THEMES } from "../../shared/themes.ts";
-import type { Talk, User, Venue } from "../../shared/types.ts";
+import type { Sponsor, Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { formatTime, minutesUntil, roomSchedule } from "./lib.ts";
 import Modal from "./Modal.tsx";
@@ -35,9 +35,24 @@ export default function Hall({
   onOpenAgenda: () => void;
   onUser: (userId: string) => void;
 }) {
-  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, venue.sponsors), [venue]);
+  // Stands: uno por patrocinador y, siempre, el del organizador (así todo evento tiene stands).
+  const stands = useMemo<Sponsor[]>(
+    () => [
+      ...venue.sponsors,
+      {
+        id: "organizador",
+        name: venue.organizer,
+        logoUrl: venue.logoUrl ?? "",
+        url: null,
+        pitch: `¡Bienvenido a ${venue.name}! Somos ${venue.organizer}. ${venue.tagline ? `${venue.tagline} ` : ""}Pregúntanos por la agenda o por cualquier sala.`,
+      },
+    ],
+    [venue],
+  );
+  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, stands), [venue, stands]);
   const [stand, setStand] = useState<number | null>(null);
-  const standSponsor = stand !== null ? venue.sponsors[stand] : undefined;
+  const standSponsor = stand !== null ? stands[stand] : undefined;
+  const isOrganizer = standSponsor?.id === "organizador";
   const floor = Math.min(me.floor, floors.length - 1);
   const map = floors[floor]!;
   const scene = useRef<SceneHandle>(null);
@@ -106,7 +121,7 @@ export default function Hall({
           onDirectory={() => setDirectoryOpen(true)}
           onNpc={(npc) => npc.sponsor !== undefined && setStand(npc.sponsor)}
           onUser={onUser}
-          media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl }}
+          media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl, stands }}
           handle={scene}
           label={`${venue.name}, ${map.floorName}`}
         />
@@ -248,7 +263,7 @@ export default function Hall({
         <Modal title={`Stand de ${standSponsor.name}`} onClose={() => setStand(null)}>
           <div className="stand-card">
             <div className="stand-logo">
-              <img src={standSponsor.logoUrl} alt={standSponsor.name} />
+              {standSponsor.logoUrl ? <img src={standSponsor.logoUrl} alt={standSponsor.name} /> : <p className="stand-name">{standSponsor.name}</p>}
             </div>
             <div className="stand-rep">
               {map.npcs.find((n) => n.sponsor === stand) && <AvatarCanvas look={map.npcs.find((n) => n.sponsor === stand)!.look} size={72} />}
@@ -261,6 +276,17 @@ export default function Hall({
             <button className="btn ghost" onClick={() => setStand(null)}>
               Seguir recorriendo
             </button>
+            {isOrganizer && (
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setStand(null);
+                  onOpenAgenda();
+                }}
+              >
+                Ver la agenda
+              </button>
+            )}
             {standSponsor.url && (
               <a className="btn primary" href={standSponsor.url} target="_blank" rel="noreferrer noopener">
                 Visitar su sitio

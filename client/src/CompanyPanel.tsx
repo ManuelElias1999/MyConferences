@@ -117,6 +117,7 @@ function EventEditor({
       name: r.name,
       topic: r.topic,
       color: r.color,
+      theme: r.theme ?? null,
       talks: ev.venue.talks.filter((t) => t.roomId === r.id).map(({ title, speaker, start, end }) => ({ title, speaker, start, end })),
     }));
   const [rooms, setRooms] = useState<RoomDraft[]>(
@@ -229,7 +230,7 @@ function EventEditor({
           <legend>Salas y agenda</legend>
           <p className="muted small">
             Mínimo {MIN_ROOMS - 1} salas más el auditorio principal, y hasta {MAX_ROOMS - 1}. Las primeras {ROOMS_PER_FLOOR} van en la planta baja; las
-            siguientes, en el piso de arriba. Cada sala tiene una forma distinta: aula, taller con mesas, anfiteatro en U o sala ancha.
+            siguientes, en el piso de arriba. Cada sala tiene una forma distinta: aula, taller con mesas, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
           </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
@@ -242,6 +243,14 @@ function EventEditor({
                   {ROOM_COLORS.map((c) => (
                     <option key={c} value={c} style={{ color: c }}>
                       ■ {c}
+                    </option>
+                  ))}
+                </select>
+                <select value={r.theme ?? ""} onChange={(e) => setRoom(i, { theme: (e.target.value || null) as ThemeId | null })} aria-label="Temática de la sala" title="Temática de la sala">
+                  <option value="">Temática del evento</option>
+                  {THEMES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
                     </option>
                   ))}
                 </select>

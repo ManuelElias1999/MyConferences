@@ -491,14 +491,14 @@ export default function Scene(props: SceneProps) {
 
       const items: Drawable[] = [...furni];
       const labels: { x: number; y: number; name: string; mine: boolean; sitting: boolean; id: string; tag: boolean }[] = [];
-      const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, tag: boolean, fixedDir?: Dir) => {
-        const pose = poseFor(w, fixedDir);
+      const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, tag: boolean, fixedDir?: Dir, sit = false) => {
+        const pose = sit ? { dir: fixedDir ?? w.dir, walk: null, sitting: true } : poseFor(w, fixedDir);
         const f = feet(w.x, w.y);
         items.push({ key: w.y + 0.82, draw: (g) => drawAvatar(g, look, f.x, f.y, pose) });
         labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag });
       };
       for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
-      for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir);
+      for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir, c.sit);
       // 🎧: está en una charla privada.
       for (const u of visible) addAvatar(u.id, u.inCall ? `${u.name} 🎧` : u.name, u.look, others.current.get(u.id)!, false, true);
       addAvatar(p.me.id, p.me.inCall ? `${p.me.name} 🎧` : p.me.name, p.me.look, my.current, true, true);

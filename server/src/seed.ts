@@ -40,7 +40,7 @@ const seeds: VenueSeed[] = [
     sponsors: [logo("novapay", "NovaPay"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
     rooms: [
       { id: "auditorio", name: "Auditorio principal", topic: "Keynotes y paneles", color: "#f59e0b", main: true },
-      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1", main: false },
+      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1", main: false, theme: "stellar" },
       { id: "ia", name: "Sala IA", topic: "Inteligencia artificial aplicada", color: "#10b981", main: false },
       { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899", main: false },
       { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9", main: false },
@@ -124,7 +124,7 @@ const seeds: VenueSeed[] = [
     private: true,
     theme: "medieval",
     organizer: "Comunidad Stellar LatAm",
-    sponsors: [logo("pixel-bank", "Pixel Bank"), logo("orbit-cloud", "Orbit Cloud")],
+    sponsors: [logo("pixel-bank", "Pixel Bank"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
     rooms: [
       { id: "auditorio", name: "Auditorio principal", topic: "Keynotes del día", color: "#9b2335", main: true },
       { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1", main: false },
@@ -181,7 +181,7 @@ const seeds: VenueSeed[] = [
     private: true,
     theme: "minimal",
     organizer: "Andes Ventures",
-    sponsors: [logo("novapay", "NovaPay")],
+    sponsors: [logo("novapay", "NovaPay"), logo("pixel-bank", "Pixel Bank"), logo("orbit-cloud", "Orbit Cloud")],
     rooms: [
       { id: "auditorio", name: "Auditorio principal", topic: "Bienvenida y resultados", color: "#64748b", main: true },
       { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899", main: false },
@@ -214,6 +214,55 @@ const seeds: VenueSeed[] = [
         ["Reuniones 1:1", "Fundadores", "Agenda abierta para conversar con los equipos."],
         ["Reuniones 1:1", "Fundadores", "Agenda abierta para conversar con los equipos."],
         ["Reuniones 1:1", "Fundadores", "Agenda abierta para conversar con los equipos."],
+      ],
+    },
+  },
+  {
+    id: "404",
+    name: "Stellar Hub LatAm",
+    tagline: "Un día para construir sobre Stellar: pagos, Soroban y comunidad.",
+    private: false,
+    theme: "stellar",
+    organizer: "Comunidad Stellar LatAm",
+    sponsors: [logo("pixel-bank", "Pixel Bank"), logo("novapay", "NovaPay"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
+    rooms: [
+      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes de la red", color: "#f59e0b", main: true },
+      { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1", main: false },
+      { id: "pagos", name: "Sala Pagos", topic: "Pagos y remesas", color: "#10b981", main: false },
+      { id: "anchors", name: "Sala Anchors", topic: "Rampas de entrada y salida", color: "#f59e0b", main: false },
+      { id: "wallets", name: "Sala Wallets", topic: "Billeteras y passkeys", color: "#14b8a6", main: false },
+      { id: "defi", name: "Sala DeFi", topic: "Liquidez y préstamos", color: "#ec4899", main: false },
+      { id: "rwa", name: "Activos reales", topic: "Tokenización de activos", color: "#8b5cf6", main: false },
+      { id: "hackathon", name: "Hackathon", topic: "Equipos construyendo en vivo", color: "#ef4444", main: false },
+      { id: "comunidad", name: "Comunidad", topic: "Embajadores y meetups", color: "#0ea5e9", main: false },
+    ],
+    program: {
+      auditorio: [
+        ["Bienvenida al Hub", "Equipo organizador", "Cómo moverte por el hub, la agenda y las salas."],
+        ["Keynote: pagos globales en segundos", "Valentina Cruz", "Por qué los pagos son el caso de uso que más crece en la región."],
+        ["Panel: construir en Latinoamérica", "Varios invitados", "Equipos de la región cuentan qué funcionó y qué no."],
+        ["Cierre y premios del hackathon", "Equipo organizador", "Ganadores y próximos pasos."],
+      ],
+      soroban: [
+        ["Tu primer contrato en Soroban", "Diego Paredes", "De cero a un contrato desplegado en testnet."],
+        ["Patrones de almacenamiento", "Ana Ruiz", "Instancia, persistente y temporal: cuándo usar cada uno."],
+        ["Testing y auditoría", "Equipo de seguridad", "Pruebas, fuzzing y revisión de contratos."],
+      ],
+      pagos: [
+        ["Remesas con stablecoins", "Martín Silva", "Cómo armar un flujo de remesas de punta a punta."],
+        ["Conciliación sin dolor", "Ricardo Vega", "Registrar y conciliar pagos en tiempo real."],
+      ],
+      anchors: [
+        ["SEP-24 en la práctica", "Natalia Ortiz", "Depósitos y retiros con un anchor."],
+        ["Cumplimiento en la región", "Natalia Ortiz", "KYC y requisitos de cada país."],
+      ],
+      wallets: [
+        ["Billeteras con passkeys", "Valentina Cruz", "Onboarding sin frases semilla."],
+        ["Cuentas patrocinadas", "Iván Torres", "Que tus usuarios no paguen comisiones."],
+      ],
+      hackathon: [
+        ["Arranque del hackathon", "Mentores", "Formación de equipos y reglas."],
+        ["Demo day", "Equipos", "Cada equipo presenta lo que construyó."],
       ],
     },
   },

@@ -288,6 +288,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
       topic: clean(raw.topic, 80) || (main ? "Charlas principales" : "Charla abierta"),
       color: typeof raw.color === "string" && ROOM_COLORS.includes(raw.color) ? raw.color : ROOM_COLORS[rooms.length % ROOM_COLORS.length]!,
       main,
+      theme: isTheme(raw.theme) ? raw.theme : null,
     });
     const roomTalks = readTalks(raw.talks, id);
     if (typeof roomTalks === "string") return { error: roomTalks };

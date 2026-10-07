@@ -166,6 +166,22 @@ const hedge: FacePainter = (ctx, px, py, row) => {
   for (let i = 0; i < 4; i++) ctx.fillRect(px + ((i * 9 + (py >> 3)) % 28), py + i * 8 + 2, 4, 3);
 };
 
+/** Paneles negros con una línea amarilla y alguna estrella, al estilo de la red Stellar. */
+const stellarPanels: FacePainter = (ctx, px, py, row) => {
+  ctx.fillStyle = row === 1 ? "#18181f" : "#212129";
+  ctx.fillRect(px, py, T, T);
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillRect(px + T - 1, py, 1, T);
+  if (row === 0) {
+    ctx.fillStyle = "#fdda24";
+    ctx.fillRect(px, py + 10, T, 2);
+    if (hash(px, py, 21) > 0.6) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(px + 6 + Math.floor(hash(py, px, 22) * 18), py + 18, 2, 2);
+    }
+  }
+};
+
 interface Style {
   floor: Painter;
   face: FacePainter;
@@ -184,6 +200,7 @@ const STYLES: Record<StyleId, Style> = {
   rustic: { floor: flat("#e7cda6"), face: logs, cap: "#4a3220", base: "#3e2a18", outside: "#b6a27f" },
   medieval: { floor: flat("#e0dbcf"), face: bricks(["#8f899e", "#878196", "#958fa4", "#827c91"], "#6b6579"), cap: "#433e55", base: "#3a3548", outside: "#a7b892" },
   garden: { floor: flat("#f1e8d2"), face: hedge, cap: "#2c5a28", base: "#24481f", outside: "#a7d084" },
+  stellar: { floor: flat("#fbfaf5"), face: stellarPanels, cap: "#0f0f14", base: "#fdda24", outside: "#d6d1ef" },
 };
 
 const tileAt = (map: SceneMap, x: number, y: number) => map.tiles[y]?.[x] ?? "#";
@@ -523,6 +540,29 @@ function topDoor(ctx: CanvasRenderingContext2D, door: Door) {
       ctx.fillRect(x + 2, top + 26, w - 4, 3);
       break;
     }
+    case "stellar": {
+      // Puerta negra con marco amarillo y una estrella de cuatro puntas.
+      frame(ctx, x, top, w, h, "#fdda24");
+      ctx.fillStyle = "#16161d";
+      ctx.fillRect(x + 3, top + 3, w - 6, h - 3);
+      ctx.fillStyle = "#2a2a33";
+      ctx.fillRect(x + w / 2 - 1, top + 3, 2, h - 3);
+      const sx = x + w / 2;
+      const sy = top + 16;
+      ctx.fillStyle = door.color;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 8);
+      ctx.lineTo(sx + 2, sy - 2);
+      ctx.lineTo(sx + 8, sy);
+      ctx.lineTo(sx + 2, sy + 2);
+      ctx.lineTo(sx, sy + 8);
+      ctx.lineTo(sx - 2, sy + 2);
+      ctx.lineTo(sx - 8, sy);
+      ctx.lineTo(sx - 2, sy - 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
     case "garden": {
       ctx.fillStyle = "#3f8f3a";
       ctx.beginPath();
@@ -612,6 +652,7 @@ const STEP: Record<StyleId, { tread: string; rail: string }> = {
   medieval: { tread: "#c4bdae", rail: "#4f4a5c" },
   garden: { tread: "#d9cfb6", rail: "#6b4a2f" },
   cowork: { tread: "#d5dde9", rail: "#4b5563" },
+  stellar: { tread: "#e8e6dd", rail: "#fdda24" },
 };
 
 /**
@@ -811,6 +852,7 @@ const ROOF: Record<StyleId, { base: string; line: string }> = {
   medieval: { base: "#9a95a6", line: "#7f7a8c" },
   garden: { base: "#d39a6a", line: "#bd8456" },
   cowork: { base: "#dbe3ee", line: "#c3cedd" },
+  stellar: { base: "#2a2a33", line: "#34343f" },
 };
 
 /** Techo de un edificio de sala: claro, con el color de la sala y su nombre bien grande. */
@@ -832,6 +874,15 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
       ctx.fillStyle = "#4f74b3";
       ctx.fillRect(px + 1, y + 9, 10, 5);
     }
+  }
+  if (style === "stellar") {
+    // Techo oscuro con estrellas y una franja amarilla.
+    for (let i = 0; i < roof.w * roof.h; i++) {
+      ctx.fillStyle = i % 4 ? "rgba(255,255,255,0.7)" : "#fdda24";
+      ctx.fillRect(x + 6 + ((i * 37) % (w - 12)), y + 6 + ((i * 23) % (h - 12)), 2, 2);
+    }
+    ctx.fillStyle = "#fdda24";
+    ctx.fillRect(x, y + 4, w, 2);
   }
   if (style === "garden") {
     // Pabellón con tejas: una cumbrera al medio.
@@ -970,6 +1021,7 @@ export function renderStatic(map: SceneMap, scale: number) {
             medieval: "#5a3a22",
             garden: "#8a5a32",
             cowork: "#2f3440",
+            stellar: "#16161d",
           };
           frame(ctx, x - 4, T + 2, w + 8, 2 * T - 6, frameColor[map.style]);
           break;
@@ -1105,6 +1157,7 @@ const CHAIR: Record<StyleId, { frame: string; seat: string }> = {
   medieval: { frame: "#6b4226", seat: "#9b2335" },
   garden: { frame: "#8a5a32", seat: "#c8e6a0" },
   cowork: { frame: "#2f3440", seat: "#2f6bff" },
+  stellar: { frame: "#16161d", seat: "#fdda24" },
 };
 
 export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
@@ -1682,11 +1735,86 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fillRect(sx, sy + ih - 3, iw, 3);
         });
         break;
+      case "rocket":
+        // Cohete a escala sobre un pedestal.
+        add(y + 1, (ctx) => {
+          shadowUnder(ctx, cx, base - 3, 12);
+          box(ctx, cx - 11, base - 14, 22, 4, 9, "#2a2a33", "#3a3a45");
+          ctx.fillStyle = "#fdda24";
+          ctx.fillRect(cx - 11, base - 6, 22, 2);
+          // Aletas, cuerpo y ventanilla.
+          ctx.fillStyle = "#e5484d";
+          ctx.fillRect(cx - 10, base - 26, 5, 12);
+          ctx.fillRect(cx + 5, base - 26, 5, 12);
+          frame(ctx, cx - 5, base - 52, 10, 38, "#f4f4f5");
+          ctx.fillStyle = "#e5484d";
+          ctx.beginPath();
+          ctx.moveTo(cx - 5, base - 52);
+          ctx.lineTo(cx, base - 62);
+          ctx.lineTo(cx + 5, base - 52);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#2f6bff";
+          ctx.fillRect(cx - 3, base - 44, 6, 6);
+          ctx.fillStyle = "#fdda24";
+          ctx.fillRect(cx - 3, base - 18, 6, 3);
+        });
+        break;
+      case "constellation":
+        // Columna con nodos de luz unidos: la red.
+        add(y + 1, (ctx, t) => {
+          shadowUnder(ctx, cx, base - 3, 9);
+          frame(ctx, cx - 4, base - 54, 8, 50, "#16161d");
+          const nodes = [
+            [-10, -58],
+            [8, -66],
+            [12, -48],
+            [-8, -40],
+            [0, -74],
+          ] as const;
+          ctx.strokeStyle = "rgba(253,218,36,0.7)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          nodes.forEach(([dx, dy], i) => (i ? ctx.lineTo(cx + dx, base + dy) : ctx.moveTo(cx + dx, base + dy)));
+          ctx.stroke();
+          nodes.forEach(([dx, dy], i) => {
+            const on = (Math.floor(t / 400) + i) % 5 !== 0;
+            ctx.fillStyle = on ? "#fdda24" : "#ffffff";
+            ctx.fillRect(cx + dx - 2, base + dy - 2, 4, 4);
+          });
+        });
+        break;
+      case "partition":
+        // Mampara de vidrio: marco fino y vidrio celeste translúcido.
+        add(y + d, (ctx) => {
+          const pw = w * T;
+          const ph = d * T;
+          if (w >= d) {
+            ctx.fillStyle = "rgba(186,230,253,0.45)";
+            ctx.fillRect(px, py + ph - 30, pw, 26);
+            ctx.fillStyle = "#64748b";
+            ctx.fillRect(px, py + ph - 32, pw, 2);
+            ctx.fillRect(px, py + ph - 5, pw, 2);
+            for (let i = 0; i <= w; i++) ctx.fillRect(px + i * T - (i === w ? 2 : 0), py + ph - 32, 2, 29);
+            ctx.fillStyle = "rgba(255,255,255,0.6)";
+            ctx.fillRect(px + 6, py + ph - 26, 3, 18);
+          } else {
+            ctx.fillStyle = "rgba(186,230,253,0.45)";
+            ctx.fillRect(px + 12, py - 20, 8, ph + 16);
+            ctx.fillStyle = "#64748b";
+            ctx.fillRect(px + 11, py - 22, 2, ph + 18);
+            ctx.fillRect(px + 19, py - 22, 2, ph + 18);
+          }
+        });
+        break;
       case "booth": {
         // Stand de un patrocinador: panel en la pared, dos roll-ups y el mostrador con su logo.
         const n = f.n ?? 0;
         const color = BOOTH_COLORS[n % BOOTH_COLORS.length]!;
-        const sponsor = () => media?.().sponsors[n] ?? null;
+        const sponsor = () => {
+          const m = media?.();
+          return (m?.stands ?? m?.sponsors)?.[n] ?? null;
+        };
         const sw = 3 * T;
         add(y - 0.5, (ctx) => {
           const sp = sponsor();
@@ -1943,6 +2071,8 @@ export interface Media {
   title: string;
   /** Logo del evento para la pantalla grande del lobby. */
   logoUrl?: string | null;
+  /** Quién atiende cada stand (los patrocinadores y el organizador). */
+  stands?: Sponsor[];
 }
 
 /** Colores de los stands, para que cada patrocinador se distinga. */

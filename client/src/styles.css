@@ -1988,3 +1988,11 @@ textarea {
 .people-call {
   margin-left: auto;
 }
+
+.stand-name {
+  display: grid;
+  place-items: center;
+  height: 70px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
