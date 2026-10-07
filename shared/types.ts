@@ -43,6 +43,8 @@ export interface Sponsor {
   url: string | null;
   /** Lo que cuenta su representante en el stand. */
   pitch: string;
+  /** Correos de quienes atienden el stand (hasta 2). Si no hay nadie, atienden dos muñecos. */
+  reps?: string[];
 }
 
 export interface Talk {
@@ -133,8 +135,10 @@ export interface User {
   speakerFor: string | null;
   /** Está en una charla privada por micrófono (los demás no la escuchan). */
   inCall: boolean;
-  /** Su papel en el evento en el que está: organizador o mentor. */
-  role: "staff" | "mentor" | null;
+  /** Su papel en el evento en el que está: organizador, mentor o quien atiende un stand. */
+  role: "staff" | "mentor" | "sponsor" | null;
+  /** Si atiende un stand: la posición de su patrocinador en la lista. */
+  sponsor: number | null;
   /** Posición en baldosas del mapa en el que está. */
   x: number;
   y: number;

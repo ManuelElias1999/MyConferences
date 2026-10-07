@@ -85,6 +85,8 @@ export interface SceneProps {
   onStairs?: (floor: number) => void;
   onNpc?: (npc: Npc) => void;
   onDirectory?: () => void;
+  /** Personajes del mapa que no se muestran (los muñecos de un stand cuando atiende alguien real). */
+  hideNpcs?: Set<string>;
   /** Clic sobre otra persona (para invitarla a una charla privada). */
   onUser?: (userId: string) => void;
   handle?: Ref<SceneHandle>;
@@ -497,7 +499,7 @@ export default function Scene(props: SceneProps) {
         items.push({ key: w.y + 0.82, draw: (g) => drawAvatar(g, look, f.x, f.y, pose) });
         labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag });
       };
-      for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
+      for (const n of map.npcs) if (!p.hideNpcs?.has(n.id)) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
       for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir, c.sit);
       // 🎧: está en una charla privada.
       // ⭐ organizador, 🧭 mentor, 🎧 en una charla privada.
@@ -516,7 +518,7 @@ export default function Scene(props: SceneProps) {
       }
       // Marcadores sobre lo que se puede usar: la recepcionista y los directorios.
       const markers = [
-        ...map.npcs.map((n) => ({ x: n.x, y: n.y, h: avatarHeight(false) + 26, text: "!" })),
+        ...map.npcs.filter((n) => !p.hideNpcs?.has(n.id)).map((n) => ({ x: n.x, y: n.y, h: avatarHeight(false) + 26, text: "!" })),
         ...map.directories.map((d) => ({ ...d, h: 66, text: "?" })),
       ];
       for (const m of markers) {

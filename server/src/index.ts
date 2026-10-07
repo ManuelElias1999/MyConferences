@@ -10,7 +10,8 @@ import { DEFAULT_LOOK } from "../../shared/look.ts";
 import {
   floorOfRoom,
   inFront,
-  inRestricted,
+  offLimits,
+  standList,
   inZone,
   interiorFor,
   isWalkable,
@@ -94,19 +95,30 @@ const speakerCodes = new Map<string, string>();
 
 /** Registra (o actualiza) un evento en memoria, conservando el estado de las salas que siguen. */
 /** Papel de cada correo en cada evento: organizador o mentor. */
-const venueRoles = new Map<string, Map<string, "staff" | "mentor">>();
+type Role = { role: "staff" | "mentor" | "sponsor"; sponsor: number | null };
+const venueRoles = new Map<string, Map<string, Role>>();
 function setRoles(venueId: string, staff: string[] = [], mentors: string[] = []) {
-  const roles = new Map<string, "staff" | "mentor">();
-  for (const e of mentors) roles.set(e, "mentor");
-  for (const e of staff) roles.set(e, "staff");
+  const roles = new Map<string, Role>();
+  for (const e of mentors) roles.set(e, { role: "mentor", sponsor: null });
+  for (const e of staff) roles.set(e, { role: "staff", sponsor: null });
   venueRoles.set(venueId, roles);
+}
+
+/** Papel de alguien en un evento: organizador (dueño o por correo), mentor o quien atiende un stand. */
+function roleIn(state: VenueState, account: Account | null): Role | null {
+  if (!account) return null;
+  if (state.ownerId === account.id) return { role: "staff", sponsor: null };
+  const byEmail = venueRoles.get(state.venue.id)?.get(account.email);
+  if (byEmail) return byEmail;
+  const sponsor = state.venue.sponsors.findIndex((s) => s.reps?.includes(account.email));
+  return sponsor >= 0 ? { role: "sponsor", sponsor } : null;
 }
 
 function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<string, string> = {}, ownerId: string | null = null) {
   const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
   for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
   for (const id of rooms.keys()) if (!venue.rooms.some((r) => r.id === id)) rooms.delete(id);
-  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms, [], venue.capacity), rooms, ownerId });
+  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms, standList(venue), venue.capacity), rooms, ownerId });
   for (const r of venue.rooms) {
     const key = `${venue.id}/${r.id}`;
     const code = codes[r.id] ?? speakerCodes.get(key) ?? randomBytes(3).toString("hex").toUpperCase();
@@ -346,7 +358,7 @@ function evictVenue(venueId: string, reason: string) {
     leaveCall(u.id);
     for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, sponsor: null, x: spot.x, y: spot.y });
     sock.join("reception");
     sock.to("reception").emit("userJoined", u);
     moved.push(u);
@@ -470,6 +482,11 @@ app.post("/api/company/events/:id/sponsors", express.raw({ type: Object.keys(IMA
         logoUrl: `/uploads/logos/${fileName}`,
         url: safeUrl(decodeURIComponent(String(req.header("x-sponsor-url") ?? ""))),
         pitch: clean(decodeURIComponent(String(req.header("x-sponsor-pitch") ?? "")), 280),
+        reps: decodeURIComponent(String(req.header("x-sponsor-reps") ?? ""))
+          .split(/[\s,;]+/)
+          .map((e) => e.trim().toLowerCase())
+          .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+          .slice(0, 2),
       }],
   };
   await companyEvents.save(entry);
@@ -691,6 +708,7 @@ io.on("connection", (socket) => {
       speakerFor: null,
       inCall: false,
       role: null,
+      sponsor: null,
       x: spot.x,
       y: spot.y,
     };
@@ -731,7 +749,7 @@ io.on("connection", (socket) => {
     const y = Number(pos?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     // A la sala de organizadores solo entra su equipo.
-    if (u.role !== "staff" && inRestricted(map, { x: Math.round(x), y: Math.round(y) })) return;
+    if (offLimits(map, { x: Math.round(x), y: Math.round(y) }, u)) return;
     u.x = Math.max(0, Math.min(map.w - 1, Math.round(x * 100) / 100));
     u.y = Math.max(0, Math.min(map.h - 1, Math.round(y * 100) / 100));
     socket.to(sceneChannel(u)).volatile.emit("moved", { id: u.id, x: u.x, y: u.y });
@@ -757,8 +775,8 @@ io.on("connection", (socket) => {
     const state = venues.get(id);
     if (!state) return ack({ ok: false, error: `No encuentro el evento ${id || number}. ¿Puedes revisar el número?` });
     // La empresa dueña siempre puede entrar a su evento.
-    const role = conn.account ? (state.ownerId === conn.account.id ? "staff" : (venueRoles.get(id)?.get(conn.account.email) ?? null)) : null;
-    if (state.whitelist && !role) {
+    const roleInfo = roleIn(state, conn.account);
+    if (state.whitelist && !roleInfo) {
       if (!conn.account) {
         return ack({ ok: false, error: `El evento ${id} es privado. Inicia sesión con tu cuenta para que revise la lista de invitados.` });
       }
@@ -771,7 +789,7 @@ io.on("connection", (socket) => {
     socket.to("reception").emit("userLeft", u.id);
     const ground = state.floors[0]!;
     const spot = spawnNear(ground, ground.spawn);
-    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, role, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, role: roleInfo?.role ?? null, sponsor: roleInfo?.sponsor ?? null, x: spot.x, y: spot.y });
     socket.join([venueChannel(id), hallChannel(id, 0)]);
     socket.to(venueChannel(id)).emit("userJoined", u);
     ack({ ok: true, data: { venue: state.venue, user: u, users: usersIn(id) } });
@@ -800,7 +818,7 @@ io.on("connection", (socket) => {
     socket.leave(hallChannel(venueId, u.floor));
     socket.to(venueChannel(venueId)).emit("userLeft", u.id);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, sponsor: null, x: spot.x, y: spot.y });
     socket.join("reception");
     socket.to("reception").emit("userJoined", u);
     ack({ ok: true, data: { user: u, users: usersIn(null) } });

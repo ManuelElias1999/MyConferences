@@ -942,6 +942,15 @@ export function renderStatic(map: SceneMap, scale: number) {
   for (const area of map.areas) AREA_FLOOR[area.floor](ctx, area.x * T, area.y * T, (area.x + area.w) * T, (area.y + area.h) * T);
   // Mesas de equipo: un rectángulo de color suave con borde, para que se vea hasta dónde llega la conversación.
   for (const z of map.zones) {
+    if (z.id.startsWith("stand-")) {
+      // El cuadrado de un stand: apenas marcado, para saber dónde se escucha.
+      ctx.strokeStyle = "rgba(100,116,139,0.45)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(z.x * T + 2, z.y * T + 2, z.w * T - 4, z.h * T - 4);
+      ctx.setLineDash([]);
+      continue;
+    }
     const x = z.x * T + 2;
     const y = z.y * T + 2;
     const w = z.w * T - 4;
@@ -1769,6 +1778,28 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fillRect(sx, sy + ih - 3, iw, 3);
         });
         break;
+      case "signpost": {
+        // Poste con carteles: una línea por destino, con su flecha.
+        const lines = (f.label ?? "").split("|");
+        add(y + 1, (ctx) => {
+          ctx.font = `700 9px ${FONT}`;
+          const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
+          const bh = lines.length * 14 + 6;
+          shadowUnder(ctx, cx, base - 3, 8);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(cx - 2, base - 30, 4, 27);
+          const top = base - 30 - bh;
+          ctx.fillStyle = "#16161d";
+          ctx.fillRect(cx - bw / 2 - 2, top - 2, bw + 4, bh + 4);
+          lines.forEach((l, i) => {
+            ctx.fillStyle = ["#ff5c39", "#2f6bff", "#10b981", "#a78bfa", "#f59e0b"][i % 5]!;
+            ctx.fillRect(cx - bw / 2, top + 3 + i * 14, 3, 11);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(l, cx - bw / 2 + 7, top + 12 + i * 14);
+          });
+        });
+        break;
+      }
       case "frontdesk":
         // Mostrador de recepción: cubierta blanca, frente grafito con una línea de luz y el nombre.
         add(y + 1, (ctx) => {
@@ -1919,7 +1950,8 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fillText((sp?.name ?? "").toUpperCase(), px + sw / 2, py - 2 * T + 41, sw - 12);
           ctx.textAlign = "left";
         });
-        for (const rx of [px + 4, px + sw - 24]) {
+        // Un roll-up al medio; a los costados se paran las dos personas que atienden.
+        for (const rx of [cx - 10]) {
           add(y + 0.9, (ctx) => {
             const sp = sponsor();
             const b = py + T - 2;
@@ -2135,6 +2167,7 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
   }
   // Cartel de cada mesa de equipo, en su esquina.
   for (const z of map.zones) {
+    if (z.id.startsWith("stand-")) continue;
     ctx.font = `700 9px ${FONT}`;
     const text = `${z.label} · hasta ${z.seats}`;
     const width = ctx.measureText(text).width + 12;

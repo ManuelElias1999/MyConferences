@@ -43,6 +43,7 @@ export default function Hall({
       ...venue.sponsors,
       {
         id: "organizador",
+        organizer: true,
         name: venue.organizer,
         logoUrl: venue.logoUrl ?? "",
         url: null,
@@ -57,7 +58,16 @@ export default function Hall({
   const isOrganizer = standSponsor?.id === "organizador";
   const floor = Math.min(me.floor, floors.length - 1);
   // Quien no es del equipo organizador no puede entrar a su sala.
-  const map = useMemo(() => forVisitor(floors[floor]!, me.role === "staff"), [floors, floor, me.role]);
+  const map = useMemo(() => forVisitor(floors[floor]!, me), [floors, floor, me.role, me.sponsor]);
+  // Cuando alguien del patrocinador está detrás de su mostrador, ocupa el lugar de un muñeco.
+  const hideNpcs = new Set<string>();
+  for (const r of map.restricted) {
+    if (r.sponsor === undefined) continue;
+    const real = [...users.values()].filter(
+      (u) => u.venueId === venue.id && !u.roomId && u.floor === floor && Math.round(u.x) >= r.x && Math.round(u.x) < r.x + r.w && Math.round(u.y) === r.y,
+    ).length;
+    for (let k = 0; k < Math.min(real, 2); k++) hideNpcs.add(`stand-${r.sponsor}-${k}`);
+  }
   const mentorsHere = everyoneMentors(users);
   const scene = useRef<SceneHandle>(null);
   const [directoryOpen, setDirectoryOpen] = useState(false);
@@ -124,6 +134,7 @@ export default function Hall({
           onStairs={onStairs}
           onDirectory={() => setDirectoryOpen(true)}
           onNpc={(npc) => npc.sponsor !== undefined && setStand(npc.sponsor)}
+          hideNpcs={hideNpcs}
           onUser={onUser}
           media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl, stands }}
           handle={scene}

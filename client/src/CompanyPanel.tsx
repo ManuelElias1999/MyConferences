@@ -386,6 +386,7 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [pitch, setPitch] = useState("");
+  const [reps, setReps] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -401,12 +402,13 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
       const ev = await companyApi<CompanyEvent>(`/events/${id}/sponsors`, {
         method: "POST",
         file,
-        headers: { "X-Sponsor-Name": encodeURIComponent(name), "X-Sponsor-Url": encodeURIComponent(url), "X-Sponsor-Pitch": encodeURIComponent(pitch) },
+        headers: { "X-Sponsor-Name": encodeURIComponent(name), "X-Sponsor-Url": encodeURIComponent(url), "X-Sponsor-Pitch": encodeURIComponent(pitch), "X-Sponsor-Reps": encodeURIComponent(reps) },
       });
       onChange(ev);
       setName("");
       setUrl("");
       setPitch("");
+      setReps("");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
     } catch (err) {
@@ -453,6 +455,12 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
           rows={2}
           placeholder="Qué cuenta su representante en el stand (opcional)"
           aria-label="Qué cuenta el representante del stand"
+        />
+        <input
+          value={reps}
+          onChange={(e) => setReps(e.target.value)}
+          placeholder="Quiénes atienden el stand: hasta 2 correos (si no, atienden dos muñecos)"
+          aria-label="Correos de quienes atienden el stand"
         />
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Logo" required />
         <button className="btn" disabled={busy || !file || !name.trim()}>
