@@ -13,20 +13,21 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - nombre y descripción;
   - **temática** del recinto: tecnológica, minimalista, rústica, medieval o jardín, con vista previa del recinto completo;
   - **acceso**: privado (solo los correos de la lista) o abierto;
-  - **salas y agenda**: el **auditorio principal** y **ocho salas**, cada una con su color, su **código de ponente** y sus charlas (título, ponente, hora de inicio y duración). Cada sala tiene una distribución distinta: aula, taller con mesas, anfiteatro en U o sala ancha;
+  - **salas y agenda**: el **auditorio principal** y entre **8 y 16 salas** (las primeras ocho van en la planta baja y las demás en el piso de arriba), cada una con su color, su **código de ponente** y sus charlas (título, ponente, hora de inicio y duración). Cada sala tiene una distribución distinta: aula, taller con mesas, anfiteatro en U o sala ancha;
+  - **logo del evento**: aparece en la pantalla gigante del lobby (si no hay logo, se muestra el nombre);
   - **patrocinadores**: logos en PNG, JPG o WebP con su sitio web opcional. Rotan en las pantallas gigantes de la fachada del auditorio, en los tótems de la plaza y en las pantallas de cada sala.
 - Cada evento recibe un **número** para compartir con los invitados. La empresa siempre puede entrar a su propio evento con «Visitar mi evento», y también puede cerrarlo: quien esté dentro vuelve a recepción.
 
 ### Para los asistentes
 
 - **Recepción**: un cowork pequeño; la recepcionista está a pocos pasos. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
-- **Recinto del evento**: cada temática tiene su propio plano, no el mismo recoloreado:
-  - **Tecnológica — campus futurista**: atrio con hologramas, pasillo central de neón hasta el auditorio, dos laboratorios con robots y pilares de luz, y alas oeste y este con cuatro salas cada una.
-  - **Medieval — castillo**: patio de armas con fuentes, paso al gran salón (el auditorio), galerías y torres a ambos lados.
-  - **Jardín — parque**: plaza de entrada, gran jardín central con el auditorio y dos jardines laterales con fuentes y árboles.
-  - **Minimalista — galería**: hall de entrada, una galería larga con esculturas y las ocho salas, y el auditorio al fondo de un pasillo.
-  - **Rústica — pueblo**: patio de llegada, una calle principal con salas, callejones y una calle alta con el auditorio.
-  - En todas, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces), y hay anuncios, directorios y gente conversando a la que se puede atravesar.
+- **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
+  - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
+  - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
+  - **Jardín (parque)**: pícnic, café del jardín con sombrillas, zona recreativa y un mirador arriba.
+  - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
+  - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
+  - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces), y cada zona tiene su letrero pintado en el piso.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.
 - **Puertas**: cada una muestra el nombre de la sala, la charla en curso o la próxima, y su horario (por ejemplo «10:00–10:45»).
 - **Directorio**: los tótems con **?** (y el botón «Cómo llegar a cada sala») muestran dónde está cada sala y qué charla hay ahora y después. Se puede **marcar el camino en el suelo** o pedir **«Llevarme»** para ir caminando solo.
@@ -42,7 +43,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 | Número | Evento | Temática | Acceso |
 | --- | --- | --- | --- |
-| 101 | MyConferences Tech Summit (auditorio + 8 salas) | Tecnológica | Abierto |
+| 101 | MyConferences Tech Summit (auditorio + 10 salas, en dos pisos) | Tecnológica | Abierto |
 | 202 | Stellar Builders Day (auditorio + 8 salas) | Medieval | Privado |
 | 303 | Demo Day · Inversores (auditorio + 8 salas) | Minimalista | Privado |
 
@@ -123,5 +124,5 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
 - El cobro a las empresas todavía no está integrado: cualquiera puede crear una cuenta de empresa. El siguiente paso es conectar un medio de pago (por ejemplo Stripe) y activar la cuenta al pagar.
-- Cada evento tiene el auditorio y hasta ocho salas. Los puestos sin sala asignada muestran un cuadro en el muro.
+- Cada evento tiene el auditorio y entre 8 y 16 salas. En el piso de arriba, los puestos sin sala muestran un cuadro en el muro.
 - La agenda se genera alrededor de la hora en que arranca el servidor, para que siempre haya algo en vivo durante la demo.
