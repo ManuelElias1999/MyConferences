@@ -1,14 +1,16 @@
-import { useMemo, useRef } from "react";
-import { floorName, venueFloors } from "../../shared/maps.ts";
+import { useMemo, useRef, useState } from "react";
+import { venueMap, type Door } from "../../shared/maps.ts";
 import { THEMES } from "../../shared/themes.ts";
-import type { User, Venue } from "../../shared/types.ts";
+import type { Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { formatTime, minutesUntil, roomSchedule } from "./lib.ts";
+import Modal from "./Modal.tsx";
 import SayBar from "./SayBar.tsx";
 import Scene, { type SceneHandle } from "./Scene.tsx";
 import type { DoorStatus } from "./world.ts";
 
 const themeLabel = (id: string) => THEMES.find((t) => t.id === id)?.label ?? "";
+const span = (t: Talk) => `${formatTime(t.start)}–${formatTime(t.end)}`;
 
 export default function Hall({
   me,
@@ -18,7 +20,6 @@ export default function Hall({
   now,
   onEnterRoom,
   onExit,
-  onStairs,
   onOpenAgenda,
 }: {
   me: User;
@@ -28,36 +29,39 @@ export default function Hall({
   now: number;
   onEnterRoom: (roomId: string) => void;
   onExit: () => void;
-  onStairs: (floor: number) => void;
   onOpenAgenda: () => void;
 }) {
-  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms), [venue]);
-  const floor = Math.min(me.floor, floors.length - 1);
-  const map = floors[floor]!;
+  const map = useMemo(() => venueMap(venue.theme, venue.rooms), [venue]);
   const scene = useRef<SceneHandle>(null);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [guiding, setGuiding] = useState<string | null>(null);
 
   void usersVersion;
   const everyone = [...users.values()];
+  const doorById = new Map(map.doors.map((d) => [d.id, d]));
+  const info = venue.rooms.map((room) => {
+    const { current, next } = roomSchedule(venue, room.id, now);
+    const talk = current ?? next;
+    return { room, current, next, door: doorById.get(room.id), count: everyone.filter((u) => u.roomId === room.id).length, talk };
+  });
   const doorStatus = new Map<string, DoorStatus>(
-    venue.rooms.map((r) => [
-      r.id,
-      {
-        live: Boolean(roomSchedule(venue, r.id, now).current),
-        count: everyone.filter((u) => u.roomId === r.id).length,
-        label: themeLabel(venue.theme),
-      },
-    ]),
+    info.map(({ room, current, talk, count }) => [room.id, { live: Boolean(current), count, title: talk?.title ?? "", time: talk ? span(talk) : "" }]),
   );
   const upcoming = venue.talks
     .filter((t) => t.start > now)
     .sort((a, b) => a.start - b.start)
     .slice(0, 4);
   const roomById = new Map(venue.rooms.map((r) => [r.id, r]));
-  const floorOf = new Map(floors.flatMap((m, i) => m.doors.map((d) => [d.id, i] as const)));
 
-  // Si la sala está en este piso el personaje camina hasta su puerta; si no, entra directo.
-  const goTo = (roomId: string) => {
-    const door = map.doors.find((d) => d.id === roomId);
+  const guide = (door: Door) => {
+    scene.current?.guide({ x: door.x, y: door.y });
+    setGuiding(door.label);
+    setDirectoryOpen(false);
+  };
+  const go = (door: Door | undefined, roomId: string) => {
+    setDirectoryOpen(false);
+    setGuiding(null);
+    scene.current?.guide(null);
     if (!door || !scene.current?.walkTo({ x: door.x, y: door.y })) onEnterRoom(roomId);
   };
 
@@ -65,25 +69,38 @@ export default function Hall({
     <main className="hall">
       <div className="world">
         <Scene
-          key={`${venue.id}:${floor}`}
           map={map}
           me={me}
           users={users}
-          inScene={(u) => u.venueId === venue.id && !u.roomId && u.floor === floor}
+          inScene={(u) => u.venueId === venue.id && !u.roomId}
           camera="follow"
           names="all"
           doorStatus={doorStatus}
           onDoor={(door) => onEnterRoom(door.id)}
           onExit={onExit}
-          onStairs={onStairs}
+          onDirectory={() => setDirectoryOpen(true)}
           media={{ sponsors: venue.sponsors, title: venue.name }}
           handle={scene}
-          label={`${venue.name}, ${floorName(floor)}`}
+          label={`Recinto de ${venue.name}`}
         />
         <p className="scene-hint">
-          Cruza una puerta para entrar a esa sala. Reacciona con las teclas <kbd>1</kbd>–<kbd>5</kbd>.
+          Recorre el evento: el auditorio está al fondo del pasillo central y hay salas a la izquierda y a la derecha. Usa los tótems <b>?</b> para
+          saber cómo llegar.
         </p>
-        {floors.length > 1 && <span className="floor-badge">{floorName(floor)}</span>}
+        {guiding && (
+          <p className="guide-chip">
+            Siguiendo el camino a <b>{guiding}</b>
+            <button
+              className="btn ghost sm"
+              onClick={() => {
+                scene.current?.guide(null);
+                setGuiding(null);
+              }}
+            >
+              Quitar
+            </button>
+          </p>
+        )}
         <SayBar />
       </div>
 
@@ -95,6 +112,9 @@ export default function Hall({
           <h2 className="side-event">{venue.name}</h2>
           <p className="muted small">Organiza {venue.organizer}</p>
           {venue.tagline && <p className="small side-tagline">{venue.tagline}</p>}
+          <button className="btn primary sm side-directory" onClick={() => setDirectoryOpen(true)}>
+            Cómo llegar a cada sala
+          </button>
         </section>
 
         {venue.sponsors.length > 0 && (
@@ -116,38 +136,29 @@ export default function Hall({
           </section>
         )}
 
-        {floors.map((m, i) => (
-          <section key={i}>
-            <h3 className="side-title">
-              {floors.length > 1 ? `Salas · ${floorName(i)}` : "Salas"}
-              {floors.length > 1 && i === floor && <span className="here">Estás aquí</span>}
-            </h3>
-            <ul className="room-list">
-              {m.doors.map((d) => {
-                const room = roomById.get(d.id)!;
-                const s = doorStatus.get(d.id)!;
-                const { current } = roomSchedule(venue, d.id, now);
-                return (
-                  <li key={d.id} style={{ "--room": room.color } as React.CSSProperties}>
-                    <span className="room-dot" />
-                    <div>
-                      <p className="room-name">
-                        {room.name} {s.live && <span className="status live">En vivo</span>}
-                      </p>
-                      <p className="muted small">
-                        {current ? current.title : room.topic}
-                        {s.count > 0 && ` · ${s.count} dentro`}
-                      </p>
-                    </div>
-                    <button className="btn sm" onClick={() => goTo(d.id)}>
-                      Ir
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
+        <section>
+          <h3 className="side-title">Salas</h3>
+          <ul className="room-list">
+            {info.map(({ room, current, talk, door, count }) => (
+              <li key={room.id} style={{ "--room": room.color } as React.CSSProperties}>
+                <span className="room-dot" />
+                <div>
+                  <p className="room-name">
+                    {room.name} {current && <span className="status live">En vivo</span>}
+                  </p>
+                  <p className="muted small">
+                    {talk ? `${span(talk)} · ${talk.title}` : room.topic}
+                    {count > 0 && ` · ${count} dentro`}
+                  </p>
+                  {door && <p className="muted small">{door.zone}</p>}
+                </div>
+                <button className="btn sm" onClick={() => go(door, room.id)}>
+                  Ir
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         {upcoming.length > 0 && (
           <section>
@@ -182,16 +193,58 @@ export default function Hall({
                     {u.name}
                     {u.id === me.id && <span className="muted"> (tú)</span>}
                   </p>
-                  <p className="muted small">
-                    {u.roomId ? roomById.get(u.roomId)?.name : floorName(u.floor)}
-                    {u.roomId && floorOf.has(u.roomId) && ` · ${floorName(floorOf.get(u.roomId)!)}`}
-                  </p>
+                  <p className="muted small">{u.roomId ? roomById.get(u.roomId)?.name : "Recorriendo el evento"}</p>
                 </div>
               </li>
             ))}
           </ul>
         </section>
       </aside>
+
+      {directoryOpen && (
+        <Modal title="Directorio de salas" onClose={() => setDirectoryOpen(false)}>
+          <p className="muted small directory-lead">Elige una sala: te marcamos el camino en el suelo o te llevamos caminando.</p>
+          <ul className="directory">
+            {info.map(({ room, current, next, door, count }) => (
+              <li key={room.id} className={room.main ? "main" : ""} style={{ "--room": room.color } as React.CSSProperties}>
+                <div className="directory-room">
+                  <p className="room-name">
+                    {room.name} {current && <span className="status live">En vivo</span>}
+                  </p>
+                  <p className="muted small">
+                    {door?.zone ?? ""}
+                    {count > 0 && ` · ${count} dentro`}
+                  </p>
+                </div>
+                <div className="directory-talks">
+                  {current && (
+                    <p>
+                      <b>Ahora</b> {span(current)} · {current.title}
+                      {current.speaker && <span className="muted"> — {current.speaker}</span>}
+                    </p>
+                  )}
+                  {next && (
+                    <p className="muted">
+                      <b>Después</b> {span(next)} · {next.title}
+                    </p>
+                  )}
+                  {!current && !next && <p className="muted">{room.topic}</p>}
+                </div>
+                <div className="directory-actions">
+                  {door && (
+                    <button className="btn sm" onClick={() => guide(door)}>
+                      Mostrar camino
+                    </button>
+                  )}
+                  <button className="btn primary sm" onClick={() => go(door, room.id)}>
+                    Llevarme
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Modal>
+      )}
     </main>
   );
 }

@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { venueFloors } from "../../shared/maps.ts";
+import { MAX_ROOMS, venueMap } from "../../shared/maps.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
-import type { Account, CompanyEvent, EventInput } from "../../shared/types.ts";
-import { companyApi } from "./lib.ts";
+import type { Account, CompanyEvent, EventInput, TalkInput } from "../../shared/types.ts";
+import { companyApi, loadToken } from "./lib.ts";
+import Modal from "./Modal.tsx";
 import { furniDrawables, renderStatic, T } from "./world.ts";
 
-/** Miniatura del lugar del evento con ese estilo. */
+/** Miniatura del recinto completo del evento con ese estilo. */
 function ThemePreview({ theme }: { theme: ThemeId }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    const map = venueFloors(theme, [
-      { id: "a", name: "A", color: "#5b5bf0" },
-      { id: "b", name: "B", color: "#06c38d" },
-      { id: "c", name: "C", color: "#f59e0b" },
-      { id: "d", name: "D", color: "#ec4899" },
-    ])[0]!;
+    const sample = ["#ff5c39", "#2f6bff", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6"].map((color, i) => ({
+      id: `s${i}`,
+      name: i ? `Sala ${i}` : "Auditorio",
+      color,
+      main: i === 0,
+    }));
+    const map = venueMap(theme, sample);
     const canvas = ref.current!;
     const dpr = window.devicePixelRatio || 1;
     const width = 180;
@@ -31,7 +33,64 @@ function ThemePreview({ theme }: { theme: ThemeId }) {
 
 type RoomDraft = EventInput["rooms"][number];
 
-const blankRoom = (i: number): RoomDraft => ({ name: "", topic: "", color: ROOM_COLORS[i % ROOM_COLORS.length]! });
+const blankRoom = (i: number): RoomDraft => ({ name: "", topic: "", color: ROOM_COLORS[i % ROOM_COLORS.length]!, talks: [] });
+
+const HOUR = 3_600_000;
+
+/** "2026-10-06T18:30" en hora local, para los campos de fecha y hora. */
+function toLocalInput(ms: number) {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const nextHour = () => Math.ceil(Date.now() / HOUR) * HOUR;
+
+/** Agenda de una sala: cada charla con título, ponente, inicio y duración. */
+function TalksEditor({ talks, onChange }: { talks: TalkInput[]; onChange: (talks: TalkInput[]) => void }) {
+  const set = (i: number, patch: Partial<TalkInput>) => onChange(talks.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  return (
+    <div className="talks-editor">
+      {talks.map((t, i) => (
+        <div key={i} className="talk-row">
+          <input value={t.title} onChange={(e) => set(i, { title: e.target.value })} maxLength={100} placeholder="Título de la charla" aria-label="Título de la charla" required />
+          <input value={t.speaker} onChange={(e) => set(i, { speaker: e.target.value })} maxLength={60} placeholder="Ponente" aria-label="Ponente" />
+          <input
+            type="datetime-local"
+            value={toLocalInput(t.start)}
+            onChange={(e) => {
+              const start = new Date(e.target.value).getTime();
+              if (Number.isFinite(start)) set(i, { start, end: start + (t.end - t.start) });
+            }}
+            aria-label="Inicio"
+            required
+          />
+          <select value={Math.round((t.end - t.start) / 60_000)} onChange={(e) => set(i, { end: t.start + Number(e.target.value) * 60_000 })} aria-label="Duración">
+            {[15, 20, 30, 45, 60, 90, 120, 180].map((m) => (
+              <option key={m} value={m}>
+                {m} min
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn ghost sm" onClick={() => onChange(talks.filter((_, j) => j !== i))} aria-label="Quitar charla">
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="link small"
+        onClick={() => {
+          const last = talks[talks.length - 1];
+          const start = last ? last.end + 15 * 60_000 : nextHour();
+          onChange([...talks, { title: "", speaker: "", start, end: start + 45 * 60_000 }]);
+        }}
+      >
+        ＋ Agregar charla
+      </button>
+    </div>
+  );
+}
 
 function EventEditor({
   initial,
@@ -52,7 +111,18 @@ function EventEditor({
   const [theme, setTheme] = useState<ThemeId>(v?.theme ?? "tech");
   const [isPrivate, setPrivate] = useState(v?.private ?? true);
   const [whitelist, setWhitelist] = useState((initial?.whitelist ?? []).join("\n"));
-  const [rooms, setRooms] = useState<RoomDraft[]>(v?.rooms.map((r) => ({ ...r })) ?? [{ ...blankRoom(0), name: "Sala principal" }]);
+  const draftsFrom = (ev: CompanyEvent): RoomDraft[] =>
+    ev.venue.rooms.map((r) => ({
+      id: r.id,
+      name: r.name,
+      topic: r.topic,
+      color: r.color,
+      talks: ev.venue.talks.filter((t) => t.roomId === r.id).map(({ title, speaker, start, end }) => ({ title, speaker, start, end })),
+    }));
+  const [rooms, setRooms] = useState<RoomDraft[]>(
+    initial ? draftsFrom(initial) : [{ ...blankRoom(0), name: "Auditorio principal", topic: "Charlas principales" }, { ...blankRoom(1), name: "Sala 1" }],
+  );
+  const [openAgenda, setOpenAgenda] = useState<number | null>(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -73,7 +143,7 @@ function EventEditor({
     try {
       const ev = await companyApi<CompanyEvent>(v ? `/events/${v.id}` : "/events", { method: v ? "PUT" : "POST", body });
       onSaved(ev);
-      setRooms(ev.venue.rooms.map((r) => ({ ...r })));
+      setRooms(draftsFrom(ev));
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar");
@@ -151,31 +221,41 @@ function EventEditor({
         </fieldset>
 
         <fieldset className="rooms-editor">
-          <legend>Salas de charla</legend>
+          <legend>Salas y agenda</legend>
+          <p className="muted small">La primera es el auditorio principal: es más grande y tiene una entrada propia al fondo del pasillo central.</p>
           {rooms.map((r, i) => (
-            <div key={r.id ?? `new-${i}`} className="room-row" style={{ "--room": r.color } as React.CSSProperties}>
-              <span className="room-dot" />
-              <input value={r.name} onChange={(e) => setRoom(i, { name: e.target.value })} maxLength={40} placeholder="Nombre de la sala" aria-label="Nombre de la sala" required />
-              <input value={r.topic} onChange={(e) => setRoom(i, { topic: e.target.value })} maxLength={80} placeholder="Tema" aria-label="Tema de la sala" />
-              <select value={r.color} onChange={(e) => setRoom(i, { color: e.target.value })} aria-label="Color de la sala" style={{ color: r.color }}>
-                {ROOM_COLORS.map((c) => (
-                  <option key={c} value={c} style={{ color: c }}>
-                    ■ {c}
-                  </option>
-                ))}
-              </select>
-              {r.id && initial?.speakerCodes[r.id] && (
-                <span className="code-chip" title="Código de ponente">
-                  🎤 {initial.speakerCodes[r.id]}
-                </span>
-              )}
-              <button type="button" className="btn ghost sm" onClick={() => setRooms((rs) => rs.filter((_, j) => j !== i))} disabled={rooms.length === 1} aria-label="Quitar sala">
-                ✕
-              </button>
+            <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
+              <div className="room-row">
+                <span className="room-dot" />
+                {i === 0 && <span className="main-tag">Auditorio</span>}
+                <input value={r.name} onChange={(e) => setRoom(i, { name: e.target.value })} maxLength={40} placeholder="Nombre de la sala" aria-label="Nombre de la sala" required />
+                <input value={r.topic} onChange={(e) => setRoom(i, { topic: e.target.value })} maxLength={80} placeholder="Tema" aria-label="Tema de la sala" />
+                <select value={r.color} onChange={(e) => setRoom(i, { color: e.target.value })} aria-label="Color de la sala" style={{ color: r.color }}>
+                  {ROOM_COLORS.map((c) => (
+                    <option key={c} value={c} style={{ color: c }}>
+                      ■ {c}
+                    </option>
+                  ))}
+                </select>
+                {r.id && initial?.speakerCodes[r.id] && (
+                  <span className="code-chip" title="Código de ponente">
+                    🎤 {initial.speakerCodes[r.id]}
+                  </span>
+                )}
+                <button type="button" className="btn ghost sm" onClick={() => setOpenAgenda(openAgenda === i ? null : i)} aria-expanded={openAgenda === i}>
+                  Agenda ({r.talks.length})
+                </button>
+                {i > 0 && (
+                  <button type="button" className="btn ghost sm" onClick={() => setRooms((rs) => rs.filter((_, j) => j !== i))} aria-label="Quitar sala">
+                    ✕
+                  </button>
+                )}
+              </div>
+              {openAgenda === i && <TalksEditor talks={r.talks} onChange={(talks) => setRoom(i, { talks })} />}
             </div>
           ))}
-          {rooms.length < 12 && (
-            <button type="button" className="link" onClick={() => setRooms((rs) => [...rs, blankRoom(rs.length)])}>
+          {rooms.length < MAX_ROOMS && (
+            <button type="button" className="link" onClick={() => setRooms((rs) => [...rs, { ...blankRoom(rs.length), name: `Sala ${rs.length}` }])}>
               ＋ Agregar sala
             </button>
           )}
@@ -274,11 +354,14 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
 export default function CompanyPanel({
   account,
   canVisit,
+  startNew = false,
   onVisit,
   onClose,
 }: {
   account: Account;
   canVisit: boolean;
+  /** Abrir directo en «Nuevo evento». */
+  startNew?: boolean;
   onVisit: (id: string) => void;
   onClose: () => void;
 }) {
@@ -290,7 +373,7 @@ export default function CompanyPanel({
     companyApi<CompanyEvent[]>("/events").then(
       (list) => {
         setEvents(list);
-        setSelected(list[0]?.venue.id ?? "new");
+        setSelected(startNew ? "new" : (list[0]?.venue.id ?? "new"));
       },
       (err) => setError(err.message),
     );
@@ -355,5 +438,47 @@ export default function CompanyPanel({
         )}
       </div>
     </div>
+  );
+}
+
+/** Convierte una cuenta personal en cuenta de empresa para poder organizar eventos. */
+export function CompanyUpgrade({ onDone, onClose }: { onDone: (account: Account) => void; onClose: () => void }) {
+  const [company, setCompany] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal title="Crea tu evento" onClose={onClose} narrow>
+      <form
+        className="form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError("");
+          try {
+            const res = await fetch("/api/company/upgrade", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${loadToken() ?? ""}` },
+              body: JSON.stringify({ company }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error ?? "No se pudo actualizar la cuenta");
+            onDone(data.account as Account);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Algo salió mal");
+            setBusy(false);
+          }
+        }}
+      >
+        <p className="muted">Para organizar eventos tu cuenta pasa a ser de empresa. Puedes seguir entrando a eventos como siempre.</p>
+        <label>
+          Nombre de la empresa
+          <input value={company} onChange={(e) => setCompany(e.target.value)} maxLength={60} required autoFocus placeholder="Acme Tech" />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button className="btn primary" disabled={busy || !company.trim()}>
+          {busy ? "Un momento…" : "Continuar"}
+        </button>
+      </form>
+    </Modal>
   );
 }

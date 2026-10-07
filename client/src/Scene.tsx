@@ -10,7 +10,6 @@ import {
   drawName,
   drawPlaques,
   drawScreenContent,
-  drawSigns,
   drawSponsorScreens,
   feet,
   findPath,
@@ -27,6 +26,7 @@ const SPEED = 6.5; // baldosas por segundo
 const REMOTE_SPEED = 7;
 const BUBBLE_MS = 7000;
 const EMOTE_MS = 2600;
+const CHATTER_MS = 4200;
 
 const KEY_DIRS: Record<string, Dir> = {
   ArrowUp: "up",
@@ -40,12 +40,28 @@ const KEY_DIRS: Record<string, Dir> = {
 };
 const DELTA: Record<Dir, Tile> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
+/** Frases de la gente que conversa en los pasillos. */
+const CHATTER = [
+  "¿Vas al auditorio?",
+  "La charla de IA estuvo buenísima",
+  "¿Dónde es el taller?",
+  "Hay café en la plaza",
+  "¿Te pasaste por el stand?",
+  "Nos vemos en la próxima",
+  "¿Grabarán las charlas?",
+  "Me encantó la demo",
+  "¿Conectamos en LinkedIn?",
+  "Ya casi empieza la keynote",
+];
+
 const dirFrom = (dx: number, dy: number, fallback: Dir): Dir =>
   Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3 ? fallback : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
 
 export interface SceneHandle {
   /** Camina hasta la baldosa y luego llama a `then`. Devuelve false si no hay camino. */
   walkTo: (tile: Tile, then?: () => void) => boolean;
+  /** Marca en el suelo el camino hasta una baldosa (o lo borra con null). */
+  guide: (tile: Tile | null) => void;
   bubble: (userId: string, text: string) => void;
 }
 
@@ -63,8 +79,8 @@ export interface SceneProps {
   locked?: boolean;
   onDoor?: (door: Door) => void;
   onExit?: () => void;
-  onStairs?: (floor: number) => void;
   onNpc?: (npc: Npc) => void;
+  onDirectory?: () => void;
   handle?: Ref<SceneHandle>;
   label: string;
 }
@@ -83,19 +99,24 @@ interface MyState extends Walker {
   then: (() => void) | null;
 }
 
+const near = (a: Tile, b: Tile) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
+
 export default function Scene(props: SceneProps) {
   const { map, me, handle } = props;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const miniRef = useRef<HTMLCanvasElement>(null);
   const live = useRef(props);
   live.current = props;
   const [prompt, setPrompt] = useState<string | null>(null);
+  const showMinimap = map.w > 30;
 
   const my = useRef<MyState>({ x: me.x, y: me.y, dir: "down", walk: 0, moving: false, seg: null, path: [], then: null });
   const others = useRef(new Map<string, Walker>());
   const bubbles = useRef(new Map<string, { text: string; at: number }>());
   const emotes = useRef(new Map<string, { emoji: string; at: number }>());
   const keys = useRef<Dir[]>([]);
+  const guideTo = useRef<Tile | null>(null);
   const view = useRef({ zoom: 1, camX: 0, camY: 0, w: 0, h: 0 });
   const hover = useRef<{ tile: Tile | null; user: string | null; npc: string | null; door: string | null }>({
     tile: null,
@@ -104,9 +125,11 @@ export default function Scene(props: SceneProps) {
     door: null,
   });
 
+  const here = () => ({ x: Math.round(my.current.x), y: Math.round(my.current.y) });
+
   const walkTo = (tile: Tile, then?: () => void) => {
     const s = my.current;
-    const from = s.seg ? s.seg.to : { x: Math.round(s.x), y: Math.round(s.y) };
+    const from = s.seg ? s.seg.to : here();
     const path = findPath(map, from, tile);
     if (!path) return false;
     s.path = path;
@@ -120,16 +143,26 @@ export default function Scene(props: SceneProps) {
 
   /** NPC al lado del personaje (o del mostrador en el que está parado). */
   const nearbyNpc = () => {
-    const s = my.current;
-    if (s.seg) return null;
-    const here = { x: Math.round(s.x), y: Math.round(s.y) };
-    return (
-      map.npcs.find((n) => map.desk.some((t) => sameTile(here, t)) || Math.abs(n.x - here.x) + Math.abs(n.y - here.y) === 1) ?? null
-    );
+    if (my.current.seg) return null;
+    const h = here();
+    return map.npcs.find((n) => map.desk.some((t) => sameTile(h, t)) || Math.abs(n.x - h.x) + Math.abs(n.y - h.y) === 1) ?? null;
   };
+  const nearbyDirectory = () => (my.current.seg ? null : (map.directories.find((d) => near(d, here())) ?? null));
+
+  /** Baldosa libre junto a un objeto, la más cercana al personaje. */
+  const besideTile = (t: Tile) =>
+    [
+      { x: t.x, y: t.y + 1 },
+      { x: t.x - 1, y: t.y },
+      { x: t.x + 1, y: t.y },
+      { x: t.x, y: t.y - 1 },
+    ]
+      .filter((c) => isWalkable(map, c.x, c.y))
+      .sort((a, b) => Math.hypot(a.x - my.current.x, a.y - my.current.y) - Math.hypot(b.x - my.current.x, b.y - my.current.y));
 
   useImperativeHandle(handle, () => ({
     walkTo,
+    guide: (tile) => (guideTo.current = tile),
     bubble: (userId, text) => bubbles.current.set(userId, { text, at: performance.now() }),
   }));
 
@@ -144,7 +177,7 @@ export default function Scene(props: SceneProps) {
     };
   }, []);
 
-  // Teclado: flechas o WASD para caminar, X para hablar.
+  // Teclado: flechas o WASD para caminar, X para interactuar, 1 a 5 para reaccionar.
   useEffect(() => {
     const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     const name = (e: KeyboardEvent) => (e.key.length === 1 ? e.key.toLowerCase() : e.key);
@@ -158,11 +191,11 @@ export default function Scene(props: SceneProps) {
         my.current.path = [];
         my.current.then = null;
       } else if (/^[1-5]$/.test(k)) {
-        // Reacciones rápidas con las teclas 1 a 5, como en Gather.
         socket.emit("emote", EMOTES[Number(k) - 1]!);
       } else if (k === "x") {
         const npc = nearbyNpc();
         if (npc) live.current.onNpc?.(npc);
+        else if (nearbyDirectory()) live.current.onDirectory?.();
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -184,9 +217,23 @@ export default function Scene(props: SceneProps) {
     const canvas = canvasRef.current!;
     const wrap = wrapRef.current!;
     const ctx = canvas.getContext("2d")!;
-    const STATIC_SCALE = 2;
-    const backdrop = renderStatic(map, STATIC_SCALE);
+    const backdrop = renderStatic(map, 2);
     const furni = furniDrawables(map, () => live.current.media ?? { sponsors: [], title: "" });
+    const W = map.w * T;
+    const H = map.h * T;
+
+    // Minimapa: el recinto en miniatura con las puertas marcadas.
+    const mini = miniRef.current;
+    const miniCtx = mini?.getContext("2d") ?? null;
+    const MINI_W = 180;
+    const miniScale = MINI_W / W;
+    if (mini) {
+      const dpr = window.devicePixelRatio || 1;
+      mini.width = MINI_W * dpr;
+      mini.height = H * miniScale * dpr;
+      mini.style.width = `${MINI_W}px`;
+      mini.style.height = `${H * miniScale}px`;
+    }
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -219,14 +266,13 @@ export default function Scene(props: SceneProps) {
       const intended = !s.path.length || keys.current.length > 0;
       const door = intended && p.onDoor && map.doors.find((d) => onSpan(to, d));
       const exit = intended && p.onExit && map.exit && onSpan(to, map.exit);
-      const stairs = intended && p.onStairs && map.stairs.find((st) => onSpan(to, st));
-      if (door || exit || stairs) {
+      if (door || exit) {
         s.path = [];
         s.then = null;
         keys.current = [];
         s.moving = false;
+        guideTo.current = null;
         if (door) p.onDoor!(door);
-        else if (stairs) p.onStairs!(stairs.to);
         else p.onExit!();
         return;
       }
@@ -281,10 +327,9 @@ export default function Scene(props: SceneProps) {
       };
     };
 
+    const lookAhead = { x: 0, y: 0 };
     const updateCamera = () => {
       const v = view.current;
-      const W = map.w * T;
-      const H = map.h * T;
       if (live.current.camera === "fit") {
         // En la franja del público se encuadran el atril y los asientos.
         const spots = [...map.seats, ...(map.podium ? [map.podium] : [])];
@@ -298,24 +343,32 @@ export default function Scene(props: SceneProps) {
         v.camY = ((y0 + y1) / 2) * T;
         return;
       }
-      // Si el mapa entero cabe con un zoom razonable se muestra completo, como en Gather.
-      v.zoom = Math.max(1, Math.min(2, v.h / H, v.w / W));
+      // Mapas chicos se ven completos; en el recinto grande la cámara sigue al personaje.
+      v.zoom = showMinimap ? Math.max(1.1, Math.min(1.8, v.h / (19 * T))) : Math.max(1, Math.min(2, v.h / H, v.w / W));
       const f = feet(my.current.x, my.current.y);
+      // En el recinto se mira un poco hacia donde camina el personaje.
+      const ahead = showMinimap ? DELTA[my.current.dir] : { x: 0, y: 0 };
+      lookAhead.x += (ahead.x * 3 * T - lookAhead.x) * 0.04;
+      lookAhead.y += (ahead.y * 3 * T - lookAhead.y) * 0.04;
       const halfW = v.w / 2 / v.zoom;
       const halfH = v.h / 2 / v.zoom;
       const clamp = (c: number, size: number, half: number) => (size <= half * 2 ? size / 2 : Math.max(half, Math.min(size - half, c)));
-      v.camX = clamp(f.x, W, halfW);
-      // Se encuadra un poco más arriba del personaje para ver el muro y sus puertas.
-      v.camY = clamp(f.y - 48, H, halfH);
+      v.camX = clamp(f.x + lookAhead.x, W, halfW);
+      v.camY = clamp(f.y - 24 + lookAhead.y, H, halfH);
     };
 
     let raf = 0;
     let last = performance.now();
     let lastPrompt: string | null = null;
+    let nextChatter = performance.now() + 1500;
+    let guidePath: Tile[] = [];
+    let guideFrom = "";
+
     const frame = (t: number) => {
       const dt = Math.min(0.05, (t - last) / 1000);
       last = t;
       const p = live.current;
+      const wall = Date.now();
       step(dt);
 
       // Los demás se acercan suavemente a la última posición que mandó el servidor.
@@ -346,8 +399,17 @@ export default function Scene(props: SceneProps) {
       }
       for (const id of others.current.keys()) if (!visible.some((u) => u.id === id)) others.current.delete(id);
 
+      // La gente del pasillo comenta algo de vez en cuando, si está cerca de ti.
+      if (map.crowd.length && t > nextChatter) {
+        const nearby = map.crowd.filter((c) => Math.hypot(c.x - my.current.x, c.y - my.current.y) < 12);
+        const who = nearby[Math.floor(Math.random() * nearby.length)];
+        if (who) bubbles.current.set(who.id, { text: CHATTER[Math.floor(Math.random() * CHATTER.length)]!, at: t - (BUBBLE_MS - CHATTER_MS) });
+        nextChatter = t + 3500 + Math.random() * 3500;
+      }
+
       const npc = p.onNpc ? nearbyNpc() : null;
-      const nextPrompt = npc ? `Pulsa X para hablar con la ${npc.name.toLowerCase()}` : null;
+      const directory = p.onDirectory ? nearbyDirectory() : null;
+      const nextPrompt = npc ? `hablar con la ${npc.name.toLowerCase()}` : directory ? "ver cómo llegar a cada sala" : null;
       if (nextPrompt !== lastPrompt) {
         lastPrompt = nextPrompt;
         setPrompt(nextPrompt);
@@ -357,80 +419,90 @@ export default function Scene(props: SceneProps) {
       const v = view.current;
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = "#dfe4ec";
+      ctx.fillStyle = "#1d1b26";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const z = v.zoom * dpr;
       ctx.setTransform(z, 0, 0, z, Math.round((v.w / 2 - v.camX * v.zoom) * dpr), Math.round((v.h / 2 - v.camY * v.zoom) * dpr));
       ctx.imageSmoothingEnabled = false;
 
-      ctx.drawImage(backdrop, 0, 0, map.w * T, map.h * T);
+      ctx.drawImage(backdrop, 0, 0, W, H);
       drawAnimatedDecor(ctx, map, t);
-      drawSigns(ctx, map);
-      drawSponsorScreens(ctx, map, p.media ?? { sponsors: [], title: "" }, Date.now());
+      drawSponsorScreens(ctx, map, p.media ?? { sponsors: [], title: "" }, wall);
       if (p.screen) drawScreenContent(ctx, map, p.screen.color, p.screen.title, p.screen.live);
 
-      // Camino que va a recorrer el personaje, con puntos como en Gather.
+      // Camino guiado: cuadros en el suelo hasta la sala elegida en el directorio.
+      if (guideTo.current) {
+        const h0 = here();
+        const key = `${h0.x},${h0.y}`;
+        if (key !== guideFrom) {
+          guideFrom = key;
+          guidePath = findPath(map, h0, guideTo.current) ?? [];
+        }
+        if (sameTile(h0, guideTo.current)) guideTo.current = null;
+        const pulse = Math.floor(wall / 120) % 6;
+        guidePath.forEach((stepTile, i) => {
+          ctx.fillStyle = i % 6 === pulse ? "#ff5c39" : "rgba(255, 92, 57, 0.45)";
+          ctx.fillRect(stepTile.x * T + 12, stepTile.y * T + 12, 8, 8);
+        });
+      }
+
+      // Camino que va a recorrer el personaje al hacer clic.
       const s0 = my.current;
       if (s0.path.length) {
-        ctx.fillStyle = "rgba(91, 91, 240, 0.45)";
-        for (const step of s0.path) {
-          ctx.beginPath();
-          ctx.arc((step.x + 0.5) * T, (step.y + 0.5) * T, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        ctx.fillStyle = "rgba(47, 107, 255, 0.5)";
+        for (const stepTile of s0.path) ctx.fillRect(stepTile.x * T + 13, stepTile.y * T + 13, 6, 6);
         const goal = s0.path[s0.path.length - 1]!;
-        ctx.strokeStyle = "rgba(91, 91, 240, 0.8)";
+        ctx.strokeStyle = "rgba(47, 107, 255, 0.9)";
         ctx.lineWidth = 2;
         ctx.strokeRect(goal.x * T + 4, goal.y * T + 4, T - 8, T - 8);
       }
 
       const h = hover.current;
       if (h.tile && !p.locked && isWalkable(map, h.tile.x, h.tile.y)) {
-        ctx.strokeStyle = "rgba(79, 70, 229, 0.55)";
+        ctx.strokeStyle = "rgba(29, 27, 38, 0.45)";
         ctx.lineWidth = 1.5;
         ctx.strokeRect(h.tile.x * T + 1.5, h.tile.y * T + 1.5, T - 3, T - 3);
       }
 
       const items: Drawable[] = [...furni];
-      const labels: { x: number; y: number; name: string; mine: boolean; sitting: boolean; id: string }[] = [];
-      const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, fixedDir?: Dir) => {
+      const labels: { x: number; y: number; name: string; mine: boolean; sitting: boolean; id: string; tag: boolean }[] = [];
+      const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, tag: boolean, fixedDir?: Dir) => {
         const pose = poseFor(w, fixedDir);
         const f = feet(w.x, w.y);
         items.push({ key: w.y + 0.82, draw: (g) => drawAvatar(g, look, f.x, f.y, pose) });
-        labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id });
+        labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag });
       };
-      for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, n.dir);
-      for (const u of visible) addAvatar(u.id, u.name, u.look, others.current.get(u.id)!, false);
-      addAvatar(p.me.id, p.me.name, p.me.look, my.current, true);
+      for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
+      for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir);
+      for (const u of visible) addAvatar(u.id, u.name, u.look, others.current.get(u.id)!, false, true);
+      addAvatar(p.me.id, p.me.name, p.me.look, my.current, true, true);
       items.sort((a, b) => a.key - b.key);
-      const wall = Date.now();
       for (const it of items) it.draw(ctx, wall);
 
-      drawPlaques(ctx, map, p.doorStatus ?? null, h.door);
+      drawPlaques(ctx, map, p.doorStatus ?? null, h.door, wall);
 
       for (const l of labels) {
-        const isNpc = map.npcs.some((n) => n.id === l.id);
-        if ((p.names === "all" && !isNpc) || l.mine || h.user === l.id || h.npc === l.id) {
+        if ((p.names === "all" && l.tag) || l.mine || h.user === l.id || h.npc === l.id) {
           drawName(ctx, l.x, l.y - avatarHeight(l.sitting) - 8, l.mine ? `${l.name} (tú)` : l.name, l.mine);
         }
       }
-      // Signo de exclamación sobre la recepcionista, como los objetos interactivos de Gather.
-      for (const n of map.npcs) {
-        const f = feet(n.x, n.y);
+      // Marcadores sobre lo que se puede usar: la recepcionista y los directorios.
+      const markers = [
+        ...map.npcs.map((n) => ({ x: n.x, y: n.y, h: avatarHeight(false) + 26, text: "!" })),
+        ...map.directories.map((d) => ({ ...d, h: 66, text: "?" })),
+      ];
+      for (const m of markers) {
+        const f = feet(m.x, m.y);
         const bob = Math.round(Math.sin(t / 260) * 2);
-        const y = f.y - avatarHeight(false) - 34 + bob;
+        const y = f.y - m.h + bob;
+        ctx.fillStyle = "#16161d";
+        ctx.fillRect(f.x - 9, y - 9, 18, 18);
+        ctx.fillStyle = "#ff5c39";
+        ctx.fillRect(f.x - 7, y - 7, 14, 14);
         ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(f.x, y, 9, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#06c38d";
-        ctx.beginPath();
-        ctx.arc(f.x, y, 7.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "700 11px Inter, sans-serif";
+        ctx.font = "700 11px 'Space Grotesk', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("!", f.x, y + 4);
+        ctx.fillText(m.text, f.x, y + 4);
         ctx.textAlign = "left";
       }
 
@@ -448,7 +520,7 @@ export default function Scene(props: SceneProps) {
         ctx.globalAlpha = age > EMOTE_MS - 400 ? (EMOTE_MS - age) / 400 : 1;
         ctx.font = "20px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(e.emoji, l.x + 16, l.y - avatarHeight(l.sitting) - 6 - rise * 10 - Math.sin(age / 120) * 2);
+        ctx.fillText(e.emoji, l.x + 16, l.y - avatarHeight(l.sitting) - 6 - rise * 10);
         ctx.restore();
       }
       for (const l of labels) {
@@ -461,6 +533,33 @@ export default function Scene(props: SceneProps) {
         }
         const alpha = age > BUBBLE_MS - 1000 ? (BUBBLE_MS - age) / 1000 : 1;
         drawBubble(ctx, l.x, l.y - avatarHeight(l.sitting) - 20, l.name, b.text, alpha);
+      }
+
+      if (miniCtx && mini) {
+        const md = window.devicePixelRatio || 1;
+        miniCtx.setTransform(md, 0, 0, md, 0, 0);
+        miniCtx.imageSmoothingEnabled = true;
+        miniCtx.drawImage(backdrop, 0, 0, MINI_W, H * miniScale);
+        for (const d of map.doors) {
+          miniCtx.fillStyle = d.color;
+          miniCtx.fillRect(d.x * T * miniScale - 1, d.y * T * miniScale - 1, d.w * T * miniScale + 2, 5);
+        }
+        if (guideTo.current) {
+          miniCtx.fillStyle = "#ff5c39";
+          miniCtx.fillRect(guideTo.current.x * T * miniScale - 3, guideTo.current.y * T * miniScale - 3, 6, 6);
+        }
+        for (const o of others.current.values()) {
+          miniCtx.fillStyle = "#ffffff";
+          miniCtx.fillRect((o.x + 0.5) * T * miniScale - 1.5, (o.y + 0.5) * T * miniScale - 1.5, 3, 3);
+        }
+        miniCtx.fillStyle = "#16161d";
+        miniCtx.fillRect((my.current.x + 0.5) * T * miniScale - 4, (my.current.y + 0.5) * T * miniScale - 4, 8, 8);
+        miniCtx.fillStyle = "#ffb703";
+        miniCtx.fillRect((my.current.x + 0.5) * T * miniScale - 3, (my.current.y + 0.5) * T * miniScale - 3, 6, 6);
+        // Recuadro de lo que se ve en pantalla.
+        miniCtx.strokeStyle = "rgba(255,255,255,0.85)";
+        miniCtx.lineWidth = 1;
+        miniCtx.strokeRect((v.camX - v.w / 2 / v.zoom) * miniScale, (v.camY - v.h / 2 / v.zoom) * miniScale, (v.w / v.zoom) * miniScale, (v.h / v.zoom) * miniScale);
       }
 
       raf = requestAnimationFrame(frame);
@@ -484,19 +583,17 @@ export default function Scene(props: SceneProps) {
     return Math.abs(wx - f.x) < 12 && wy > f.y - avatarHeight(false) && wy < f.y + 4;
   };
 
-  // Las puertas y escaleras se pueden clickear en todo su dibujo, no solo en la baldosa pisable.
+  // Puertas y objetos se pueden clickear en todo su dibujo, no solo en la baldosa pisable.
   const spanHit = (s: Span, wx: number, wy: number) => {
     const tiles = spanTiles(s);
     const x0 = tiles[0]!.x * T;
-    const y0 = tiles[0]!.y * T;
     const x1 = (tiles[tiles.length - 1]!.x + 1) * T;
-    const y1 = (tiles[tiles.length - 1]!.y + 1) * T;
-    if (s.side === "top") return wx >= x0 && wx < x1 && wy >= 0 && wy < 3 * T;
-    if (s.side === "bottom") return wx >= x0 && wx < x1 && wy >= y0 - T / 2;
-    return wy >= y0 && wy < y1 && (s.side === "left" ? wx < x1 + T / 2 : wx >= x0 - T / 2);
+    if (wx < x0 || wx >= x1) return false;
+    return s.side === "top" ? wy >= (s.y - 1) * T && wy < (s.y + 1) * T : wy >= (s.y - 0.5) * T && wy < (s.y + 1) * T;
   };
   const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy));
-  const hitStairs = (wx: number, wy: number) => map.stairs.find((st) => spanHit(st, wx, wy));
+  const hitDirectory = (wx: number, wy: number) =>
+    map.directories.find((d) => wx >= d.x * T && wx < (d.x + 1) * T && wy >= (d.y - 1.2) * T && wy < (d.y + 1) * T);
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const w = toWorld(e);
@@ -506,7 +603,7 @@ export default function Scene(props: SceneProps) {
     h.user = null;
     for (const [id, o] of others.current) if (hitAvatar(w.x, w.y, o.x, o.y)) h.user = id;
     h.door = hitDoor(w.x, w.y)?.id ?? null;
-    e.currentTarget.style.cursor = h.npc || h.door || hitStairs(w.x, w.y) ? "pointer" : "default";
+    e.currentTarget.style.cursor = h.npc || h.door || hitDirectory(w.x, w.y) ? "pointer" : "default";
   };
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -518,16 +615,22 @@ export default function Scene(props: SceneProps) {
     if (npc) {
       const talk = () => p.onNpc?.(npc);
       if (nearbyNpc()?.id === npc.id) return talk();
-      const s = my.current;
       const spots = map.desk
         .filter((t) => isWalkable(map, t.x, t.y))
-        .sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y));
+        .sort((a, b) => Math.hypot(a.x - my.current.x, a.y - my.current.y) - Math.hypot(b.x - my.current.x, b.y - my.current.y));
       for (const spot of spots) if (walkTo(spot, talk)) return;
       return;
     }
-    const target = hitDoor(w.x, w.y) ?? hitStairs(w.x, w.y);
-    if (target) {
-      walkTo({ x: target.x, y: target.y });
+    const directory = hitDirectory(w.x, w.y);
+    if (directory) {
+      const open = () => p.onDirectory?.();
+      if (near(directory, here()) && !my.current.seg) return open();
+      for (const spot of besideTile(directory)) if (walkTo(spot, open)) return;
+      return;
+    }
+    const door = hitDoor(w.x, w.y);
+    if (door) {
+      walkTo({ x: door.x, y: door.y });
       return;
     }
     const tile = screenToTile(w.x, w.y);
@@ -543,9 +646,10 @@ export default function Scene(props: SceneProps) {
         onMouseLeave={() => (hover.current = { tile: null, user: null, npc: null, door: null })}
         aria-label={props.label}
       />
+      {showMinimap && <canvas ref={miniRef} className="minimap" aria-label="Minimapa del recinto" />}
       {prompt && (
         <p className="scene-prompt">
-          <kbd>X</kbd> {prompt.replace(/^Pulsa X para /, "")}
+          <kbd>X</kbd> {prompt}
         </p>
       )}
     </div>

@@ -1,24 +1,13 @@
 // Dibujo de los mapas vistos desde arriba, al estilo Gather: pisos y muros según el
 // estilo de cada lugar, adornos, puertas, escaleras, muebles y la búsqueda de caminos.
 
-import {
-  isWalkable,
-  spanTiles,
-  type Decor,
-  type Door,
-  type Furni,
-  type SceneMap,
-  type Span,
-  type Stairs,
-  type StyleId,
-  type Tile,
-} from "../../shared/maps.ts";
+import { isWalkable, spanTiles, type Decor, type Door, type Furni, type SceneMap, type Span, type StyleId, type Tile } from "../../shared/maps.ts";
 import type { ThemeId } from "../../shared/themes.ts";
 import type { Sponsor } from "../../shared/types.ts";
 import { shade } from "./avatar.ts";
 
 export const T = 32;
-const FONT = '"DM Sans", Inter, ui-sans-serif, system-ui, sans-serif';
+const FONT = '"Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif';
 const LINE = "rgba(30, 30, 45, 0.55)";
 
 /** Número pseudoaleatorio estable por posición, para variar tablas y piedras sin parpadeos. */
@@ -252,7 +241,6 @@ interface Style {
 
 const STYLES: Record<StyleId, Style> = {
   cowork: { floor: planks(["#e2c49a", "#dcbd91", "#e6caa2", "#d8b88b"]), face: bricks(["#c96f52", "#bf654a", "#d0785a", "#c46a4e"], "#ead8c8"), cap: "#5d6170", base: "#8b5a44" },
-  lobby: { floor: tiles(["#dfe5ee", "#dae1eb"], 32, "rgba(120,135,160,0.25)"), face: plaster("#f3f5f9", "#c9d6ea", "#ffffff"), cap: "#6f7890", base: "#9fb0cc" },
   tech: { floor: tiles(["#e4e9f1", "#dfe5ee"], 32, "rgba(56,189,248,0.35)"), face: panels, cap: "#475569", base: "#38bdf8" },
   minimal: { floor: planks(["#efe3cf", "#eadcc5", "#f2e8d6", "#e8d8bf"], "rgba(150,120,80,0.25)"), face: plaster("#f8f6f2", null, "#e9e4dc"), cap: "#bdb6aa", base: "#ddd5c8" },
   rustic: { floor: planks(["#a87445", "#b07c4b", "#9f6c3f", "#a9784a"]), face: logs, cap: "#6b4a2f", base: "#5a3a22" },
@@ -312,7 +300,7 @@ function windowDecor(ctx: CanvasRenderingContext2D, d: Decor, style: StyleId) {
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.fillRect(x + 8 + hash(d.x, 1) * (w - 30), y + 9, 14, 4);
   ctx.fillRect(x + 12 + hash(d.x, 1) * (w - 30), y + 6, 8, 4);
-  if (style === "cowork" || style === "lobby" || style === "tech") {
+  if (style === "cowork" || style === "tech") {
     // Edificios de la ciudad.
     for (let bx = x + 3; bx < x + w - 3; bx += 7) {
       const bh = 10 + Math.floor(hash(bx, d.x, 22) * 18);
@@ -391,22 +379,10 @@ function whiteboard(ctx: CanvasRenderingContext2D, d: Decor) {
 function clock(ctx: CanvasRenderingContext2D, d: Decor) {
   const cx = d.x * T + T / 2;
   const cy = T + 24;
-  ctx.fillStyle = LINE;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 11, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(cx, cy, 9.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#1f2433";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx, cy - 7);
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + 5, cy + 2);
-  ctx.stroke();
+  frame(ctx, cx - 10, cy - 10, 20, 20, "#ffffff");
+  ctx.fillStyle = "#1f2433";
+  ctx.fillRect(cx - 1, cy - 7, 2, 8);
+  ctx.fillRect(cx, cy - 1, 6, 2);
 }
 
 function shelf(ctx: CanvasRenderingContext2D, d: Decor) {
@@ -602,32 +578,6 @@ function topDoor(ctx: CanvasRenderingContext2D, door: Door) {
   }
 }
 
-/** Puerta en un muro lateral: un vano con la hoja abierta y un felpudo del color de la sala. */
-function sideDoor(ctx: CanvasRenderingContext2D, map: SceneMap, door: Door) {
-  const style = STYLES[map.style];
-  const x = door.x * T;
-  const y = door.y * T;
-  const h = door.w * T;
-  style.floor(ctx, x, y, x + T, y + h);
-  const left = door.side === "left";
-  // Jambas.
-  ctx.fillStyle = shade(style.cap, -0.2);
-  ctx.fillRect(x, y - 4, T, 6);
-  ctx.fillRect(x, y + h - 2, T, 6);
-  // Hoja abierta contra el muro, con el estilo de la sala.
-  const leaf: Record<ThemeId, string> = { tech: "#bde8fb", minimal: "#ffffff", rustic: "#a8713f", medieval: "#7a4a2a", garden: "#3f8f3a" };
-  const lx = left ? x + T - 8 : x + 2;
-  frame(ctx, lx, y + 2, 6, h / 2, leaf[door.theme]);
-  // Felpudo.
-  const mx = left ? x + T + 2 : x - T + 2;
-  ctx.fillStyle = shade(door.color, -0.2);
-  ctx.fillRect(mx, y + 4, T - 4, h - 8);
-  ctx.fillStyle = door.color;
-  ctx.fillRect(mx + 2, y + 6, T - 8, h - 12);
-  // Franja de color en el borde interior del vano.
-  ctx.fillStyle = door.color;
-  ctx.fillRect(left ? x + T - 2 : x, y, 2, h);
-}
 
 function bottomOpening(ctx: CanvasRenderingContext2D, map: SceneMap, s: Span, color: string) {
   const style = STYLES[map.style];
@@ -642,37 +592,7 @@ function bottomOpening(ctx: CanvasRenderingContext2D, map: SceneMap, s: Span, co
   ctx.fillRect(x + 2, y, w - 4, 3);
 }
 
-function topStairs(ctx: CanvasRenderingContext2D, s: Stairs) {
-  const x = s.x * T;
-  const w = s.w * T;
-  const steps = 7;
-  for (let i = 0; i < steps; i++) {
-    const y = 3 * T - (i + 1) * ((2 * T) / steps);
-    const inset = i * 1.5;
-    ctx.fillStyle = shade("#c8b49a", -i * 0.06);
-    ctx.fillRect(x + inset, y, w - inset * 2, (2 * T) / steps);
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.fillRect(x + inset, y + (2 * T) / steps - 2, w - inset * 2, 2);
-  }
-  ctx.fillStyle = "#4b5563";
-  ctx.fillRect(x - 3, T + 2, 4, 2 * T - 2);
-  ctx.fillRect(x + w - 1, T + 2, 4, 2 * T - 2);
-}
 
-function bottomStairs(ctx: CanvasRenderingContext2D, s: Stairs) {
-  const x = s.x * T;
-  const y = s.y * T;
-  const w = s.w * T;
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = shade("#c8b49a", -0.1 - i * 0.12);
-    ctx.fillRect(x, y + i * 8, w, 8);
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.fillRect(x, y + i * 8 + 6, w, 2);
-  }
-  ctx.fillStyle = "#4b5563";
-  ctx.fillRect(x - 3, y, 4, T);
-  ctx.fillRect(x + w - 1, y, 4, T);
-}
 
 // ---------- Alfombras ----------
 
@@ -698,17 +618,52 @@ function rug(ctx: CanvasRenderingContext2D, f: Furni) {
   const color = f.color ?? "#c7d2e3";
   ctx.fillStyle = shade(color, -0.15);
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 8);
+  ctx.rect(x, y, w, h);
   ctx.fill();
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.roundRect(x + 3, y + 3, w - 6, h - 6, 6);
+  ctx.rect(x + 3, y + 3, w - 6, h - 6);
   ctx.fill();
   ctx.strokeStyle = shade(color, 0.35);
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.roundRect(x + 8, y + 8, w - 16, h - 16, 4);
+  ctx.rect(x + 8, y + 8, w - 16, h - 16);
   ctx.stroke();
+}
+
+/** Desplaza el dibujo para que un adorno pensado para la cara de muro de las filas 1-2 quede en `y`. */
+function atRow(ctx: CanvasRenderingContext2D, y: number, draw: () => void) {
+  ctx.save();
+  ctx.translate(0, (y - 2) * T);
+  draw();
+  ctx.restore();
+}
+
+/** Entrada monumental del auditorio principal: columnas, puertas dobles altas y alfombra roja. */
+function mainDoor(ctx: CanvasRenderingContext2D, door: Door) {
+  const x = door.x * T;
+  const w = door.w * T;
+  const top = T + 2;
+  const bottom = 3 * T;
+  // Columnas a los lados.
+  for (const cx of [x - 10, x + w + 2]) {
+    frame(ctx, cx, top - 6, 8, bottom - top + 6, "#e9e4dc");
+    ctx.fillStyle = "#c9c3b8";
+    ctx.fillRect(cx + 5, top - 6, 3, bottom - top + 6);
+    frame(ctx, cx - 2, top - 8, 12, 4, "#f4f1ea");
+  }
+  frame(ctx, x - 2, top - 2, w + 4, bottom - top + 2, "#3a2f2a");
+  // Hojas de la puerta con paneles y tiradores dorados.
+  for (const lx of [x + 2, x + w / 2 + 1]) {
+    ctx.fillStyle = shade(door.color, -0.35);
+    ctx.fillRect(lx, top + 2, w / 2 - 3, bottom - top - 2);
+    ctx.fillStyle = shade(door.color, -0.15);
+    ctx.fillRect(lx + 4, top + 7, w / 2 - 11, 18);
+    ctx.fillRect(lx + 4, top + 30, w / 2 - 11, 22);
+  }
+  ctx.fillStyle = "#f2c94c";
+  ctx.fillRect(x + w / 2 - 6, top + 30, 3, 10);
+  ctx.fillRect(x + w / 2 + 3, top + 30, 3, 10);
 }
 
 /** Dibuja todo lo que no cambia en un canvas aparte, que luego se copia en cada frame. */
@@ -721,22 +676,24 @@ export function renderStatic(map: SceneMap, scale: number) {
   ctx.imageSmoothingEnabled = false;
   const style = STYLES[map.style];
 
-  style.floor(ctx, T, 3 * T, (map.w - 1) * T, (map.h - 1) * T);
+  style.floor(ctx, 0, 0, map.w * T, map.h * T);
   for (let y = 0; y < map.h; y++) {
     for (let x = 0; x < map.w; x++) {
       const c = tileAt(map, x, y);
       if (c === "#") wallCap(ctx, map, style, x, y);
-      else if (c === "=") style.face(ctx, x * T, y * T, y - 1);
+      else if (c === "=") {
+        const lower = tileAt(map, x, y + 1) === ".";
+        style.face(ctx, x * T, y * T, lower ? 1 : 0);
+        if (lower) {
+          // Zócalo y una sombra suave sobre el piso.
+          ctx.fillStyle = style.base;
+          ctx.fillRect(x * T, (y + 1) * T - 4, T, 4);
+          ctx.fillStyle = "rgba(40,40,60,0.14)";
+          ctx.fillRect(x * T, (y + 1) * T, T, 6);
+        }
+      }
     }
   }
-  // Zócalo del muro norte y una sombra suave sobre el piso.
-  ctx.fillStyle = style.base;
-  ctx.fillRect(T, 3 * T - 4, (map.w - 2) * T, 4);
-  const shadow = ctx.createLinearGradient(0, 3 * T, 0, 3 * T + 10);
-  shadow.addColorStop(0, "rgba(40,40,60,0.18)");
-  shadow.addColorStop(1, "rgba(40,40,60,0)");
-  ctx.fillStyle = shadow;
-  ctx.fillRect(T, 3 * T, (map.w - 2) * T, 10);
 
   for (const f of map.furni) {
     if (f.kind === "rug") rug(ctx, f);
@@ -744,77 +701,77 @@ export function renderStatic(map: SceneMap, scale: number) {
   }
 
   for (const d of map.decor) {
-    switch (d.kind) {
-      case "window":
-        windowDecor(ctx, d, map.style);
-        break;
-      case "neon":
-        neon(ctx, d);
-        break;
-      case "art":
-        art(ctx, d);
-        break;
-      case "whiteboard":
-        whiteboard(ctx, d);
-        break;
-      case "clock":
-        clock(ctx, d);
-        break;
-      case "shelf":
-        shelf(ctx, d);
-        break;
-      case "banner":
-        banner(ctx, d);
-        break;
-      case "fireplace":
-        fireplace(ctx, d, map.style);
-        break;
-      case "ivy":
-        ivy(ctx, d);
-        break;
-      case "entrance":
-        entrance(ctx, d);
-        break;
-      case "torch": {
-        const cx = d.x * T + T / 2;
-        ctx.fillStyle = "#3a3346";
-        ctx.fillRect(cx - 2, 2 * T - 2, 4, 14);
-        ctx.fillStyle = "#6e4526";
-        ctx.fillRect(cx - 3, 2 * T - 8, 6, 8);
-        break;
-      }
-      case "sponsors": {
-        const x = d.x * T + 3;
-        const w = (d.w ?? 2) * T - 6;
-        frame(ctx, x - 2, T + 4, w + 4, 2 * T - 12, "#1f2433");
-        ctx.fillStyle = "#3a3f4d";
-        ctx.fillRect(x + w / 2 - 6, 3 * T - 9, 12, 5);
-        break;
-      }
-      case "screen": {
-        const x = d.x * T + 4;
-        const w = (d.w ?? 4) * T - 8;
-        const frameColor: Record<StyleId, string> = {
-          tech: "#1f2937",
-          minimal: "#d9d4cb",
-          rustic: "#6e4526",
-          medieval: "#5a3a22",
-          garden: "#8a5a32",
-          cowork: "#2f3440",
-          lobby: "#2f3440",
-        };
-        frame(ctx, x - 4, T + 2, w + 8, 2 * T - 6, frameColor[map.style]);
-        break;
-      }
+    if (d.kind === "entrance") {
+      entrance(ctx, d);
+      continue;
     }
+    atRow(ctx, d.y, () => {
+      switch (d.kind) {
+        case "window":
+          windowDecor(ctx, d, map.style);
+          break;
+        case "neon":
+          neon(ctx, d);
+          break;
+        case "art":
+          art(ctx, d);
+          break;
+        case "whiteboard":
+          whiteboard(ctx, d);
+          break;
+        case "clock":
+          clock(ctx, d);
+          break;
+        case "shelf":
+          shelf(ctx, d);
+          break;
+        case "banner":
+          banner(ctx, d);
+          break;
+        case "fireplace":
+          fireplace(ctx, d, map.style);
+          break;
+        case "ivy":
+          ivy(ctx, d);
+          break;
+        case "torch": {
+          const cx = d.x * T + T / 2;
+          ctx.fillStyle = "#3a3346";
+          ctx.fillRect(cx - 2, 2 * T - 2, 4, 14);
+          ctx.fillStyle = "#6e4526";
+          ctx.fillRect(cx - 3, 2 * T - 8, 6, 8);
+          break;
+        }
+        case "sponsors": {
+          const x = d.x * T + 3;
+          const w = (d.w ?? 2) * T - 6;
+          frame(ctx, x - 2, T + 4, w + 4, 2 * T - 12, "#16161d");
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(x + w / 2 - 6, 3 * T - 9, 12, 5);
+          break;
+        }
+        case "screen": {
+          const x = d.x * T + 4;
+          const w = (d.w ?? 4) * T - 8;
+          const frameColor: Record<StyleId, string> = {
+            tech: "#1f2937",
+            minimal: "#d9d4cb",
+            rustic: "#6e4526",
+            medieval: "#5a3a22",
+            garden: "#8a5a32",
+            cowork: "#2f3440",
+          };
+          frame(ctx, x - 4, T + 2, w + 8, 2 * T - 6, frameColor[map.style]);
+          break;
+        }
+      }
+    });
   }
   for (const door of map.doors) {
-    if (door.side === "top") topDoor(ctx, door);
-    else if (door.side === "bottom") bottomOpening(ctx, map, door, door.color);
-    else sideDoor(ctx, map, door);
+    if (door.side === "top") atRow(ctx, door.y, () => (door.main ? mainDoor(ctx, door) : topDoor(ctx, door)));
+    else bottomOpening(ctx, map, door, door.color);
   }
-  for (const s of map.stairs) (s.side === "top" ? topStairs : bottomStairs)(ctx, s);
-  if (map.exit && !map.decor.some((d) => d.kind === "entrance")) bottomOpening(ctx, map, map.exit, "#06c38d");
+  if (map.exit && !map.decor.some((d) => d.kind === "entrance")) bottomOpening(ctx, map, map.exit, "#ff5c39");
   return canvas;
 }
 
@@ -846,25 +803,26 @@ function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, co
   ctx.fillRect(x - r, y - r, r * 2, r * 2);
 }
 
-/** Llamas de antorchas y chimeneas, y un brillo suave de neones y lámparas. */
+/** Llamas de antorchas y chimeneas, y un brillo suave de neones. */
 export function drawAnimatedDecor(ctx: CanvasRenderingContext2D, map: SceneMap, t: number) {
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
   for (const d of map.decor) {
-    const cx = (d.x + (d.w ?? 1) / 2) * T;
-    const flicker = 0.85 + 0.15 * Math.sin(t / 120 + d.x);
-    if (d.kind === "torch") glow(ctx, cx, 2 * T - 6, 60, "rgba(255,170,80,ALPHA)", 0.25 * flicker);
-    if (d.kind === "fireplace") glow(ctx, cx, 3 * T - 10, 90, "rgba(255,170,80,ALPHA)", 0.25 * flicker);
-    if (d.kind === "neon") glow(ctx, cx, T + 30, 80, `rgba(${hexRgb(d.color ?? "#22d3ee")},ALPHA)`, 0.18);
-  }
-  ctx.restore();
-  for (const d of map.decor) {
-    if (d.kind === "torch") drawFlame(ctx, d.x * T + T / 2, 2 * T - 7, 10, t, d.x);
-    if (d.kind === "fireplace") {
-      const x = d.x * T + 18;
-      const w = (d.w ?? 2) * T - 36;
-      for (let i = 0; i < 4; i++) drawFlame(ctx, x + (w * (i + 0.5)) / 4, 3 * T - 9, 13 + (i % 2) * 5, t, d.x + i);
-    }
+    if (d.kind !== "torch" && d.kind !== "fireplace" && d.kind !== "neon") continue;
+    atRow(ctx, d.y, () => {
+      const cx = (d.x + (d.w ?? 1) / 2) * T;
+      const flicker = 0.85 + 0.15 * Math.sin(t / 120 + d.x);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      if (d.kind === "torch") glow(ctx, cx, 2 * T - 6, 60, "rgba(255,170,80,ALPHA)", 0.25 * flicker);
+      if (d.kind === "fireplace") glow(ctx, cx, 3 * T - 10, 90, "rgba(255,170,80,ALPHA)", 0.25 * flicker);
+      if (d.kind === "neon") glow(ctx, cx, T + 30, 80, `rgba(${hexRgb(d.color ?? "#22d3ee")},ALPHA)`, 0.18);
+      ctx.restore();
+      if (d.kind === "torch") drawFlame(ctx, d.x * T + T / 2, 2 * T - 7, 10, t, d.x);
+      if (d.kind === "fireplace") {
+        const x = d.x * T + 18;
+        const w = (d.w ?? 2) * T - 36;
+        for (let i = 0; i < 4; i++) drawFlame(ctx, x + (w * (i + 0.5)) / 4, 3 * T - 9, 13 + (i % 2) * 5, t, d.x + i);
+      }
+    });
   }
 }
 
@@ -893,31 +851,31 @@ function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, top
 }
 
 function shadowUnder(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number) {
-  ctx.fillStyle = "rgba(40,40,60,0.18)";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, rx * 0.35, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = "rgba(30,28,45,0.16)";
+  ctx.fillRect(Math.round(cx - rx), Math.round(cy - rx * 0.3), Math.round(rx * 2), Math.max(3, Math.round(rx * 0.6)));
 }
 
+/** Follaje de bloques: varios cuadrados superpuestos con luz arriba a la izquierda. */
 function leaves(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, palette: string[]) {
-  const blobs: [number, number, number][] = [
-    [-0.55, 0.1, 0.55],
-    [0.55, 0.1, 0.55],
-    [0, -0.35, 0.65],
-    [-0.3, -0.75, 0.45],
-    [0.35, -0.7, 0.45],
+  const blocks: [number, number, number][] = [
+    [-0.9, -0.2, 0.9],
+    [0, -0.25, 0.9],
+    [-0.5, -0.95, 0.95],
+    [-0.35, -0.55, 0.8],
   ];
-  for (const [dx, dy, r] of blobs) {
+  for (const [dx, dy, k] of blocks) {
+    const s0 = Math.round(size * k);
     ctx.fillStyle = LINE;
-    ctx.beginPath();
-    ctx.arc(cx + dx * size, cy + dy * size, r * size + 1, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(Math.round(cx + dx * size) - 1, Math.round(cy + dy * size) - 1, s0 + 2, s0 + 2);
   }
-  blobs.forEach(([dx, dy, r], i) => {
+  blocks.forEach(([dx, dy, k], i) => {
+    const s0 = Math.round(size * k);
+    const x = Math.round(cx + dx * size);
+    const y = Math.round(cy + dy * size);
     ctx.fillStyle = palette[i % palette.length]!;
-    ctx.beginPath();
-    ctx.arc(cx + dx * size, cy + dy * size, r * size, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(x, y, s0, s0);
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(x, y, s0, 2);
   });
 }
 
@@ -931,8 +889,7 @@ const CHAIR: Record<StyleId, { frame: string; seat: string }> = {
   rustic: { frame: "#7a4f2c", seat: "#a8713f" },
   medieval: { frame: "#6b4226", seat: "#9b2335" },
   garden: { frame: "#8a5a32", seat: "#c8e6a0" },
-  cowork: { frame: "#2f3440", seat: "#5b7fd6" },
-  lobby: { frame: "#2f3440", seat: "#5b7fd6" },
+  cowork: { frame: "#2f3440", seat: "#2f6bff" },
 };
 
 export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
@@ -1008,21 +965,10 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       case "beanbag": {
-        const color = f.color ?? "#ffd166";
+        const color = f.color ?? "#ffb703";
         add(y + 1, (ctx) => {
           shadowUnder(ctx, cx, base - 4, 12);
-          ctx.fillStyle = LINE;
-          ctx.beginPath();
-          ctx.ellipse(cx, py + 18, 13, 11, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.ellipse(cx, py + 18, 12, 10, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = shade(color, 0.35);
-          ctx.beginPath();
-          ctx.ellipse(cx - 3, py + 14, 6, 4, 0, 0, Math.PI * 2);
-          ctx.fill();
+          box(ctx, px + 6, py + 8, T - 12, 10, 8, color);
         });
         break;
       }
@@ -1162,15 +1108,6 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fill();
         });
         break;
-      case "pingpong":
-        add(y + 1, (ctx) => {
-          shadowUnder(ctx, cx, base - 2, (w * T) / 2);
-          box(ctx, px + 2, py + 6, w * T - 4, 16, 5, "#1d4ed8", "#2563eb");
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(px + 2, py + 13, w * T - 4, 1);
-          ctx.fillRect(cx - 1, py + 4, 2, 20);
-        });
-        break;
       case "lamp":
         add(y + 1, (ctx) => {
           shadowUnder(ctx, cx, base - 4, 7);
@@ -1245,28 +1182,16 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         break;
       case "fountain":
         add(y + d, (ctx, t) => {
-          const fy = py + (d * T) / 2;
-          ctx.fillStyle = LINE;
-          ctx.beginPath();
-          ctx.ellipse(cx, fy + 4, (w * T) / 2 - 2, (d * T) / 2 - 6, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#c9c4b8";
-          ctx.beginPath();
-          ctx.ellipse(cx, fy + 4, (w * T) / 2 - 3, (d * T) / 2 - 7, 0, 0, Math.PI * 2);
-          ctx.fill();
+          frame(ctx, px + 3, py + 4, w * T - 6, d * T - 8, "#c9c4b8");
           ctx.fillStyle = "#6cc4f0";
-          ctx.beginPath();
-          ctx.ellipse(cx, fy + 2, (w * T) / 2 - 9, (d * T) / 2 - 12, 0, 0, Math.PI * 2);
-          ctx.fill();
-          const r = ((t / 600) % 1) * 14;
-          ctx.strokeStyle = `rgba(255,255,255,${0.7 - r / 20})`;
+          ctx.fillRect(px + 8, py + 9, w * T - 16, d * T - 18);
+          const r = Math.floor(((t / 600) % 1) * 10);
+          ctx.strokeStyle = `rgba(255,255,255,${0.7 - r / 15})`;
           ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.ellipse(cx, fy + 2, 4 + r, 2 + r / 2, 0, 0, Math.PI * 2);
-          ctx.stroke();
-          frame(ctx, cx - 3, fy - 16, 6, 16, "#d6d2c6");
+          ctx.strokeRect(cx - 3 - r, py + (d * T) / 2 - 3 - r / 2, 6 + r * 2, 6 + r);
+          frame(ctx, cx - 3, py + (d * T) / 2 - 16, 6, 14, "#d6d2c6");
           ctx.fillStyle = "#a5dcf5";
-          ctx.fillRect(cx - 1, fy - 22, 2, 7);
+          ctx.fillRect(cx - 1, py + (d * T) / 2 - 22, 2, 7);
         });
         break;
       case "kiosk":
@@ -1298,10 +1223,7 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
       case "cooler":
         add(y + 1, (ctx) => {
           frame(ctx, cx - 8, base - 26, 16, 24, "#f4f4f6");
-          ctx.fillStyle = "#93c5fd";
-          ctx.beginPath();
-          ctx.ellipse(cx, base - 32, 7, 9, 0, 0, Math.PI * 2);
-          ctx.fill();
+          frame(ctx, cx - 6, base - 40, 12, 14, "#93c5fd");
           ctx.fillStyle = "#3b82f6";
           ctx.fillRect(cx - 3, base - 18, 6, 3);
         });
@@ -1318,6 +1240,29 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           box(ctx, px + 2, py + 6, w * T - 4, 14, 6, "#8a5a32", "#b07a46");
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(cx - 4, py + 10, 8, 6);
+        });
+        break;
+      case "directory":
+        add(y + 1, (ctx) => {
+          shadowUnder(ctx, cx, base - 3, 12);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(cx - 3, base - 12, 6, 9);
+          ctx.fillRect(cx - 10, base - 5, 20, 3);
+          frame(ctx, cx - 14, base - 50, 28, 39, "#16161d");
+          ctx.fillStyle = "#f6f5f2";
+          ctx.fillRect(cx - 12, base - 48, 24, 35);
+          // Mini plano con caminos de colores.
+          ctx.fillStyle = "#ff5c39";
+          ctx.fillRect(cx - 9, base - 30, 18, 3);
+          ctx.fillStyle = "#2f6bff";
+          ctx.fillRect(cx - 2, base - 44, 3, 17);
+          ctx.fillStyle = "#16161d";
+          ctx.fillRect(cx - 10, base - 22, 20, 7);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = `700 6px ${FONT}`;
+          ctx.textAlign = "center";
+          ctx.fillText("SALAS", cx, base - 16.5);
+          ctx.textAlign = "left";
         });
         break;
       case "totem": {
@@ -1342,76 +1287,108 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
 
 // ---------- Textos sobre el mapa ----------
 
-function plaque(ctx: CanvasRenderingContext2D, cx: number, y: number, title: string, sub: string, color: string, highlight: boolean, live: boolean) {
-  ctx.font = `700 11px ${FONT}`;
-  ctx.font = `700 11px ${FONT}`;
-  const width = Math.min(150, Math.max(ctx.measureText(title).width + 22, 74));
-  const x = cx - width / 2;
-  ctx.fillStyle = "rgba(30,30,45,0.35)";
-  ctx.beginPath();
-  ctx.roundRect(x + 1, y + 2, width, 28, 8);
-  ctx.fill();
-  ctx.fillStyle = highlight ? shade(color, 0.15) : color;
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, 28, 8);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
-  ctx.fillText(title, cx, y + 12, width - 12);
-  ctx.font = `600 8.5px ${FONT}`;
-  ctx.fillStyle = live ? "#fff6c8" : "rgba(255,255,255,0.88)";
-  ctx.fillText(sub, cx, y + 23, width - 10);
-  ctx.textAlign = "left";
-}
-
 export interface DoorStatus {
   live: boolean;
   count: number;
-  label: string;
+  /** Charla en curso o la próxima, y su horario ("10:00–10:45"). */
+  title: string;
+  time: string;
 }
 
-/** Etiquetas pequeñas sobre el muro, encima de cada puerta, y las de escaleras y salida. */
-export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status: Map<string, DoorStatus> | null, hovered: string | null) {
-  for (const door of map.doors) {
-    if (door.id === "salida" || door.side !== "top") continue;
-    const s = status?.get(door.id);
-    const cx = (door.x + door.w / 2) * T;
-    ctx.font = `700 9px ${FONT}`;
-    const text = s?.count ? `${door.label} · ${s.count}` : door.label;
-    const maxW = door.w * T + 22;
-    const width = Math.min(maxW, ctx.measureText(text).width + (s?.live ? 22 : 14));
-    const x = cx - width / 2;
-    const y = T - 9;
-    ctx.fillStyle = door.id === hovered ? shade(door.color, 0.15) : door.color;
-    ctx.beginPath();
-    ctx.roundRect(x, y, width, 14, 7);
-    ctx.fill();
-    let tx = x + 7;
-    if (s?.live) {
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(tx + 2, y + 7, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      tx += 8;
-    }
+function truncate(ctx: CanvasRenderingContext2D, text: string, max: number) {
+  if (ctx.measureText(text).width <= max) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > max) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+/** Placa de una sala: nombre, charla y horario. Va sobre el muro, nunca en el pasillo. */
+function doorPlate(ctx: CanvasRenderingContext2D, cx: number, y: number, door: Door, s: DoorStatus | undefined, hovered: boolean) {
+  const width = door.w * T + 52;
+  const x = Math.round(cx - width / 2);
+  const h = 30;
+  ctx.fillStyle = "#16161d";
+  ctx.fillRect(x - 1, y - 1, width + 2, h + 2);
+  ctx.fillStyle = hovered ? "#2a2a36" : "#20202a";
+  ctx.fillRect(x, y, width, h);
+  ctx.fillStyle = door.color;
+  ctx.fillRect(x, y, 4, h);
+  ctx.font = `700 9px ${FONT}`;
+  ctx.fillStyle = "#ffffff";
+  let name = door.label;
+  if (s?.count) name += ` · ${s.count}`;
+  ctx.fillText(truncate(ctx, name, width - (s?.live ? 34 : 12)), x + 8, y + 11);
+  if (s?.live) {
+    ctx.fillStyle = "#ff5c39";
+    ctx.fillRect(x + width - 26, y + 3, 23, 10);
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(text, tx, y + 10, width - (tx - x) - 6);
+    ctx.font = `700 7px ${FONT}`;
+    ctx.fillText("VIVO", x + width - 23, y + 10.5);
+  }
+  ctx.font = `500 8px ${FONT}`;
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  const line = s?.title ? `${s.time} ${s.title}` : "Sin charlas programadas";
+  ctx.fillText(truncate(ctx, line, width - 12), x + 8, y + 24);
+}
+
+/** Marquesina con luces sobre la entrada del auditorio principal. */
+function marquee(ctx: CanvasRenderingContext2D, door: Door, s: DoorStatus | undefined, t: number) {
+  const cx = (door.x + door.w / 2) * T;
+  const width = door.w * T + 120;
+  const x = Math.round(cx - width / 2);
+  const y = (door.y - 2) * T - 18;
+  const h = 44;
+  ctx.fillStyle = "#16161d";
+  ctx.fillRect(x - 2, y - 2, width + 4, h + 4);
+  ctx.fillStyle = door.color;
+  ctx.fillRect(x, y, width, h);
+  ctx.fillStyle = "#20202a";
+  ctx.fillRect(x + 6, y + 6, width - 12, h - 12);
+  // Bombillas alrededor, encendiéndose en secuencia.
+  const bulbs = Math.floor(width / 10);
+  for (let i = 0; i < bulbs; i++) {
+    const on = (Math.floor(t / 180) + i) % 3 === 0;
+    ctx.fillStyle = on ? "#fff3b0" : "#c9a227";
+    ctx.fillRect(x + 3 + i * 10, y + 1, 4, 4);
+    ctx.fillRect(x + 3 + i * 10, y + h - 5, 4, 4);
+  }
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 12px ${FONT}`;
+  ctx.fillText(door.label.toUpperCase(), cx, y + 21, width - 24);
+  ctx.font = `500 8px ${FONT}`;
+  ctx.fillStyle = s?.live ? "#ffd6c9" : "rgba(255,255,255,0.75)";
+  const line = s?.title ? `${s.live ? "● EN VIVO · " : ""}${s.time} ${s.title}` : "Auditorio principal";
+  ctx.fillText(truncate(ctx, line, width - 24), cx, y + 33);
+  ctx.textAlign = "left";
+}
+
+/** Placas de las salas, marquesina del auditorio y la etiqueta de la salida. */
+export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status: Map<string, DoorStatus> | null, hovered: string | null, t: number) {
+  for (const door of map.doors) {
+    if (door.id === "salida") continue;
+    const s = status?.get(door.id);
+    if (door.main) {
+      marquee(ctx, door, s, t);
+      continue;
+    }
+    const cx = (door.x + door.w / 2) * T;
+    // Arriba: sobre el muro, encima de la cara. Abajo: sobre el muro sur, debajo del vano.
+    const y = door.side === "top" ? (door.y - 2) * T - 4 : (door.y + 1) * T + 1;
+    doorPlate(ctx, cx, y, door, s, door.id === hovered);
   }
   const exits: (Span & { label: string })[] = [
-    ...map.stairs.map((s) => ({ ...s, label: `${s.label.startsWith("Subir") ? "▲" : "▼"} ${s.label}` })),
-    ...(map.exit ? [{ ...map.exit, label: "Recepción" }] : []),
+    ...(map.exit ? [{ ...map.exit, label: "Salida a recepción" }] : []),
     ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" })),
   ];
   for (const e of exits) {
     const tiles = spanTiles(e);
     const cx = ((tiles[0]!.x + tiles[tiles.length - 1]!.x + 1) / 2) * T;
-    const y = e.side === "top" ? 3 * T + 4 : e.y * T - 14;
+    const y = e.y * T - 14;
     ctx.font = `700 9px ${FONT}`;
     const width = ctx.measureText(e.label).width + 14;
-    ctx.fillStyle = "rgba(30,30,45,0.7)";
-    ctx.beginPath();
-    ctx.roundRect(cx - width / 2, y, width, 13, 6.5);
-    ctx.fill();
+    ctx.fillStyle = "#16161d";
+    ctx.fillRect(cx - width / 2, y, width, 13);
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.fillText(e.label, cx, y + 9.5);
@@ -1488,7 +1465,7 @@ function sponsorSlide(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
 export function drawSponsorScreens(ctx: CanvasRenderingContext2D, map: SceneMap, media: Media, t: number) {
   map.decor
     .filter((d) => d.kind === "sponsors")
-    .forEach((d, i) => {
+    .forEach((d, i) => atRow(ctx, d.y, () => {
       const x = d.x * T + 3;
       const w = (d.w ?? 2) * T - 6;
       sponsorSlide(ctx, x, T + 6, w, 2 * T - 16, media, t, i);
@@ -1499,29 +1476,18 @@ export function drawSponsorScreens(ctx: CanvasRenderingContext2D, map: SceneMap,
         ctx.fillText("PATROCINADORES", x + w / 2, 3 * T - 12);
         ctx.textAlign = "left";
       }
-    });
+    }));
 }
 
-export function drawSigns(ctx: CanvasRenderingContext2D, map: SceneMap) {
-  for (const s of map.signs) {
-    const cx = (s.x + s.w / 2) * T;
-    ctx.font = `700 11px ${FONT}`;
-    const width = ctx.measureText(s.text).width + 20;
-    ctx.fillStyle = "#2f3440";
-    ctx.beginPath();
-    ctx.roundRect(cx - width / 2, 6, width, 20, 6);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.fillText(s.text, cx, 20);
-    ctx.textAlign = "left";
-  }
-}
 
 /** Contenido de la pantalla de la sala: título de la charla y si está en vivo. */
 export function drawScreenContent(ctx: CanvasRenderingContext2D, map: SceneMap, color: string, title: string, live: boolean) {
   const d = map.decor.find((x) => x.kind === "screen");
   if (!d) return;
+  atRow(ctx, d.y, () => screenContent(ctx, d, color, title, live));
+}
+
+function screenContent(ctx: CanvasRenderingContext2D, d: Decor, color: string, title: string, live: boolean) {
   const x = d.x * T + 4;
   const w = (d.w ?? 4) * T - 8;
   const top = T + 6;
@@ -1548,9 +1514,9 @@ export function drawScreenContent(ctx: CanvasRenderingContext2D, map: SceneMap, 
 export function drawName(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, mine: boolean) {
   ctx.font = `600 10px ${FONT}`;
   const w = Math.ceil(ctx.measureText(text).width) + 12;
-  ctx.fillStyle = mine ? "rgba(6, 195, 141, 0.95)" : "rgba(30, 30, 45, 0.7)";
+  ctx.fillStyle = mine ? "rgba(255, 92, 57, 0.95)" : "rgba(22, 22, 29, 0.75)";
   ctx.beginPath();
-  ctx.roundRect(x - w / 2, y - 7, w, 14, 7);
+  ctx.rect(x - w / 2, y - 7, w, 14);
   ctx.fill();
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
@@ -1585,18 +1551,18 @@ export function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, 
   const by = Math.round(y - h);
   ctx.fillStyle = "rgba(30,30,45,0.25)";
   ctx.beginPath();
-  ctx.roundRect(bx + 1, by + 2, w, h, 10);
+  ctx.rect(bx + 1, by + 2, w, h);
   ctx.fill();
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.roundRect(bx, by, w, h, 10);
+  ctx.rect(bx, by, w, h);
   ctx.fill();
   ctx.beginPath();
   ctx.moveTo(x - 5, by + h - 0.5);
   ctx.lineTo(x, by + h + 6);
   ctx.lineTo(x + 5, by + h - 0.5);
   ctx.fill();
-  ctx.fillStyle = "#4f46e5";
+  ctx.fillStyle = "#ff5c39";
   ctx.font = `700 10px ${FONT}`;
   ctx.fillText(name, bx + 8, by + 14);
   ctx.fillStyle = "#1f2433";

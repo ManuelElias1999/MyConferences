@@ -127,6 +127,16 @@ export function createAccountStore(dataDir: string) {
       return account ? toAccount(account) : null;
     },
 
+    async setCompany(id: string, company: unknown) {
+      const account = store.accounts.find((a) => a.id === id);
+      if (!account) throw new AccountError("La cuenta ya no existe");
+      const name = typeof company === "string" ? company.trim().replace(/\s+/g, " ").slice(0, 60) : "";
+      if (!name) throw new AccountError("Escribe el nombre de la empresa");
+      account.company = { name };
+      await persist();
+      return toAccount(account);
+    },
+
     async update(id: string, changes: { name: unknown; look: Look }) {
       const account = store.accounts.find((a) => a.id === id);
       if (!account) throw new AccountError("La cuenta ya no existe");

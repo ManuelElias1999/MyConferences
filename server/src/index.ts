@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "socket.io";
 import { DEFAULT_LOOK } from "../../shared/look.ts";
-import { inFront, isWalkable, receptionMap, roomMap, stairsArrival, venueFloors, type SceneMap, type Tile } from "../../shared/maps.ts";
+import { auditoriumMap, inFront, isWalkable, MAX_ROOMS, receptionMap, roomMap, venueMap, type SceneMap, type Tile } from "../../shared/maps.ts";
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   Account,
@@ -16,6 +16,7 @@ import type {
   CompanyEvent,
   Question,
   Room,
+  Talk,
   RtcSignal,
   ServerToClientEvents,
   Stage,
@@ -28,7 +29,6 @@ import { createVenues } from "./seed.ts";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const MAX_CHAT = 200;
-const MAX_ROOMS = 12;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR ?? path.join(here, "../data"));
 const uploadsDir = path.resolve(here, "../uploads");
@@ -53,16 +53,18 @@ interface RoomState {
 interface VenueState {
   venue: Venue;
   whitelist: Set<string> | null;
-  /** Un mapa por piso del lugar del evento. */
-  floors: SceneMap[];
+  /** Mapa del recinto del evento. */
+  map: SceneMap;
   rooms: Map<string, RoomState>;
   /** Cuenta de la empresa dueña del evento (null en los de ejemplo). */
   ownerId: string | null;
 }
 
 const RECEPTION = receptionMap();
-// Todas las salas comparten la distribución de asientos; el estilo solo cambia la decoración.
+// Las salas comparten la distribución de asientos; el estilo solo cambia la decoración.
 const ROOM_MAP = roomMap("minimal", "#000");
+const AUDITORIUM_MAP = auditoriumMap("minimal", "#000");
+const interiorOf = (room: Room | undefined) => (room?.main ? AUDITORIUM_MAP : ROOM_MAP);
 
 const newRoomState = (): RoomState => ({
   stage: { mode: "slides", slidesUrl: null, slidesName: null, slide: 1, streamUrl: null, presenterId: null, live: null },
@@ -79,7 +81,7 @@ function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<s
   const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
   for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
   for (const id of rooms.keys()) if (!venue.rooms.some((r) => r.id === id)) rooms.delete(id);
-  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms), rooms, ownerId });
+  venues.set(venue.id, { venue, whitelist, map: venueMap(venue.theme, venue.rooms), rooms, ownerId });
   for (const r of venue.rooms) {
     const key = `${venue.id}/${r.id}`;
     const code = codes[r.id] ?? speakerCodes.get(key) ?? randomBytes(3).toString("hex").toUpperCase();
@@ -222,13 +224,35 @@ const toCompanyEvent = (e: StoredEvent): CompanyEvent => ({ venue: e.venue, whit
 const slug = (text: string) =>
   text.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "sala";
 
-/** Valida lo que manda el panel y arma las salas, conservando ids y códigos de las que ya existían. */
+const MAX_TALKS_PER_ROOM = 20;
+const DAY = 86_400_000;
+
+/** Valida la agenda de una sala: horarios coherentes, dentro de un rango razonable. */
+function readTalks(raw: unknown, roomId: string): Talk[] | string {
+  const talks: Talk[] = [];
+  for (const t of (Array.isArray(raw) ? raw : []).slice(0, MAX_TALKS_PER_ROOM) as Record<string, unknown>[]) {
+    const title = clean(t?.title, 100);
+    if (!title) return "Cada charla necesita un título";
+    const start = Number(t.start);
+    const end = Number(t.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > DAY) {
+      return `Revisa el horario de «${title}»`;
+    }
+    talks.push({ id: `${roomId}-${randomUUID().slice(0, 8)}`, roomId, title, speaker: clean(t.speaker, 60), description: "", start, end });
+  }
+  return talks.sort((a, b) => a.start - b.start);
+}
+
+/**
+ * Valida lo que manda el panel y arma las salas, conservando ids y códigos de las
+ * que ya existían. La primera sala siempre es el auditorio principal.
+ */
 function readEventInput(body: Record<string, unknown>, previous: StoredEvent | null) {
   const name = clean(body.name, 60);
   if (!name) return { error: "Ponle un nombre al evento" };
   if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
   const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
-  if (!rawRooms.length) return { error: "El evento necesita al menos una sala" };
+  if (!rawRooms.length) return { error: "El evento necesita su auditorio principal" };
   const whitelist = [
     ...new Set(
       (Array.isArray(body.whitelist) ? body.whitelist : [])
@@ -237,9 +261,11 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     ),
   ].slice(0, 5000);
   const rooms: Room[] = [];
+  const talks: Talk[] = [];
   const codes: Record<string, string> = {};
-  for (const raw of rawRooms as Record<string, unknown>[]) {
-    const roomName = clean(raw?.name, 40);
+  for (const [index, raw] of (rawRooms as Record<string, unknown>[]).entries()) {
+    const main = index === 0;
+    const roomName = clean(raw?.name, 40) || (main ? "Auditorio principal" : "");
     if (!roomName) return { error: "Todas las salas necesitan un nombre" };
     const kept = typeof raw.id === "string" && previous?.venue.rooms.some((r) => r.id === raw.id) ? raw.id : null;
     let id = kept ?? slug(roomName);
@@ -247,9 +273,13 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     rooms.push({
       id,
       name: roomName,
-      topic: clean(raw.topic, 80) || "Charla abierta",
+      topic: clean(raw.topic, 80) || (main ? "Charlas principales" : "Charla abierta"),
       color: typeof raw.color === "string" && ROOM_COLORS.includes(raw.color) ? raw.color : ROOM_COLORS[rooms.length % ROOM_COLORS.length]!,
+      main,
     });
+    const roomTalks = readTalks(raw.talks, id);
+    if (typeof roomTalks === "string") return { error: roomTalks };
+    talks.push(...roomTalks);
     codes[id] = previous?.speakerCodes[id] ?? randomBytes(3).toString("hex").toUpperCase();
   }
   return {
@@ -259,6 +289,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     private: body.private !== false,
     whitelist,
     rooms,
+    talks,
     codes,
   };
 }
@@ -279,7 +310,7 @@ function evictVenue(venueId: string, reason: string) {
     if (u.venueId !== venueId || !sock) continue;
     for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
     sock.join("reception");
     sock.to("reception").emit("userJoined", u);
     moved.push(u);
@@ -289,6 +320,19 @@ function evictVenue(venueId: string, reason: string) {
 }
 
 const json = express.json({ limit: "200kb" });
+
+/** Convierte una cuenta de persona en cuenta de empresa para poder crear eventos. */
+app.post("/api/company/upgrade", json, async (req, res) => {
+  const account = accounts.verify(String(req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
+  if (!account) return res.status(401).json({ error: "Inicia sesión de nuevo" });
+  try {
+    const updated = await accounts.setCompany(account.id, (req.body ?? {}).company);
+    for (const conn of connections.values()) if (conn.account?.id === updated.id) conn.account = updated;
+    res.json({ account: updated });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo actualizar la cuenta" });
+  }
+});
 
 app.get("/api/company/events", (req, res) => {
   const account = companyFrom(req, res);
@@ -309,7 +353,7 @@ app.post("/api/company/events", json, async (req, res) => {
     theme: input.theme,
     organizer: account.company!.name,
     rooms: input.rooms,
-    talks: [],
+    talks: input.talks,
     sponsors: [],
   };
   const entry: StoredEvent = { ownerId: account.id, venue, whitelist: input.whitelist, speakerCodes: input.codes, createdAt: Date.now() };
@@ -328,7 +372,15 @@ app.put("/api/company/events/:id", json, async (req, res) => {
   const removed = entry.venue.rooms.filter((r) => !input.rooms.some((n) => n.id === r.id));
   const busy = removed.find((r) => [...connections.values()].some((c) => c.user.venueId === entry.venue.id && c.user.roomId === r.id));
   if (busy) return res.status(409).json({ error: `Hay personas en ${busy.name}. Espera a que salgan para quitarla.` });
-  entry.venue = { ...entry.venue, name: input.name, tagline: input.tagline, private: input.private, theme: input.theme, rooms: input.rooms };
+  entry.venue = {
+    ...entry.venue,
+    name: input.name,
+    tagline: input.tagline,
+    private: input.private,
+    theme: input.theme,
+    rooms: input.rooms,
+    talks: input.talks,
+  };
   entry.whitelist = input.whitelist;
   entry.speakerCodes = input.codes;
   await companyEvents.save(entry);
@@ -404,11 +456,11 @@ if (existsSync(clientDist)) {
 //   hall:<salón>:<piso> quienes caminan por ese piso del edificio
 //   room:<salón>:<sala> quienes están en una sala
 const venueChannel = (venueId: string) => `v:${venueId}`;
-const hallChannel = (venueId: string, floor: number) => `hall:${venueId}:${floor}`;
+const hallChannel = (venueId: string) => `hall:${venueId}`;
 const roomChannel = (venueId: string, roomId: string) => `room:${venueId}:${roomId}`;
 
 const sceneChannel = (u: User) =>
-  !u.venueId ? "reception" : u.roomId ? roomChannel(u.venueId, u.roomId) : hallChannel(u.venueId, u.floor);
+  !u.venueId ? "reception" : u.roomId ? roomChannel(u.venueId, u.roomId) : hallChannel(u.venueId);
 const presenceChannel = (u: User) => (u.venueId ? venueChannel(u.venueId) : "reception");
 
 const usersIn = (venueId: string | null) =>
@@ -416,10 +468,10 @@ const usersIn = (venueId: string | null) =>
 
 function sceneMapFor(u: User): SceneMap {
   if (!u.venueId) return RECEPTION;
-  if (u.roomId) return ROOM_MAP;
-  const floors = venues.get(u.venueId)?.floors;
-  if (!floors) return RECEPTION;
-  return floors[u.floor] ?? floors[0]!;
+  const state = venues.get(u.venueId);
+  if (!state) return RECEPTION;
+  if (u.roomId) return interiorOf(state.venue.rooms.find((r) => r.id === u.roomId));
+  return state.map;
 }
 
 const guestName = () => `Invitado ${Math.floor(1000 + Math.random() * 9000)}`;
@@ -463,7 +515,6 @@ io.on("connection", (socket) => {
       name: account?.name ?? guestName(),
       look: account?.look ?? DEFAULT_LOOK,
       registered: Boolean(account),
-      floor: 0,
       venueId: null,
       roomId: null,
       speakerFor: null,
@@ -541,10 +592,9 @@ io.on("connection", (socket) => {
 
     socket.leave("reception");
     socket.to("reception").emit("userLeft", u.id);
-    const ground = state.floors[0]!;
-    const spot = spawnNear(ground, ground.spawn);
-    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
-    socket.join([venueChannel(id), hallChannel(id, 0)]);
+    const spot = spawnNear(state.map, state.map.spawn);
+    Object.assign(u, { venueId: id, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
+    socket.join([venueChannel(id), hallChannel(id)]);
     socket.to(venueChannel(id)).emit("userJoined", u);
     ack({ ok: true, data: { venue: state.venue, user: u, users: usersIn(id) } });
   });
@@ -568,10 +618,10 @@ io.on("connection", (socket) => {
     const venueId = u.venueId!;
     leaveCurrentRoom();
     socket.leave(venueChannel(venueId));
-    socket.leave(hallChannel(venueId, u.floor));
+    socket.leave(hallChannel(venueId));
     socket.to(venueChannel(venueId)).emit("userLeft", u.id);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
     socket.join("reception");
     socket.to("reception").emit("userJoined", u);
     ack({ ok: true, data: { user: u, users: usersIn(null) } });
@@ -586,11 +636,12 @@ io.on("connection", (socket) => {
     if (!state) return ack({ ok: false, error: "Sala no encontrada" });
     if (u.roomId !== roomId) {
       leaveCurrentRoom();
-      socket.leave(hallChannel(u.venueId, u.floor));
+      socket.leave(hallChannel(u.venueId));
       socket.join(roomChannel(u.venueId, roomId));
       u.roomId = roomId;
-      u.x = ROOM_MAP.spawn.x;
-      u.y = ROOM_MAP.spawn.y;
+      const interior = interiorOf(venues.get(u.venueId)!.venue.rooms.find((r) => r.id === roomId));
+      u.x = interior.spawn.x;
+      u.y = interior.spawn.y;
       if (u.speakerFor === roomId) {
         state.stage = { ...state.stage, presenterId: u.id };
         socket.to(roomChannel(u.venueId, roomId)).emit("stage", state.stage);
@@ -600,7 +651,7 @@ io.on("connection", (socket) => {
     let seat: number | null = null;
     for (const [s, id] of state.seats) if (id === u.id) seat = s;
     if (seat === null && u.speakerFor !== roomId) {
-      seat = ROOM_MAP.seats.findIndex((_, i) => !state.seats.has(i));
+      seat = interiorOf(venues.get(u.venueId)!.venue.rooms.find((r) => r.id === roomId)).seats.findIndex((_, i) => !state.seats.has(i));
       if (seat < 0) seat = null;
       else state.seats.set(seat, u.id);
     }
@@ -610,31 +661,17 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", (ack) => {
     const u = conn?.user;
     if (!u?.venueId || !u.roomId) return ack({ ok: false, error: "No estás en una sala" });
-    const floors = venues.get(u.venueId)!.floors;
-    const floor = Math.max(0, floors.findIndex((m) => m.doors.some((d) => d.id === u.roomId)));
-    const door = floors[floor]!.doors.find((d) => d.id === u.roomId);
+    const map = venues.get(u.venueId)!.map;
+    const door = map.doors.find((d) => d.id === u.roomId);
     leaveCurrentRoom();
-    // Aparece justo afuera de la puerta de la sala que dejó, en el piso donde está.
-    const spot = door ? inFront(door) : floors[floor]!.spawn;
-    Object.assign(u, { floor, x: spot.x, y: spot.y });
-    socket.join(hallChannel(u.venueId, floor));
+    // Aparece justo afuera de la puerta de la sala que dejó.
+    const spot = door ? inFront(door) : map.spawn;
+    Object.assign(u, { x: spot.x, y: spot.y });
+    socket.join(hallChannel(u.venueId));
     io.to(venueChannel(u.venueId)).emit("userUpdated", u);
     ack({ ok: true, data: { user: u } });
   });
 
-  socket.on("changeFloor", (floor, ack) => {
-    const u = conn?.user;
-    if (!u?.venueId || u.roomId) return ack({ ok: false, error: "Solo se cambia de piso desde los pasillos" });
-    const floors = venues.get(u.venueId)!.floors;
-    const target = Math.floor(Number(floor));
-    if (!floors[target] || Math.abs(target - u.floor) !== 1) return ack({ ok: false, error: "Esa escalera no lleva ahí" });
-    socket.leave(hallChannel(u.venueId, u.floor));
-    const spot = stairsArrival(floors, target, u.floor);
-    Object.assign(u, { floor: target, x: spot.x, y: spot.y });
-    socket.join(hallChannel(u.venueId, target));
-    io.to(venueChannel(u.venueId)).emit("userUpdated", u);
-    ack({ ok: true, data: { user: u } });
-  });
 
   socket.on("emote", (emoji) => {
     if (!conn || !EMOTES.includes(emoji)) return;

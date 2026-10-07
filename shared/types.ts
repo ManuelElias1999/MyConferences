@@ -29,6 +29,8 @@ export interface Room {
   name: string;
   topic: string;
   color: string;
+  /** El auditorio principal: todo evento tiene uno, es más grande y tiene entrada propia. */
+  main: boolean;
 }
 
 /** Patrocinador de un evento: su logo rota en las pantallas del lugar. */
@@ -83,8 +85,17 @@ export interface EventInput {
   theme: ThemeId;
   private: boolean;
   whitelist: string[];
-  /** Salas existentes llevan su id; las nuevas, no. */
-  rooms: { id?: string; name: string; topic: string; color: string }[];
+  /** La primera es el auditorio principal. Salas existentes llevan su id; las nuevas, no. */
+  rooms: { id?: string; name: string; topic: string; color: string; talks: TalkInput[] }[];
+}
+
+/** Charla de la agenda tal como la carga la empresa. */
+export interface TalkInput {
+  title: string;
+  speaker: string;
+  /** Timestamps en milisegundos. */
+  start: number;
+  end: number;
 }
 
 export interface User {
@@ -97,8 +108,6 @@ export interface User {
   venueId: string | null;
   /** Sala del salón en la que está, o null si está caminando por el salón. */
   roomId: string | null;
-  /** Piso del lugar en el que camina (0 es la planta baja). */
-  floor: number;
   /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
   /** Posición en baldosas del mapa en el que está. */
@@ -184,8 +193,6 @@ export interface ClientToServerEvents {
   leaveVenue: (ack: Ack<{ user: User; users: User[] }>) => void;
   enterRoom: (roomId: string, ack: Ack<RoomSnapshot & { user: User }>) => void;
   leaveRoom: (ack: Ack<{ user: User }>) => void;
-  /** Subir o bajar por la escalera. */
-  changeFloor: (floor: number, ack: Ack<{ user: User }>) => void;
   /** Reacción rápida (👋 👏 ❤️ 😂 🎉) sobre el personaje. */
   emote: (emoji: string) => void;
   claimSpeaker: (code: string, ack: Ack<{ user: User }>) => void;

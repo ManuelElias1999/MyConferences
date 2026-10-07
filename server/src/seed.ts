@@ -31,12 +31,12 @@ const seeds: VenueSeed[] = [
     organizer: "MyConferences",
     sponsors: [logo("novapay", "NovaPay"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
     rooms: [
-      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes y paneles", color: "#f59e0b" },
-      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1" },
-      { id: "ia", name: "Sala IA", topic: "Inteligencia artificial aplicada", color: "#10b981" },
-      { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899" },
-      { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9" },
-      { id: "producto", name: "Sala Producto", topic: "Diseño, producto y comunidad", color: "#ef4444" },
+      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes y paneles", color: "#f59e0b", main: true },
+      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1", main: false },
+      { id: "ia", name: "Sala IA", topic: "Inteligencia artificial aplicada", color: "#10b981", main: false },
+      { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899", main: false },
+      { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9", main: false },
+      { id: "producto", name: "Sala Producto", topic: "Diseño, producto y comunidad", color: "#ef4444", main: false },
     ],
     program: {
       auditorio: [
@@ -92,12 +92,20 @@ const seeds: VenueSeed[] = [
     organizer: "Comunidad Stellar LatAm",
     sponsors: [logo("pixel-bank", "Pixel Bank"), logo("orbit-cloud", "Orbit Cloud")],
     rooms: [
-      { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1" },
-      { id: "wallets", name: "Sala Wallets", topic: "Billeteras y experiencia de usuario", color: "#14b8a6" },
-      { id: "anchors", name: "Sala Anchors", topic: "Integraciones con bancos", color: "#f59e0b" },
-      { id: "mentorias", name: "Mentorías", topic: "Sesiones con el equipo core", color: "#ec4899" },
+      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes del día", color: "#9b2335", main: true },
+      { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1", main: false },
+      { id: "wallets", name: "Sala Wallets", topic: "Billeteras y experiencia de usuario", color: "#14b8a6", main: false },
+      { id: "anchors", name: "Sala Anchors", topic: "Integraciones con bancos", color: "#f59e0b", main: false },
+      { id: "mentorias", name: "Mentorías", topic: "Sesiones con el equipo core", color: "#ec4899", main: false },
     ],
     program: {
+      auditorio: [
+        ["Apertura: el estado de Stellar", "Equipo core", "Novedades de la red y hoja de ruta del año."],
+        ["Keynote: pagos que funcionan", "Valentina Cruz", "Lo que aprendimos llevando pagos a producción en la región."],
+        ["Panel: construir en comunidad", "Varios invitados", "Equipos de la región comparten cómo colaboran."],
+        ["Keynote: el futuro de Soroban", "Diego Paredes", "Qué viene para los contratos inteligentes en Stellar."],
+        ["Cierre", "Equipo organizador", "Resumen y próximos pasos."],
+      ],
       soroban: [
         ["Arquitectura de contratos en Soroban", "Diego Paredes", "Patrones de almacenamiento, eventos y actualizaciones."],
         ["Auditoría en vivo", "Equipo de seguridad", "Revisamos contratos de los equipos asistentes."],
@@ -137,10 +145,18 @@ const seeds: VenueSeed[] = [
     organizer: "Andes Ventures",
     sponsors: [logo("novapay", "NovaPay")],
     rooms: [
-      { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899" },
-      { id: "reuniones", name: "Sala de Reuniones", topic: "Conversaciones con fundadores", color: "#0ea5e9" },
+      { id: "auditorio", name: "Auditorio principal", topic: "Bienvenida y resultados", color: "#64748b", main: true },
+      { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899", main: false },
+      { id: "reuniones", name: "Sala de Reuniones", topic: "Conversaciones con fundadores", color: "#0ea5e9", main: false },
     ],
     program: {
+      auditorio: [
+        ["Bienvenida a inversores", "Andes Ventures", "Cómo funciona la jornada y criterios de evaluación."],
+        ["Tendencias de inversión en la región", "Ricardo Vega", "Dónde está el capital y qué busca."],
+        ["Charla: escalar en LatAm", "Paula Ramírez", "Errores comunes al crecer en varios países."],
+        ["Panel de inversores", "Varios invitados", "Preguntas abiertas a los fondos."],
+        ["Resultados y cierre", "Jurado", "Anuncio de los equipos seleccionados."],
+      ],
       pitches: [
         ["Bloque 1: fintech", "Cinco startups", "Cinco minutos por equipo y preguntas."],
         ["Bloque 2: salud", "Cuatro startups", "Cinco minutos por equipo y preguntas."],

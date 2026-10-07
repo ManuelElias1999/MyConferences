@@ -8,15 +8,15 @@ export default function AuthDialog({
   onDone,
   onClose,
 }: {
-  initialMode: "login" | "register";
+  initialMode: "login" | "register" | "company";
   onDone: (result: { account: Account; token: string }, created: boolean) => void;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState<"login" | "register">(initialMode === "company" ? "register" : initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isCompany, setIsCompany] = useState(false);
+  const [isCompany, setIsCompany] = useState(initialMode === "company");
   const [company, setCompany] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +39,7 @@ export default function AuthDialog({
   };
 
   return (
-    <Modal title={registering ? "Crea tu cuenta" : "Inicia sesión"} onClose={onClose} narrow>
+    <Modal title={registering ? (isCompany ? "Crea tu cuenta de empresa" : "Crea tu cuenta") : "Inicia sesión"} onClose={onClose} narrow>
       <form className="form" onSubmit={submit}>
         <p className="muted">
           {registering

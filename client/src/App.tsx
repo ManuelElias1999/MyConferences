@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
-import CompanyPanel from "./CompanyPanel.tsx";
+import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
 import AuthDialog from "./AuthDialog.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
@@ -24,10 +24,14 @@ export default function App() {
   const [place, setPlace] = useState<Place>({ kind: "reception" });
   const [connected, setConnected] = useState(socket.connected);
   const [fading, setFading] = useState(false);
-  const [auth, setAuth] = useState<"login" | "register" | null>(null);
+  const [auth, setAuth] = useState<"login" | "register" | "company" | null>(null);
   const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [panelNew, setPanelNew] = useState(false);
+  /** Al registrarse desde «Crear evento», se abre el panel apenas termina. */
+  const openPanelAfterAuth = useRef(false);
   const [notice, setNotice] = useState("");
   const [now, setNow] = useState(Date.now());
 
@@ -214,11 +218,6 @@ export default function App() {
     });
   };
 
-  const changeFloor = (floor: number) => {
-    socket.emit("changeFloor", floor, (res) => {
-      if (res.ok) transition(() => setMe(res.data.user));
-    });
-  };
 
   const claimSpeaker = (code: string) =>
     new Promise<void>((resolve, reject) => {
@@ -240,8 +239,20 @@ export default function App() {
       setMe(res.data.user);
       setAccount(res.data.account);
       setAuth(null);
-      if (created) setEditor({ welcome: true });
+      if (openPanelAfterAuth.current && res.data.account?.company) {
+        openPanelAfterAuth.current = false;
+        setPanelOpen(true);
+      } else if (created) setEditor({ welcome: true });
     });
+  };
+
+  /** «Crear evento»: según la cuenta, registra una empresa, convierte la cuenta o abre el panel. */
+  const startCreateEvent = () => {
+    setPanelNew(true);
+    if (account?.company) return setPanelOpen(true);
+    if (account) return setUpgrading(true);
+    openPanelAfterAuth.current = true;
+    setAuth("company");
   };
 
   const logout = () => {
@@ -302,9 +313,18 @@ export default function App() {
             {!account && <small className="badge">Invitado</small>}
             {me.speakerFor && me.speakerFor === room?.id && <small className="badge">Ponente</small>}
           </span>
+          <button className="btn primary sm" onClick={startCreateEvent}>
+            ＋ Crear evento
+          </button>
           {account?.company && (
-            <button className="btn primary sm" onClick={() => setPanelOpen(true)}>
-              Panel de empresa
+            <button
+              className="btn sm"
+              onClick={() => {
+                setPanelNew(false);
+                setPanelOpen(true);
+              }}
+            >
+              Mis eventos
             </button>
           )}
           {account && (
@@ -345,7 +365,6 @@ export default function App() {
           now={now}
           onEnterRoom={(roomId) => enterRoom(roomId, place.venue)}
           onExit={leaveVenue}
-          onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
         />
       )}
@@ -383,6 +402,7 @@ export default function App() {
         <CompanyPanel
           account={account}
           canVisit={place.kind === "reception"}
+          startNew={panelNew}
           onClose={() => setPanelOpen(false)}
           onVisit={(id) => {
             setPanelOpen(false);
@@ -398,7 +418,26 @@ export default function App() {
           </button>
         </div>
       )}
-      {auth && <AuthDialog initialMode={auth} onDone={onAuthDone} onClose={() => setAuth(null)} />}
+      {upgrading && account && (
+        <CompanyUpgrade
+          onClose={() => setUpgrading(false)}
+          onDone={(acc) => {
+            setAccount(acc);
+            setUpgrading(false);
+            setPanelOpen(true);
+          }}
+        />
+      )}
+      {auth && (
+        <AuthDialog
+          initialMode={auth}
+          onDone={onAuthDone}
+          onClose={() => {
+            openPanelAfterAuth.current = false;
+            setAuth(null);
+          }}
+        />
+      )}
       {editor && account && (
         <AvatarEditor
           account={account}
