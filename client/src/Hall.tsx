@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { venueFloors, type Door, type Tile } from "../../shared/maps.ts";
+import { stairsEntry, venueFloors, type Door, type Tile } from "../../shared/maps.ts";
 import { THEMES } from "../../shared/themes.ts";
 import type { Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
@@ -67,7 +67,7 @@ export default function Hall({
   const targetFor = (where: { door: Door; floor: number }): Tile => {
     if (where.floor === floor) return { x: where.door.x, y: where.door.y };
     const st = map.stairs.find((s) => s.to === where.floor) ?? map.stairs[0];
-    return st ? { x: st.x, y: st.y } : map.spawn;
+    return st ? stairsEntry(st) : map.spawn;
   };
   const guide = (roomId: string) => {
     const where = doorInfo.get(roomId);

@@ -78,7 +78,8 @@ export function findPath(map: SceneMap, from: Tile, to: Tile): Tile[] | null {
       const ny = cy + dy;
       if (!isWalkable(map, nx, ny)) continue;
       const k = key(nx, ny);
-      const cost = g.get(current)! + 1;
+      // Los muebles se pueden atravesar, pero el camino los rodea si puede.
+      const cost = g.get(current)! + (map.soft[k] && k !== goal ? 5 : 1);
       if (cost < (g.get(k) ?? Infinity)) {
         g.set(k, cost);
         came.set(k, current);
@@ -93,95 +94,27 @@ export function findPath(map: SceneMap, from: Tile, to: Tile): Tile[] | null {
 
 type Painter = (ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) => void;
 
-const planks =
-  (colors: string[], line = "rgba(80,50,20,0.35)"): Painter =>
+/** Piso liso, sin vetas ni baldosas: lo único que se ve encima son personas y muebles. */
+const flat =
+  (color: string): Painter =>
   (ctx, x0, y0, x1, y1) => {
-    for (let cy = y0; cy < y1; cy += 8) {
-      let cx = x0 - Math.floor(hash(0, cy, 5) * 48);
-      while (cx < x1) {
-        const len = 40 + Math.floor(hash(cx, cy, 6) * 56);
-        const sx = Math.max(cx, x0);
-        const w = Math.min(cx + len, x1) - sx;
-        ctx.fillStyle = pick(colors, hash(cx, cy, 7));
-        ctx.fillRect(sx, cy, w, 8);
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.fillRect(sx, cy, w, 1);
-        ctx.fillStyle = line;
-        ctx.fillRect(sx, cy + 7, w, 1);
-        if (cx >= x0) ctx.fillRect(cx, cy, 1, 8);
-        cx += len;
-      }
-    }
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
   };
-
-const tiles =
-  (colors: string[], size: number, seam: string): Painter =>
-  (ctx, x0, y0, x1, y1) => {
-    for (let y = y0; y < y1; y += size) {
-      for (let x = x0; x < x1; x += size) {
-        ctx.fillStyle = pick(colors, hash(x, y, 9));
-        ctx.fillRect(x, y, size, size);
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
-        ctx.fillRect(x, y, size, 1);
-        ctx.fillStyle = seam;
-        ctx.fillRect(x, y + size - 1, size, 1);
-        ctx.fillRect(x + size - 1, y, 1, size);
-      }
-    }
-  };
-
-const flagstones =
-  (colors: string[]): Painter =>
-  (ctx, x0, y0, x1, y1) => {
-    for (let cy = y0; cy < y1; cy += 16) {
-      const offset = (cy / 16) % 2 ? 16 : 0;
-      for (let cx = x0 - offset; cx < x1; cx += 32) {
-        const sx = Math.max(cx, x0);
-        const w = Math.min(cx + 32, x1) - sx;
-        ctx.fillStyle = pick(colors, hash(cx, cy, 3));
-        ctx.fillRect(sx, cy, w, 16);
-        ctx.fillStyle = "rgba(255,255,255,0.18)";
-        ctx.fillRect(sx, cy, w, 1);
-        ctx.fillStyle = "rgba(60,55,70,0.35)";
-        ctx.fillRect(sx, cy + 15, w, 1);
-        if (cx >= x0) ctx.fillRect(cx, cy, 1, 16);
-      }
-    }
-  };
-
-const grass: Painter = (ctx, x0, y0, x1, y1) => {
-  const greens = ["#8fd16a", "#89cb63", "#95d671", "#86c65f"];
-  for (let y = y0; y < y1; y += 8) {
-    for (let x = x0; x < x1; x += 8) {
-      ctx.fillStyle = pick(greens, hash(x, y, 13));
-      ctx.fillRect(x, y, 8, 8);
-      const r = hash(y, x, 14);
-      if (r > 0.86) {
-        ctx.fillStyle = "#6fb24e";
-        ctx.fillRect(x + 2, y + 3, 1, 3);
-        ctx.fillRect(x + 4, y + 2, 1, 4);
-      } else if (r > 0.83) {
-        ctx.fillStyle = pick(["#fff7a8", "#ffffff", "#ffb3c7"], hash(x, y, 15));
-        ctx.fillRect(x + 3, y + 3, 2, 2);
-      }
-    }
-  }
-};
 
 // ---------- Muros ----------
 
 type FacePainter = (ctx: CanvasRenderingContext2D, px: number, py: number, row: number) => void;
 
+/** Pared lisa en dos tonos, con una moldura que la separa del piso. */
 const plaster =
-  (top: string, lower: string | null, rail: string): FacePainter =>
+  (top: string, lower: string, rail: string): FacePainter =>
   (ctx, px, py, row) => {
-    ctx.fillStyle = top;
+    ctx.fillStyle = row === 1 ? lower : top;
     ctx.fillRect(px, py, T, T);
-    if (row === 1 && lower) {
-      ctx.fillStyle = lower;
-      ctx.fillRect(px, py + 10, T, T - 10);
+    if (row === 1) {
       ctx.fillStyle = rail;
-      ctx.fillRect(px, py + 8, T, 3);
+      ctx.fillRect(px, py, T, 3);
     }
   };
 
@@ -199,86 +132,102 @@ const bricks =
         if (bw <= 0) continue;
         ctx.fillStyle = pick(colors, hash(bx, by, 11));
         ctx.fillRect(sx, by, bw, h - 1);
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.fillRect(sx, by, bw, 1);
       }
     }
   };
 
+/** Paneles de un azul pizarra con una franja de luz: bien distintos del piso claro. */
 const panels: FacePainter = (ctx, px, py, row) => {
-  ctx.fillStyle = "#e3e8f0";
+  ctx.fillStyle = row === 1 ? "#4f5f80" : "#5d6e91";
   ctx.fillRect(px, py, T, T);
-  ctx.fillStyle = "#cfd6e2";
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.fillRect(px + T - 1, py, 1, T);
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillRect(px, py, 1, T);
   if (row === 0) {
     ctx.fillStyle = "#38bdf8";
-    ctx.fillRect(px, py + 6, T, 2);
-    ctx.fillStyle = "rgba(56,189,248,0.25)";
-    ctx.fillRect(px, py + 8, T, 3);
+    ctx.fillRect(px, py + 10, T, 2);
   }
 };
 
 const logs: FacePainter = (ctx, px, py) => {
-  const colors = ["#b07a46", "#a8713f", "#b8834f", "#a26b3b"];
+  const colors = ["#8a5a32", "#83552f", "#915f36", "#7d512c"];
   for (let r = 0; r < 4; r++) {
     const ly = py + r * 8;
     ctx.fillStyle = pick(colors, hash(px >> 6, ly, 17));
     ctx.fillRect(px, ly, T, 8);
-    ctx.fillStyle = "rgba(255,230,190,0.25)";
-    ctx.fillRect(px, ly + 1, T, 1);
-    ctx.fillStyle = "#6e4526";
+    ctx.fillStyle = "#4e321c";
     ctx.fillRect(px, ly + 7, T, 1);
   }
 };
 
-const hedge: FacePainter = (ctx, px, py) => {
-  ctx.fillStyle = "#4e9a45";
+const hedge: FacePainter = (ctx, px, py, row) => {
+  ctx.fillStyle = row === 1 ? "#3b7f37" : "#46923f";
   ctx.fillRect(px, py, T, T);
-  for (let i = 0; i < 9; i++) {
-    const r = hash(px, py, i);
-    ctx.fillStyle = r > 0.5 ? "#5fae53" : "#438b3b";
-    ctx.beginPath();
-    ctx.arc(px + hash(py, px, i) * T, py + r * T, 4 + r * 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  for (let i = 0; i < 4; i++) ctx.fillRect(px + ((i * 9 + (py >> 3)) % 28), py + i * 8 + 2, 4, 3);
 };
 
 interface Style {
   floor: Painter;
   face: FacePainter;
+  /** Borde superior de los muros, visto desde arriba. */
   cap: string;
+  /** Zócalo: la línea donde la pared toca el piso. */
   base: string;
+  /** Lo que queda fuera del recinto o entre edificios. */
+  outside: string;
 }
 
 const STYLES: Record<StyleId, Style> = {
-  cowork: { floor: planks(["#e2c49a", "#dcbd91", "#e6caa2", "#d8b88b"]), face: bricks(["#c96f52", "#bf654a", "#d0785a", "#c46a4e"], "#ead8c8"), cap: "#5d6170", base: "#8b5a44" },
-  tech: { floor: tiles(["#e8ecf3", "#e3e8f0"], 64, "rgba(56,189,248,0.18)"), face: panels, cap: "#475569", base: "#38bdf8" },
-  minimal: { floor: planks(["#efe3cf", "#eadcc5", "#f2e8d6", "#e8d8bf"], "rgba(150,120,80,0.25)"), face: plaster("#f8f6f2", null, "#e9e4dc"), cap: "#bdb6aa", base: "#ddd5c8" },
-  rustic: { floor: planks(["#a87445", "#b07c4b", "#9f6c3f", "#a9784a"]), face: logs, cap: "#6b4a2f", base: "#5a3a22" },
-  medieval: { floor: flagstones(["#c9c4b8", "#c2bdb0", "#cfcabe", "#bdb8ab"]), face: bricks(["#b5b0bf", "#aca7b7", "#bbb6c5", "#a8a3b2"], "#8f8a9b"), cap: "#7a7486", base: "#6c6779" },
-  garden: { floor: grass, face: hedge, cap: "#3f7d3a", base: "#356b30" },
+  cowork: { floor: flat("#e6cba3"), face: bricks(["#c96f52", "#bf654a", "#d0785a", "#c46a4e"], "#ead8c8"), cap: "#4a4e5c", base: "#6b4232", outside: "#c9ccd4" },
+  tech: { floor: flat("#f3f6fa"), face: panels, cap: "#2b3448", base: "#22d3ee", outside: "#c6cfdc" },
+  minimal: { floor: flat("#f7f3ec"), face: plaster("#b9aa94", "#a8987f", "#8a7a63"), cap: "#5e5244", base: "#6f604c", outside: "#ddd5c7" },
+  rustic: { floor: flat("#e7cda6"), face: logs, cap: "#4a3220", base: "#3e2a18", outside: "#b6a27f" },
+  medieval: { floor: flat("#e0dbcf"), face: bricks(["#8f899e", "#878196", "#958fa4", "#827c91"], "#6b6579"), cap: "#433e55", base: "#3a3548", outside: "#a7b892" },
+  garden: { floor: flat("#f1e8d2"), face: hedge, cap: "#2c5a28", base: "#24481f", outside: "#a7d084" },
 };
 
 const tileAt = (map: SceneMap, x: number, y: number) => map.tiles[y]?.[x] ?? "#";
 
-/** Muro visto desde arriba: se pinta como el techo claro de la temática, con un borde que marca la pared. */
-function wallCap(ctx: CanvasRenderingContext2D, map: SceneMap, style: Style, x: number, y: number) {
+/**
+ * Muro visto desde arriba. Solo la franja que toca un piso se pinta como
+ * muro (oscura, con borde); lo demás es el exterior, en un tono suave.
+ */
+function wallCap(ctx: CanvasRenderingContext2D, map: SceneMap, style: Style, x: number, y: number, outside: Set<number>) {
   const px = x * T;
   const py = y * T;
-  // Tono intermedio del techo de la temática: se distingue del piso sin ser una mancha negra.
-  const roof = ROOF[map.style];
-  ctx.fillStyle = shade(roof.base, -0.38);
-  ctx.fillRect(px, py, T, T);
-  ctx.fillStyle = shade(roof.line, -0.45);
-  for (let ly = 7; ly < T; ly += 8) ctx.fillRect(px, py + ly, T, 1);
   const open = (c: string) => c !== "#";
-  ctx.fillStyle = shade(style.cap, -0.1);
-  if (open(tileAt(map, x, y + 1))) ctx.fillRect(px, py + T - 4, T, 4);
-  if (open(tileAt(map, x + 1, y))) ctx.fillRect(px + T - 4, py, 4, T);
-  if (open(tileAt(map, x - 1, y))) ctx.fillRect(px, py, 4, T);
+  if (outside.has(y * map.w + x)) {
+    ctx.fillStyle = style.outside;
+    ctx.fillRect(px, py, T, T);
+    return;
+  }
+  ctx.fillStyle = style.cap;
+  ctx.fillRect(px, py, T, T);
+  ctx.fillStyle = shade(style.cap, 0.25);
+  if (open(tileAt(map, x, y + 1))) ctx.fillRect(px, py + T - 3, T, 3);
+  if (open(tileAt(map, x + 1, y))) ctx.fillRect(px + T - 3, py, 3, T);
+  if (open(tileAt(map, x - 1, y))) ctx.fillRect(px, py, 3, T);
   if (open(tileAt(map, x, y - 1))) ctx.fillRect(px, py, T, 3);
+}
+
+/** Baldosas de muro sin piso al lado y conectadas con el borde del mapa: el exterior. */
+function outsideTiles(map: SceneMap) {
+  const far = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (tileAt(map, x + dx, y + dy) !== "#") return false;
+    return true;
+  };
+  const seen = new Set<number>();
+  const queue: Tile[] = [];
+  for (let x = 0; x < map.w; x++) queue.push({ x, y: 0 }, { x, y: map.h - 1 });
+  for (let y = 0; y < map.h; y++) queue.push({ x: 0, y }, { x: map.w - 1, y });
+  while (queue.length) {
+    const t = queue.pop()!;
+    const k = t.y * map.w + t.x;
+    if (t.x < 0 || t.y < 0 || t.x >= map.w || t.y >= map.h || seen.has(k) || !far(t.x, t.y)) continue;
+    seen.add(k);
+    queue.push({ x: t.x + 1, y: t.y }, { x: t.x - 1, y: t.y }, { x: t.x, y: t.y + 1 }, { x: t.x, y: t.y - 1 });
+  }
+  return seen;
 }
 
 // ---------- Adornos del muro ----------
@@ -649,58 +598,174 @@ function rug(ctx: CanvasRenderingContext2D, f: Furni) {
 }
 
 const AREA_FLOOR: Record<AreaFloor, Painter> = {
-  grass,
-  wood: planks(["#c08a56", "#b8814e", "#c79361", "#b37b49"]),
-  deck: planks(["#a89884", "#b2a28d", "#9f8f7b"], "rgba(60,45,30,0.35)"),
-  stone: flagstones(["#d4cfc4", "#ccc7bb", "#dbd6cb"]),
-  tiles: tiles(["#f2f0ec", "#ebe8e2"], 32, "rgba(0,0,0,0.08)"),
+  grass: flat("#b3dc93"),
+  wood: flat("#dcb88d"),
+  deck: flat("#cfbea6"),
+  stone: flat("#d2ccbf"),
+  tiles: flat("#eeebe5"),
 };
 
-/** Escalera que sube, dibujada en la cara del muro: peldaños que se alejan hacia arriba. */
-function stairsUp(ctx: CanvasRenderingContext2D, s: Stairs) {
+const STEP: Record<StyleId, { tread: string; rail: string }> = {
+  tech: { tread: "#d5dde9", rail: "#38bdf8" },
+  minimal: { tread: "#e9e2d6", rail: "#6f604c" },
+  rustic: { tread: "#c9965f", rail: "#5a3a22" },
+  medieval: { tread: "#c4bdae", rail: "#4f4a5c" },
+  garden: { tread: "#d9cfb6", rail: "#6b4a2f" },
+  cowork: { tread: "#d5dde9", rail: "#4b5563" },
+};
+
+/**
+ * Escalera que sube: peldaños anchos que nacen en el piso y se meten en el
+ * muro, cada vez más oscuros, con barandas a los lados y una flecha.
+ */
+function stairsUp(ctx: CanvasRenderingContext2D, style: StyleId, s: Stairs) {
+  const c = STEP[style];
   const x = s.x * T;
   const w = s.w * T;
-  const steps = 7;
+  const top = (s.y - 2) * T;
+  const bottom = (s.y + s.h) * T;
+  // Hueco en el muro por donde sigue la escalera.
+  ctx.fillStyle = "#2a2a35";
+  ctx.fillRect(x - 6, top, w + 12, bottom - top);
+  const steps = (s.h + 2) * 2;
+  const stepH = (bottom - top) / steps;
   for (let i = 0; i < steps; i++) {
-    const y = 3 * T - (i + 1) * ((2 * T) / steps);
-    const inset = i * 1.5;
-    ctx.fillStyle = shade("#d8c7ad", -i * 0.06);
-    ctx.fillRect(x + inset, y, w - inset * 2, (2 * T) / steps);
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.fillRect(x + inset, y + (2 * T) / steps - 2, w - inset * 2, 2);
+    const y = bottom - (i + 1) * stepH;
+    const k = i / steps;
+    const inset = k * 6;
+    ctx.fillStyle = shade(c.tread, -k * 0.45);
+    ctx.fillRect(x + inset, y, w - inset * 2, stepH);
+    ctx.fillStyle = shade(c.tread, -0.25 - k * 0.4);
+    ctx.fillRect(x + inset, y + stepH - 3, w - inset * 2, 3);
   }
-  ctx.fillStyle = "#4b5563";
-  ctx.fillRect(x - 3, T + 2, 4, 2 * T - 2);
-  ctx.fillRect(x + w - 1, T + 2, 4, 2 * T - 2);
+  // Barandas con postes.
+  ctx.fillStyle = c.rail;
+  ctx.fillRect(x - 6, top + 4, 6, bottom - top - 4);
+  ctx.fillRect(x + w, top + 4, 6, bottom - top - 4);
+  ctx.fillStyle = shade(c.rail, -0.3);
+  for (let y = bottom - 8; y > top + 8; y -= 24) {
+    ctx.fillRect(x - 7, y, 8, 6);
+    ctx.fillRect(x + w - 1, y, 8, 6);
+  }
+  // Flecha hacia arriba en el primer peldaño.
+  const cx = x + w / 2;
+  const ay = bottom - 26;
+  ctx.fillStyle = "rgba(22,22,29,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(cx, ay - 10);
+  ctx.lineTo(cx + 10, ay + 2);
+  ctx.lineTo(cx + 4, ay + 2);
+  ctx.lineTo(cx + 4, ay + 10);
+  ctx.lineTo(cx - 4, ay + 10);
+  ctx.lineTo(cx - 4, ay + 2);
+  ctx.lineTo(cx - 10, ay + 2);
+  ctx.closePath();
+  ctx.fill();
 }
 
-/** Escalera que baja, en el muro sur: peldaños que se oscurecen hacia abajo. */
-function stairsDown(ctx: CanvasRenderingContext2D, s: Stairs) {
+/**
+ * Escalera que baja: un hueco en el piso con baranda en tres lados; los
+ * peldaños se oscurecen a medida que bajan. Se entra por arriba.
+ */
+function stairsDown(ctx: CanvasRenderingContext2D, style: StyleId, s: Stairs) {
+  const c = STEP[style];
   const x = s.x * T;
   const y = s.y * T;
   const w = s.w * T;
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = shade("#d8c7ad", -0.1 - i * 0.12);
-    ctx.fillRect(x, y + i * 8, w, 8);
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    ctx.fillRect(x, y + i * 8 + 6, w, 2);
+  const h = s.h * T;
+  ctx.fillStyle = "#2a2a35";
+  ctx.fillRect(x - 6, y, w + 12, h + 6);
+  const steps = s.h * 2;
+  const stepH = h / steps;
+  for (let i = 0; i < steps; i++) {
+    const k = i / steps;
+    const inset = k * 6;
+    ctx.fillStyle = shade(c.tread, -k * 0.55);
+    ctx.fillRect(x + inset, y + i * stepH, w - inset * 2, stepH);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(x + inset, y + i * stepH, w - inset * 2, 2);
   }
-  ctx.fillStyle = "#4b5563";
-  ctx.fillRect(x - 3, y, 4, T);
-  ctx.fillRect(x + w - 1, y, 4, T);
+  ctx.fillStyle = c.rail;
+  ctx.fillRect(x - 6, y, 6, h + 6);
+  ctx.fillRect(x + w, y, 6, h + 6);
+  ctx.fillRect(x - 6, y + h, w + 12, 6);
+  ctx.fillStyle = shade(c.rail, -0.3);
+  for (const py of [y, y + h - 2]) {
+    ctx.fillRect(x - 7, py, 8, 8);
+    ctx.fillRect(x + w - 1, py, 8, 8);
+  }
+  // Flecha hacia abajo en el primer peldaño.
+  const cx = x + w / 2;
+  const ay = y + 14;
+  ctx.fillStyle = "rgba(22,22,29,0.5)";
+  ctx.beginPath();
+  ctx.moveTo(cx, ay + 10);
+  ctx.lineTo(cx + 10, ay - 2);
+  ctx.lineTo(cx + 4, ay - 2);
+  ctx.lineTo(cx + 4, ay - 10);
+  ctx.lineTo(cx - 4, ay - 10);
+  ctx.lineTo(cx - 4, ay - 2);
+  ctx.lineTo(cx - 10, ay - 2);
+  ctx.closePath();
+  ctx.fill();
 }
 
-/** Letrero pintado en el piso de una zona. */
-function floorLabel(ctx: CanvasRenderingContext2D, x: number, y: number, text: string) {
-  ctx.font = `700 11px ${FONT}`;
-  const w = ctx.measureText(text).width + 16;
-  const cx = (x + 0.5) * T;
-  const cy = (y + 0.5) * T;
-  ctx.fillStyle = "rgba(22,22,29,0.72)";
-  ctx.fillRect(Math.round(cx - w / 2), Math.round(cy - 9), Math.round(w), 18);
+/** Puerta en un muro lateral: un marco grueso del color de la sala, el vano abierto y la hoja hacia adentro. */
+function sideDoor(ctx: CanvasRenderingContext2D, style: StyleId, door: Door) {
+  const x = door.x * T;
+  const y = door.y * T;
+  const h = door.w * T;
+  const toRoom = door.side === "left" ? -1 : 1;
+  frame(ctx, x, y - 4, T, h + 8, shade(door.color, -0.3));
+  ctx.fillStyle = door.color;
+  ctx.fillRect(x + 2, y - 2, T - 4, 6);
+  ctx.fillRect(x + 2, y + h - 4, T - 4, 6);
+  // Vano: el piso entra a la sala, con una sombra del lado de adentro.
+  STYLES[style].floor(ctx, x + 4, y + 6, x + T - 4, y + h - 6);
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(toRoom < 0 ? x + 4 : x + T - 12, y + 6, 8, h - 12);
+  // Hoja abierta pegada al marco, con su manija.
+  const leaf = toRoom < 0 ? x + 4 : x + T - 10;
+  ctx.fillStyle = shade(door.color, -0.15);
+  ctx.fillRect(leaf, y + 6, 6, h / 2 - 2);
+  ctx.fillStyle = "#f2c94c";
+  ctx.fillRect(leaf + 2, y + h / 2 - 10, 2, 5);
+  // Felpudo del color de la sala en el lado del pasillo, para que se vea la entrada.
+  ctx.fillStyle = door.color;
+  ctx.fillRect(toRoom < 0 ? x + T - 4 : x, y + 6, 4, h - 12);
+}
+
+/** Vano entre dos zonas: postes, dintel y el nombre de la zona a la que lleva. */
+function portal(ctx: CanvasRenderingContext2D, style: StyleId, d: Decor) {
+  const x0 = d.x * T;
+  const x1 = (d.x + (d.w ?? 2)) * T;
+  const c = STEP[style].rail;
+  for (const px of [x0 - 10, x1 + 2]) {
+    frame(ctx, px, T - 4, 8, 2 * T + 4, shade(c, 0.1));
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(px, T - 4, 2, 2 * T + 4);
+  }
+  frame(ctx, x0 - 12, T - 10, x1 - x0 + 24, 18, "#16161d");
+  ctx.fillStyle = c;
+  ctx.fillRect(x0 - 12, T + 6, x1 - x0 + 24, 2);
+  ctx.font = `700 10px ${FONT}`;
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
-  ctx.fillText(text, cx, cy + 4);
+  ctx.fillText(d.text ?? "", (x0 + x1) / 2, T + 3, x1 - x0 + 16);
+  ctx.textAlign = "left";
+}
+
+/** Cartel con flecha en la pared, para indicar hacia dónde sigue una zona. */
+function sign(ctx: CanvasRenderingContext2D, d: Decor) {
+  const x = d.x * T + 2;
+  const w = (d.w ?? 2) * T - 4;
+  frame(ctx, x, T + 12, w, 18, "#16161d");
+  ctx.fillStyle = "#ff5c39";
+  ctx.fillRect(x, T + 12, w, 2);
+  ctx.font = `700 9px ${FONT}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.fillText(d.text ?? "", x + w / 2, T + 25, w - 6);
   ctx.textAlign = "left";
 }
 
@@ -744,7 +809,7 @@ const ROOF: Record<StyleId, { base: string; line: string }> = {
   minimal: { base: "#f1ede6", line: "#e2ddd3" },
   rustic: { base: "#b07443", line: "#8f5a30" },
   medieval: { base: "#9a95a6", line: "#7f7a8c" },
-  garden: { base: "#93c66e", line: "#79ad57" },
+  garden: { base: "#d39a6a", line: "#bd8456" },
   cowork: { base: "#dbe3ee", line: "#c3cedd" },
 };
 
@@ -769,10 +834,9 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
     }
   }
   if (style === "garden") {
-    for (let i = 0; i < roof.w * 2; i++) {
-      ctx.fillStyle = i % 3 ? "#5f9a45" : "#ffd166";
-      ctx.fillRect(x + 6 + ((i * 37) % (w - 12)), y + 6 + ((i * 23) % (h - 12)), 4, 4);
-    }
+    // Pabellón con tejas: una cumbrera al medio.
+    ctx.fillStyle = "#a8683e";
+    ctx.fillRect(x, y + 4, w, 3);
   }
   ctx.fillStyle = "rgba(22,22,29,0.35)";
   ctx.fillRect(x, y, w, 2);
@@ -784,7 +848,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
   ctx.font = `700 ${roof.w > 12 ? 16 : 12}px ${FONT}`;
   const label = roof.label.toUpperCase();
   const tw = Math.min(w - 16, ctx.measureText(label).width + 18);
-  const ty = y + h / 2 - 4;
+  const ty = y + Math.round(h * 0.38);
   ctx.fillStyle = roof.open ? "#16161d" : "rgba(22,22,29,0.35)";
   ctx.fillRect(x + w / 2 - tw / 2, ty - 12, tw, 22);
   ctx.fillStyle = "#ffffff";
@@ -804,22 +868,32 @@ export function renderStatic(map: SceneMap, scale: number) {
   const style = STYLES[map.style];
 
   style.floor(ctx, 0, 0, map.w * T, map.h * T);
+  const outside = outsideTiles(map);
   for (const area of map.areas) AREA_FLOOR[area.floor](ctx, area.x * T, area.y * T, (area.x + area.w) * T, (area.y + area.h) * T);
   for (let y = 0; y < map.h; y++) {
     for (let x = 0; x < map.w; x++) {
       const c = tileAt(map, x, y);
-      if (c === "#") wallCap(ctx, map, style, x, y);
+      if (c === "#") wallCap(ctx, map, style, x, y, outside);
       else if (c === "=") {
         const lower = tileAt(map, x, y + 1) === ".";
         style.face(ctx, x * T, y * T, lower ? 1 : 0);
         if (lower) {
-          // Zócalo y una sombra suave sobre el piso.
+          // Zócalo y una sombra sobre el piso: marca bien dónde termina la pared.
           ctx.fillStyle = style.base;
-          ctx.fillRect(x * T, (y + 1) * T - 4, T, 4);
-          ctx.fillStyle = "rgba(40,40,60,0.14)";
-          ctx.fillRect(x * T, (y + 1) * T, T, 6);
+          ctx.fillRect(x * T, (y + 1) * T - 5, T, 5);
+          ctx.fillStyle = "rgba(40,40,60,0.18)";
+          ctx.fillRect(x * T, (y + 1) * T, T, 7);
         }
       }
+    }
+  }
+  // Sombra de los muros laterales sobre el piso.
+  ctx.fillStyle = "rgba(40,40,60,0.12)";
+  for (let y = 0; y < map.h; y++) {
+    for (let x = 0; x < map.w; x++) {
+      if (tileAt(map, x, y) !== ".") continue;
+      if (tileAt(map, x - 1, y) === "#") ctx.fillRect(x * T, y * T, 5, T);
+      if (tileAt(map, x + 1, y) === "#") ctx.fillRect((x + 1) * T - 3, y * T, 3, T);
     }
   }
 
@@ -864,6 +938,12 @@ export function renderStatic(map: SceneMap, scale: number) {
         case "ivy":
           ivy(ctx, d);
           break;
+        case "portal":
+          portal(ctx, map.style, d);
+          break;
+        case "sign":
+          sign(ctx, d);
+          break;
         case "torch": {
           const cx = d.x * T + T / 2;
           ctx.fillStyle = "#3a3346";
@@ -899,13 +979,13 @@ export function renderStatic(map: SceneMap, scale: number) {
   }
   for (const door of map.doors) {
     if (door.side === "top") atRow(ctx, door.y, () => (door.main ? mainDoor(ctx, door) : topDoor(ctx, door)));
-    else bottomOpening(ctx, map, door, door.color);
+    else if (door.side === "bottom") bottomOpening(ctx, map, door, door.color);
+    else sideDoor(ctx, map.style, door);
   }
   for (const st of map.stairs) {
-    if (st.side === "top") atRow(ctx, st.y, () => stairsUp(ctx, st));
-    else stairsDown(ctx, st);
+    if (st.dir === "up") stairsUp(ctx, map.style, st);
+    else stairsDown(ctx, map.style, st);
   }
-  for (const l of map.labels) floorLabel(ctx, l.x, l.y, l.text);
   if (map.exit && !map.decor.some((d) => d.kind === "entrance")) bottomOpening(ctx, map, map.exit, "#ff5c39");
   return canvas;
 }
@@ -1768,20 +1848,25 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
       marquee(ctx, door, s, t);
       continue;
     }
-    const cx = (door.x + door.w / 2) * T;
     // Arriba: sobre el muro, encima de la cara. Abajo: sobre el muro sur, debajo del vano.
-    const y = door.side === "top" ? (door.y - 2) * T - 4 : (door.y + 1) * T + 1;
-    doorPlate(ctx, cx, y, door, s, door.id === hovered);
+    // En los muros laterales, sobre el techo del edificio de la sala.
+    if (door.side === "top") doorPlate(ctx, (door.x + door.w / 2) * T, (door.y - 2) * T - 4, door, s, door.id === hovered);
+    else if (door.side === "bottom") doorPlate(ctx, (door.x + door.w / 2) * T, (door.y + 1) * T + 1, door, s, door.id === hovered);
+    else doorPlate(ctx, (door.side === "left" ? door.x - 2.5 : door.x + 3.5) * T, (door.y + 3) * T - 36, door, s, door.id === hovered);
   }
-  const exits: (Span & { label: string })[] = [
-    ...map.stairs.map((st) => ({ ...st, label: `${st.side === "top" ? "▲" : "▼"} ${st.label}` })),
-    ...(map.exit ? [{ ...map.exit, label: "Salida a recepción" }] : []),
-    ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" })),
+  const exits: { cx: number; y: number; label: string }[] = [
+    ...map.stairs.map((st) => ({
+      cx: (st.x + st.w / 2) * T,
+      y: st.dir === "up" ? (st.y - 2) * T - 15 : (st.y + st.h) * T + 9,
+      label: `${st.dir === "up" ? "▲" : "▼"} ${st.label}`,
+    })),
+    ...[...(map.exit ? [{ ...map.exit, label: "Salida a recepción" }] : []), ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" }))].map((e) => {
+      const tiles = spanTiles(e);
+      return { cx: ((tiles[0]!.x + tiles[tiles.length - 1]!.x + 1) / 2) * T, y: e.y * T - 14, label: e.label };
+    }),
   ];
   for (const e of exits) {
-    const tiles = spanTiles(e);
-    const cx = ((tiles[0]!.x + tiles[tiles.length - 1]!.x + 1) / 2) * T;
-    const y = e.side === "top" ? (e.y + 1) * T + 2 : e.y * T - 14;
+    const { cx, y } = e;
     ctx.font = `700 9px ${FONT}`;
     const width = ctx.measureText(e.label).width + 14;
     ctx.fillStyle = "#16161d";

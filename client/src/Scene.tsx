@@ -1,5 +1,5 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { isWalkable, onSpan, sameTile, spanTiles, type Dir, type Door, type Npc, type SceneMap, type Span, type Tile } from "../../shared/maps.ts";
+import { isWalkable, onSpan, onStairs, sameTile, spanTiles, stairsEntry, vertical, type Dir, type Door, type Npc, type SceneMap, type Span, type Stairs, type Tile } from "../../shared/maps.ts";
 import { EMOTES } from "../../shared/themes.ts";
 import type { Bubble, Look, User } from "../../shared/types.ts";
 import { avatarHeight, drawAvatar } from "./avatar.ts";
@@ -280,7 +280,7 @@ export default function Scene(props: SceneProps) {
       const intended = !s.path.length || keys.current.length > 0;
       const door = intended && p.onDoor && map.doors.find((d) => onSpan(to, d));
       const exit = intended && p.onExit && map.exit && onSpan(to, map.exit);
-      const stairs = intended && p.onStairs && map.stairs.find((st) => onSpan(to, st));
+      const stairs = intended && p.onStairs && map.stairs.find((st) => onStairs(to, st));
       if (door || exit || stairs) {
         s.path = [];
         s.then = null;
@@ -555,7 +555,8 @@ export default function Scene(props: SceneProps) {
         miniCtx.drawImage(backdrop, 0, 0, MINI_W, H * miniScale);
         for (const d of map.doors) {
           miniCtx.fillStyle = d.color;
-          miniCtx.fillRect(d.x * T * miniScale - 1, d.y * T * miniScale - 1, d.w * T * miniScale + 2, 5);
+          if (vertical(d)) miniCtx.fillRect(d.x * T * miniScale - 1, d.y * T * miniScale - 1, 5, d.w * T * miniScale + 2);
+          else miniCtx.fillRect(d.x * T * miniScale - 1, d.y * T * miniScale - 1, d.w * T * miniScale + 2, 5);
         }
         if (guideTo.current) {
           miniCtx.fillStyle = "#ff5c39";
@@ -602,9 +603,13 @@ export default function Scene(props: SceneProps) {
     const x0 = tiles[0]!.x * T;
     const x1 = (tiles[tiles.length - 1]!.x + 1) * T;
     if (wx < x0 || wx >= x1) return false;
+    if (vertical(s)) return wy >= s.y * T && wy < (s.y + s.w) * T;
     return s.side === "top" ? wy >= (s.y - 1) * T && wy < (s.y + 1) * T : wy >= (s.y - 0.5) * T && wy < (s.y + 1) * T;
   };
-  const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy)) ?? map.stairs.find((st) => spanHit(st, wx, wy));
+  const stairsHit = (s: Stairs, wx: number, wy: number) =>
+    wx >= s.x * T && wx < (s.x + s.w) * T && wy >= (s.y - (s.dir === "up" ? 2 : 0)) * T && wy < (s.y + s.h) * T;
+  const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy));
+  const hitStairs = (wx: number, wy: number) => map.stairs.find((st) => stairsHit(st, wx, wy));
   const hitDirectory = (wx: number, wy: number) =>
     map.directories.find((d) => wx >= d.x * T && wx < (d.x + 1) * T && wy >= (d.y - 1.2) * T && wy < (d.y + 1) * T);
 
@@ -616,8 +621,8 @@ export default function Scene(props: SceneProps) {
     h.user = null;
     for (const [id, o] of others.current) if (hitAvatar(w.x, w.y, o.x, o.y)) h.user = id;
     const hd = hitDoor(w.x, w.y);
-    h.door = hd && "id" in hd ? hd.id : null;
-    e.currentTarget.style.cursor = h.npc || hd || hitDirectory(w.x, w.y) ? "pointer" : "default";
+    h.door = hd?.id ?? null;
+    e.currentTarget.style.cursor = h.npc || hd || hitStairs(w.x, w.y) || hitDirectory(w.x, w.y) ? "pointer" : "default";
   };
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -645,6 +650,11 @@ export default function Scene(props: SceneProps) {
     const door = hitDoor(w.x, w.y);
     if (door) {
       walkTo({ x: door.x, y: door.y });
+      return;
+    }
+    const stairs = hitStairs(w.x, w.y);
+    if (stairs) {
+      walkTo(stairsEntry(stairs));
       return;
     }
     const tile = screenToTile(w.x, w.y);

@@ -27,7 +27,12 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Jardín (parque)**: pícnic, café del jardín con sombrillas, zona recreativa y un mirador arriba.
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
-  - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces), y cada zona tiene su letrero pintado en el piso.
+  - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
+  - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.
+  - Entre una zona y otra hay **portales con el nombre de la zona** o carteles con flecha («← CAFETERÍA», «JUEGOS →»).
+  - Las paredes tienen un color bien distinto al piso, y el piso es liso, sin dibujos.
+  - Las **escaleras** son anchas, con barandas y una flecha: la que sube se mete en el muro y la que baja es un hueco con baranda. Basta pisarlas para cambiar de piso.
+- **Sin choques**: solo las paredes cortan el paso. Muebles y personas se pueden atravesar, aunque los caminos automáticos rodean los muebles.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.
 - **Puertas**: cada una muestra el nombre de la sala, la charla en curso o la próxima, y su horario (por ejemplo «10:00–10:45»).
 - **Directorio**: los tótems con **?** (y el botón «Cómo llegar a cada sala») muestran dónde está cada sala y qué charla hay ahora y después. Se puede **marcar el camino en el suelo** o pedir **«Llevarme»** para ir caminando solo.
