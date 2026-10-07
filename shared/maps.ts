@@ -48,6 +48,7 @@ export type FurniKind =
   | "cooler"
   | "bench"
   | "table"
+  | "totem"
   | "rug"
   | "carpet";
 
@@ -74,6 +75,7 @@ export type DecorKind =
   | "banner"
   | "fireplace"
   | "ivy"
+  | "sponsors"
   | "entrance";
 
 export interface Decor {
@@ -192,174 +194,199 @@ export const sameTile = (a: Tile, b: Tile) => Math.round(a.x) === b.x && Math.ro
 
 const empty = { doors: [], stairs: [], npcs: [], seats: [], standing: [], podium: null, exit: null, desk: [], signs: [] };
 
-// ---------- Recepción: un cowork tecnológico ----------
+// ---------- Recepción: un cowork tecnológico pequeño ----------
 
 export const RECEPTIONIST_ID = "npc-recepcion";
 
 export function receptionMap(): SceneMap {
-  const w = 26;
-  const h = 17;
-  const furni: Furni[] = [
-    { kind: "carpet", x: 12, y: 6, w: 2, d: 10, color: "#3d5a80" },
-    // Mostrador de recepción en U.
-    ...[10, 11, 12, 13, 14, 15].map((x) => ({ kind: "counter" as const, x, y: 5 })),
-    { kind: "counter", x: 10, y: 4 },
-    { kind: "counter", x: 15, y: 4 },
-    { kind: "bigplant", x: 10, y: 3 },
-    { kind: "bigplant", x: 15, y: 3 },
-    // Zona de escritorios compartidos a la izquierda.
-    { kind: "rug", x: 1, y: 7, w: 8, d: 7, color: "#c7d2e3" },
-    { kind: "workdesk", x: 2, y: 8, w: 3 },
-    { kind: "workdesk", x: 6, y: 8, w: 2 },
-    { kind: "officechair", x: 2, y: 9 },
-    { kind: "officechair", x: 3, y: 9 },
-    { kind: "officechair", x: 4, y: 9 },
-    { kind: "officechair", x: 6, y: 9 },
-    { kind: "officechair", x: 7, y: 9 },
-    { kind: "workdesk", x: 2, y: 11, w: 3 },
-    { kind: "workdesk", x: 6, y: 11, w: 2 },
-    { kind: "officechair", x: 2, y: 12 },
-    { kind: "officechair", x: 3, y: 12 },
-    { kind: "officechair", x: 4, y: 12 },
-    { kind: "officechair", x: 6, y: 12 },
-    { kind: "officechair", x: 7, y: 12 },
-    { kind: "bookshelf", x: 1, y: 3 },
-    { kind: "bookshelf", x: 2, y: 3 },
-    { kind: "cooler", x: 4, y: 3 },
-    { kind: "plant", x: 7, y: 3 },
-    { kind: "bigplant", x: 1, y: 15 },
-    { kind: "arcade", x: 8, y: 15 },
-    // Sala de estar y café a la derecha.
-    { kind: "coffeebar", x: 19, y: 3, w: 4 },
-    { kind: "plant", x: 18, y: 3 },
-    { kind: "vending", x: 24, y: 3 },
-    { kind: "rug", x: 17, y: 7, w: 8, d: 6, color: "#f2c6a0" },
-    { kind: "sofa", x: 18, y: 7, w: 3, color: "#5b7fd6", dir: "down" },
-    { kind: "armchair", x: 22, y: 7, color: "#f08a5d" },
-    { kind: "coffeetable", x: 18, y: 9, w: 3 },
-    { kind: "beanbag", x: 22, y: 9, color: "#ffd166" },
-    { kind: "sofa", x: 18, y: 11, w: 3, color: "#5b7fd6", dir: "up" },
-    { kind: "beanbag", x: 23, y: 11, color: "#ef476f" },
-    { kind: "pingpong", x: 18, y: 14, w: 3 },
-    { kind: "bigplant", x: 24, y: 15 },
-    { kind: "lamp", x: 24, y: 7 },
-    { kind: "plant", x: 9, y: 7 },
-    { kind: "plant", x: 16, y: 7 },
-  ];
+  const w = 16;
+  const h = 11;
   return finish({
     ...empty,
     w,
     h,
     tiles: enclosure(w, h),
     style: "cowork",
-    spawn: { x: 12, y: 14 },
-    furni,
+    spawn: { x: 7, y: 8 },
+    furni: [
+      { kind: "carpet", x: 7, y: 5, w: 2, d: 5, color: "#3d5a80" },
+      // Mostrador en U: la recepcionista queda adentro, a tres pasos de la entrada.
+      ...[5, 6, 7, 8, 9, 10].map((x) => ({ kind: "counter" as const, x, y: 4 })),
+      { kind: "counter", x: 5, y: 3 },
+      { kind: "counter", x: 10, y: 3 },
+      { kind: "bigplant", x: 9, y: 3 },
+      // Escritorios compartidos a la izquierda.
+      { kind: "bookshelf", x: 1, y: 3 },
+      { kind: "cooler", x: 3, y: 3 },
+      { kind: "workdesk", x: 1, y: 6, w: 3 },
+      { kind: "officechair", x: 1, y: 7 },
+      { kind: "officechair", x: 2, y: 7 },
+      { kind: "officechair", x: 3, y: 7 },
+      { kind: "bigplant", x: 1, y: 9 },
+      { kind: "arcade", x: 4, y: 9 },
+      // Café y sala de estar a la derecha.
+      { kind: "coffeebar", x: 11, y: 3, w: 3 },
+      { kind: "vending", x: 14, y: 3 },
+      { kind: "rug", x: 11, y: 5, w: 4, d: 4, color: "#f2c6a0" },
+      { kind: "sofa", x: 11, y: 5, w: 3, color: "#5b7fd6", dir: "down" },
+      { kind: "coffeetable", x: 11, y: 7, w: 2 },
+      { kind: "beanbag", x: 14, y: 7, color: "#ffd166" },
+      { kind: "bigplant", x: 14, y: 9 },
+    ],
     decor: [
       { kind: "window", x: 1, w: 3 },
-      { kind: "whiteboard", x: 5, w: 3 },
-      { kind: "neon", x: 9, w: 8, text: "MyConferences", color: "#22d3ee" },
-      { kind: "clock", x: 17 },
-      { kind: "window", x: 19, w: 3 },
-      { kind: "art", x: 23, w: 2, color: "#ef476f" },
-      { kind: "entrance", x: 12, w: 2, y: h - 1 },
+      { kind: "neon", x: 5, w: 6, text: "MyConferences", color: "#22d3ee" },
+      { kind: "clock", x: 11 },
+      { kind: "art", x: 12, w: 2, color: "#ef476f" },
+      { kind: "entrance", x: 7, w: 2, y: h - 1 },
     ],
-    npcs: [{ id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 12, y: 4, dir: "down" }],
-    desk: [11, 12, 13, 14].map((x) => ({ x, y: 6 })),
-    signs: [],
+    npcs: [{ id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 7, y: 3, dir: "down" }],
+    desk: [6, 7, 8, 9].map((x) => ({ x, y: 5 })),
   });
 }
 
-// ---------- Salón: un edificio de varios pisos ----------
+// ---------- Lugar del evento ----------
 
-const FLOOR_W = 24;
-const FLOOR_H = 16;
-/** Puestos para puertas en cada piso: la planta baja usa los muros laterales y arriba se suma el muro norte. */
-const GROUND_SLOTS: Omit<Span, "w">[] = [
-  { side: "left", x: 0, y: 5 },
-  { side: "right", x: FLOOR_W - 1, y: 5 },
-  { side: "left", x: 0, y: 10 },
-  { side: "right", x: FLOOR_W - 1, y: 10 },
-];
-const UPPER_SLOTS: Omit<Span, "w">[] = [...GROUND_SLOTS, { side: "top", x: 4, y: 2 }, { side: "top", x: FLOOR_W - 6, y: 2 }];
+const FLOOR_W = 22;
+const FLOOR_H = 12;
+/** Puertas en el muro del fondo; al centro va la pantalla de patrocinadores. */
+const DOOR_SLOTS = [2, 6, 14, 18];
+const EXIT_X = 10;
 
 export function floorCount(rooms: number) {
-  return 1 + Math.ceil(Math.max(0, rooms - GROUND_SLOTS.length) / UPPER_SLOTS.length);
+  return Math.max(1, Math.ceil(rooms / DOOR_SLOTS.length));
 }
 
 export const floorName = (floor: number) => (floor === 0 ? "Planta baja" : `Piso ${floor}`);
 
-const STAIRS_X = 11;
+const CARPET: Record<ThemeId, string> = { tech: "#1e3a5f", minimal: "#d6d3cd", rustic: "#8e3b2f", medieval: "#9b2335", garden: "#c9b48a" };
 
-/** Un mapa por piso. Las salas se reparten en orden: primero la planta baja y luego hacia arriba. */
-export function venueFloors(rooms: Pick<Room, "id" | "name" | "color" | "theme">[]): SceneMap[] {
-  const floors = floorCount(rooms.length);
-  const maps: SceneMap[] = [];
-  let next = 0;
-  for (let f = 0; f < floors; f++) {
-    const slots = f === 0 ? GROUND_SLOTS : UPPER_SLOTS;
-    const here = rooms.slice(next, next + slots.length);
-    next += here.length;
-    maps.push(floorMap(f, here, slots, f < floors - 1));
+/** Muebles y adornos propios de cada estilo para los pasillos del evento. */
+function lobbyDecor(theme: ThemeId): { furni: Furni[]; decor: Decor[] } {
+  switch (theme) {
+    case "tech":
+      return {
+        furni: [
+          { kind: "rack", x: 1, y: 3 },
+          { kind: "rack", x: 20, y: 3 },
+          { kind: "kiosk", x: 1, y: 8 },
+          { kind: "beanbag", x: 4, y: 9, color: "#22d3ee" },
+          { kind: "beanbag", x: 17, y: 9, color: "#f472b6" },
+          { kind: "arcade", x: 20, y: 8 },
+        ],
+        decor: [
+          { kind: "neon", x: 4, w: 2, text: "</>", color: "#22d3ee" },
+          { kind: "neon", x: 16, w: 2, text: "AI", color: "#f472b6" },
+        ],
+      };
+    case "minimal":
+      return {
+        furni: [
+          { kind: "bigplant", x: 1, y: 3 },
+          { kind: "bigplant", x: 20, y: 3 },
+          { kind: "lamp", x: 1, y: 8 },
+          { kind: "lamp", x: 20, y: 8 },
+          { kind: "bench", x: 3, y: 9, w: 3 },
+          { kind: "bench", x: 16, y: 9, w: 3 },
+        ],
+        decor: [
+          { kind: "art", x: 4, w: 2, color: "#e9b8a4" },
+          { kind: "art", x: 16, w: 2, color: "#a4c3e9" },
+        ],
+      };
+    case "rustic":
+      return {
+        furni: [
+          { kind: "barrel", x: 1, y: 3 },
+          { kind: "bookshelf", x: 20, y: 3 },
+          { kind: "lantern", x: 1, y: 8 },
+          { kind: "lantern", x: 20, y: 8 },
+          { kind: "table", x: 3, y: 9, w: 2 },
+          { kind: "barrel", x: 17, y: 9 },
+          { kind: "barrel", x: 18, y: 9 },
+        ],
+        decor: [
+          { kind: "shelf", x: 4, w: 2 },
+          { kind: "window", x: 16, w: 2 },
+        ],
+      };
+    case "medieval":
+      return {
+        furni: [
+          { kind: "armor", x: 1, y: 3 },
+          { kind: "armor", x: 20, y: 3 },
+          { kind: "candelabra", x: 1, y: 8 },
+          { kind: "candelabra", x: 20, y: 8 },
+          { kind: "pillar", x: 4, y: 8 },
+          { kind: "pillar", x: 17, y: 8 },
+        ],
+        decor: [
+          { kind: "banner", x: 4, color: "#9b2335" },
+          { kind: "torch", x: 5 },
+          { kind: "torch", x: 16 },
+          { kind: "banner", x: 17, color: "#9b2335" },
+        ],
+      };
+    case "garden":
+      return {
+        furni: [
+          { kind: "tree", x: 1, y: 3 },
+          { kind: "tree", x: 20, y: 3 },
+          { kind: "flowerbed", x: 1, y: 7, d: 2 },
+          { kind: "flowerbed", x: 20, y: 7, d: 2 },
+          { kind: "fountain", x: 3, y: 8, w: 2, d: 2 },
+          { kind: "lantern", x: 17, y: 9 },
+        ],
+        decor: [
+          { kind: "ivy", x: 4, w: 2 },
+          { kind: "ivy", x: 16, w: 2 },
+        ],
+      };
   }
-  return maps;
 }
 
-function floorMap(floor: number, rooms: Pick<Room, "id" | "name" | "color" | "theme">[], slots: Omit<Span, "w">[], hasUp: boolean): SceneMap {
+/** Un mapa por piso. Las salas se reparten de a cuatro por piso, en orden. */
+export function venueFloors(theme: ThemeId, rooms: Pick<Room, "id" | "name" | "color">[]): SceneMap[] {
+  const floors = floorCount(rooms.length);
+  return Array.from({ length: floors }, (_, f) =>
+    floorMap(theme, f, rooms.slice(f * DOOR_SLOTS.length, (f + 1) * DOOR_SLOTS.length), f < floors - 1),
+  );
+}
+
+function floorMap(theme: ThemeId, floor: number, rooms: Pick<Room, "id" | "name" | "color">[], hasUp: boolean): SceneMap {
   const w = FLOOR_W;
   const h = FLOOR_H;
-  const doors: Door[] = rooms.map((r, i) => ({ ...slots[i]!, w: 2, id: r.id, label: r.name, color: r.color, theme: r.theme }));
+  const doors: Door[] = rooms.map((r, i) => ({ side: "top", x: DOOR_SLOTS[i]!, y: 2, w: 2, id: r.id, label: r.name, color: r.color, theme }));
   const stairs: Stairs[] = [];
-  if (hasUp) stairs.push({ side: "top", x: STAIRS_X, y: 2, w: 2, to: floor + 1, label: `Subir al ${floorName(floor + 1).toLowerCase()}` });
-  if (floor > 0) stairs.push({ side: "bottom", x: STAIRS_X, y: h - 1, w: 2, to: floor - 1, label: `Bajar a ${floorName(floor - 1).toLowerCase()}` });
-  const accent = ["#5b7fd6", "#14b8a6", "#f08a5d", "#8b5cf6"][floor % 4]!;
+  if (hasUp) stairs.push({ side: "bottom", x: 2, y: h - 1, w: 2, to: floor + 1, label: `Subir al ${floorName(floor + 1).toLowerCase()}` });
+  if (floor > 0) stairs.push({ side: "bottom", x: w - 4, y: h - 1, w: 2, to: floor - 1, label: `Bajar a ${floorName(floor - 1).toLowerCase()}` });
+  const themed = lobbyDecor(theme);
   const furni: Furni[] = [
-    // Salas de estar entre las puertas, dejando libre el pasillo central.
-    { kind: "rug", x: 4, y: 6, w: 5, d: 5, color: "#e6dccb" },
-    { kind: "sofa", x: 5, y: 6, w: 3, color: accent, dir: "down" },
-    { kind: "coffeetable", x: 5, y: 8, w: 3 },
-    { kind: "beanbag", x: 4, y: 10, color: "#ffd166" },
-    { kind: "beanbag", x: 8, y: 10, color: "#ef476f" },
-    { kind: "rug", x: 15, y: 6, w: 5, d: 5, color: "#e6dccb" },
-    { kind: "sofa", x: 16, y: 6, w: 3, color: accent, dir: "down" },
-    { kind: "coffeetable", x: 16, y: 8, w: 3 },
-    { kind: "armchair", x: 15, y: 10, color: "#f08a5d" },
-    { kind: "armchair", x: 19, y: 10, color: "#f08a5d" },
-    { kind: "carpet", x: STAIRS_X, y: 3, w: 2, d: h - 4, color: "#3d5a80" },
-    { kind: "bigplant", x: 1, y: 3 },
-    { kind: "bigplant", x: w - 2, y: 3 },
-    { kind: "plant", x: 1, y: 8 },
-    { kind: "plant", x: w - 2, y: 8 },
-    { kind: "bigplant", x: 1, y: h - 2 },
-    { kind: "bigplant", x: w - 2, y: h - 2 },
-    { kind: "kiosk", x: 14, y: h - 3 },
-    { kind: "bench", x: 3, y: h - 3, w: 3 },
-    { kind: "bench", x: w - 6, y: h - 3, w: 3 },
+    { kind: "carpet", x: EXIT_X, y: 4, w: 2, d: h - 5, color: CARPET[theme] },
+    // Tótems con los logos de los patrocinadores, a los lados de la alfombra.
+    { kind: "totem", x: 7, y: 6 },
+    { kind: "totem", x: 14, y: 6 },
+    ...themed.furni,
   ];
-  if (floor === 0) furni.push({ kind: "vending", x: 8, y: 3 }, { kind: "cooler", x: 15, y: 3 });
   const decor: Decor[] = [
-    { kind: "window", x: 1, w: 2 },
-    { kind: "art", x: 7, w: 2, color: accent },
-    { kind: "window", x: 14, w: 3 },
-    { kind: "clock", x: 18 },
-    { kind: "window", x: w - 3, w: 2 },
+    { kind: "sponsors", x: 9, w: 4 },
+    { kind: "clock", x: 8 },
+    { kind: "clock", x: 13 },
+    ...themed.decor,
   ];
-  if (!hasUp) decor.push({ kind: "neon", x: 9, w: 6, text: floorName(floor), color: "#f472b6" });
-  if (floor === 0) decor.push({ kind: "entrance", x: STAIRS_X, w: 2, y: h - 1 });
-  // En el piso superior, los cuadros no tapan las puertas del muro norte.
-  const topDoors = doors.filter((d) => d.side === "top");
+  if (floor === 0) decor.push({ kind: "entrance", x: EXIT_X, w: 2, y: h - 1 });
   return finish({
     ...empty,
     w,
     h,
     tiles: enclosure(w, h),
-    style: "lobby",
-    spawn: floor === 0 ? { x: STAIRS_X, y: h - 3 } : { x: STAIRS_X, y: h - 2 },
-    furni: furni.filter((f) => !topDoors.some((d) => f.y === 3 && f.x >= d.x - 1 && f.x <= d.x + d.w)),
-    decor: decor.filter((d) => !topDoors.some((door) => d.x < door.x + door.w + 1 && d.x + (d.w ?? 1) > door.x - 1)),
+    style: theme,
+    spawn: floor === 0 ? { x: EXIT_X, y: h - 3 } : { x: w - 4, y: h - 2 },
+    furni,
+    decor: decor.filter((d) => d.kind === "clock" || !doors.some((door) => d.x < door.x + door.w && d.x + (d.w ?? 1) > door.x)),
     doors,
     stairs,
-    exit: floor === 0 ? { side: "bottom", x: STAIRS_X, y: h - 1, w: 2 } : null,
-    signs: hasUp ? [{ x: STAIRS_X - 3, w: 8, text: `${floorName(floor)} · Escaleras ↑` }] : [],
+    exit: floor === 0 ? { side: "bottom", x: EXIT_X, y: h - 1, w: 2 } : null,
   });
 }
 
@@ -378,8 +405,7 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
   const h = 17;
   const seats: Seat[] = [];
   const furni: Furni[] = [];
-  const aisle: Record<ThemeId, string> = { tech: "#1e3a5f", minimal: "#d6d3cd", rustic: "#8e3b2f", medieval: "#9b2335", garden: "#c9b48a" };
-  furni.push({ kind: "carpet", x: 9, y: 6, w: 2, d: h - 7, color: aisle[theme] });
+  furni.push({ kind: "carpet", x: 9, y: 6, w: 2, d: h - 7, color: CARPET[theme] });
   const stageRug: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4" };
   furni.push({ kind: "rug", x: 6, y: 3, w: 8, d: 3, color: stageRug[theme] });
   for (const y of [8, 10, 12, 14]) {
@@ -391,21 +417,23 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
   }
   furni.push({ kind: "lectern", x: 10, y: 5, color });
 
-  const decor: Decor[] = [{ kind: "screen", x: 6, w: 8 }];
+  // Pantalla principal al centro y una de patrocinadores a cada lado.
+  const decor: Decor[] = [
+    { kind: "screen", x: 6, w: 8 },
+    { kind: "sponsors", x: 3, w: 2 },
+    { kind: "sponsors", x: 15, w: 2 },
+  ];
   switch (theme) {
     case "tech":
       furni.push(
         { kind: "rack", x: 1, y: 3 },
-        { kind: "rack", x: 2, y: 3 },
-        { kind: "rack", x: 17, y: 3 },
         { kind: "rack", x: 18, y: 3 },
         { kind: "kiosk", x: 1, y: 9 },
         { kind: "kiosk", x: 18, y: 9 },
         { kind: "bigplant", x: 1, y: 15 },
         { kind: "bigplant", x: 18, y: 15 },
-        { kind: "arcade", x: 1, y: 6 },
       );
-      decor.push({ kind: "neon", x: 1, w: 4, text: "</>", color: "#22d3ee" }, { kind: "neon", x: 15, w: 4, text: "LIVE", color: "#f472b6" });
+      decor.push({ kind: "neon", x: 1, w: 2, text: "</>", color: "#22d3ee" }, { kind: "neon", x: 17, w: 2, text: "LIVE", color: "#f472b6" });
       break;
     case "minimal":
       furni.push(
@@ -418,13 +446,11 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
         { kind: "bigplant", x: 1, y: 15 },
         { kind: "bigplant", x: 18, y: 15 },
       );
-      decor.push({ kind: "art", x: 2, w: 2, color: "#e9b8a4" }, { kind: "art", x: 16, w: 2, color: "#a4c3e9" });
+      decor.push({ kind: "art", x: 1, w: 2, color: "#e9b8a4" }, { kind: "art", x: 17, w: 2, color: "#a4c3e9" });
       break;
     case "rustic":
       furni.push(
         { kind: "barrel", x: 1, y: 3 },
-        { kind: "barrel", x: 2, y: 3 },
-        { kind: "bookshelf", x: 17, y: 3 },
         { kind: "bookshelf", x: 18, y: 3 },
         { kind: "lantern", x: 1, y: 8 },
         { kind: "lantern", x: 18, y: 8 },
@@ -433,7 +459,7 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
         { kind: "table", x: 1, y: 15, w: 2 },
         { kind: "bigplant", x: 18, y: 15 },
       );
-      decor.push({ kind: "fireplace", x: 1, w: 3 }, { kind: "shelf", x: 16, w: 3 });
+      decor.push({ kind: "shelf", x: 1, w: 2 }, { kind: "window", x: 17, w: 2 });
       break;
     case "medieval":
       furni.push(
@@ -446,7 +472,7 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
         { kind: "barrel", x: 1, y: 15 },
         { kind: "plant", x: 18, y: 15 },
       );
-      decor.push({ kind: "torch", x: 2 }, { kind: "banner", x: 3, color }, { kind: "banner", x: 16, color }, { kind: "torch", x: 17 });
+      decor.push({ kind: "torch", x: 1 }, { kind: "banner", x: 2, color }, { kind: "banner", x: 17, color }, { kind: "torch", x: 18 });
       break;
     case "garden":
       furni.push(
@@ -459,7 +485,7 @@ export function roomMap(theme: ThemeId, color: string): SceneMap {
         { kind: "tree", x: 18, y: 14 },
         { kind: "flowerbed", x: 1, y: 15, w: 2 },
       );
-      decor.push({ kind: "ivy", x: 1, w: 4 }, { kind: "ivy", x: 15, w: 4 });
+      decor.push({ kind: "ivy", x: 1, w: 2 }, { kind: "ivy", x: 17, w: 2 });
       break;
   }
 

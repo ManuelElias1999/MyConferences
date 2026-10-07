@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { Room, Talk, Venue } from "../../shared/types.ts";
+import type { ThemeId } from "../../shared/themes.ts";
+import type { Room, Sponsor, Talk, Venue } from "../../shared/types.ts";
 
 const MIN = 60_000;
 
@@ -11,9 +12,14 @@ interface VenueSeed {
   name: string;
   tagline: string;
   private: boolean;
+  theme: ThemeId;
+  organizer: string;
+  sponsors: Sponsor[];
   rooms: Room[];
   program: Program;
 }
+
+const logo = (id: string, name: string, url: string | null = null): Sponsor => ({ id, name, logoUrl: `/assets/logos/${id}.svg`, url });
 
 const seeds: VenueSeed[] = [
   {
@@ -21,13 +27,16 @@ const seeds: VenueSeed[] = [
     name: process.env.EVENT_NAME ?? "MyConferences Tech Summit",
     tagline: "El salón abierto: entra a la sala que quieras y escucha en vivo.",
     private: false,
+    theme: "tech",
+    organizer: "MyConferences",
+    sponsors: [logo("novapay", "NovaPay"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
     rooms: [
-      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes y paneles", color: "#f59e0b", theme: "minimal", createdBy: null },
-      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1", theme: "tech", createdBy: null },
-      { id: "ia", name: "Sala IA", topic: "Inteligencia artificial aplicada", color: "#10b981", theme: "tech", createdBy: null },
-      { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899", theme: "rustic", createdBy: null },
-      { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9", theme: "medieval", createdBy: null },
-      { id: "producto", name: "Sala Producto", topic: "Diseño, producto y comunidad", color: "#ef4444", theme: "garden", createdBy: null },
+      { id: "auditorio", name: "Auditorio principal", topic: "Keynotes y paneles", color: "#f59e0b" },
+      { id: "stellar", name: "Sala Stellar", topic: "Blockchain, pagos y Soroban", color: "#6366f1" },
+      { id: "ia", name: "Sala IA", topic: "Inteligencia artificial aplicada", color: "#10b981" },
+      { id: "startups", name: "Escenario Startups", topic: "Pitches y emprendimiento", color: "#ec4899" },
+      { id: "web", name: "Sala Web", topic: "Frontend, backend y despliegue", color: "#0ea5e9" },
+      { id: "producto", name: "Sala Producto", topic: "Diseño, producto y comunidad", color: "#ef4444" },
     ],
     program: {
       auditorio: [
@@ -79,11 +88,14 @@ const seeds: VenueSeed[] = [
     name: "Stellar Builders Day",
     tagline: "Jornada privada para equipos que construyen sobre Stellar.",
     private: true,
+    theme: "medieval",
+    organizer: "Comunidad Stellar LatAm",
+    sponsors: [logo("pixel-bank", "Pixel Bank"), logo("orbit-cloud", "Orbit Cloud")],
     rooms: [
-      { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1", theme: "tech", createdBy: null },
-      { id: "wallets", name: "Sala Wallets", topic: "Billeteras y experiencia de usuario", color: "#14b8a6", theme: "minimal", createdBy: null },
-      { id: "anchors", name: "Sala Anchors", topic: "Integraciones con bancos", color: "#f59e0b", theme: "rustic", createdBy: null },
-      { id: "mentorias", name: "Mentorías", topic: "Sesiones con el equipo core", color: "#ec4899", theme: "garden", createdBy: null },
+      { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1" },
+      { id: "wallets", name: "Sala Wallets", topic: "Billeteras y experiencia de usuario", color: "#14b8a6" },
+      { id: "anchors", name: "Sala Anchors", topic: "Integraciones con bancos", color: "#f59e0b" },
+      { id: "mentorias", name: "Mentorías", topic: "Sesiones con el equipo core", color: "#ec4899" },
     ],
     program: {
       soroban: [
@@ -121,9 +133,12 @@ const seeds: VenueSeed[] = [
     name: "Demo Day · Inversores",
     tagline: "Sesión privada de pitches para inversores invitados.",
     private: true,
+    theme: "minimal",
+    organizer: "Andes Ventures",
+    sponsors: [logo("novapay", "NovaPay")],
     rooms: [
-      { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899", theme: "tech", createdBy: null },
-      { id: "reuniones", name: "Sala de Reuniones", topic: "Conversaciones con fundadores", color: "#0ea5e9", theme: "minimal", createdBy: null },
+      { id: "pitches", name: "Sala de Pitches", topic: "Presentaciones de startups", color: "#ec4899" },
+      { id: "reuniones", name: "Sala de Reuniones", topic: "Conversaciones con fundadores", color: "#0ea5e9" },
     ],
     program: {
       pitches: [
@@ -189,8 +204,11 @@ export function createVenues(dataDir: string, now = Date.now()) {
       name: seed.name,
       tagline: seed.tagline,
       private: seed.private,
+      theme: seed.theme,
+      organizer: seed.organizer,
       rooms: seed.rooms,
       talks: buildTalks(seed, now),
+      sponsors: seed.sponsors,
     } satisfies Venue,
     whitelist: seed.private ? (whitelists.get(seed.id) ?? new Set<string>()) : null,
   }));

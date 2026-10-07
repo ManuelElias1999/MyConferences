@@ -15,10 +15,9 @@ export default function AvatarCanvas({ look, dir = "down", size = 120, head = fa
     const ctx = canvas.getContext("2d")!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // El personaje mide unos 40 píxeles; en modo cabeza se acerca a la cara.
-    const scale = head ? (size / 22) * dpr : (size / 48) * dpr;
-    ctx.setTransform(scale, 0, 0, scale, (size * dpr) / 2, head ? scale * 39 : size * dpr - scale * 4);
-    ctx.imageSmoothingEnabled = false;
+    // El personaje mide unos 52 píxeles; en modo cabeza se acerca a la cara.
+    const scale = head ? (size / 30) * dpr : (size / 62) * dpr;
+    ctx.setTransform(scale, 0, 0, scale, (size * dpr) / 2, head ? scale * 50 : size * dpr - scale * 5);
     drawAvatar(ctx, look, 0, 0, { dir, walk: null, sitting: false });
   }, [look, dir, size, head]);
 

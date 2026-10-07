@@ -16,26 +16,22 @@ export default function Hall({
   users,
   usersVersion,
   now,
-  canCreate,
   onEnterRoom,
   onExit,
   onStairs,
   onOpenAgenda,
-  onCreateRoom,
 }: {
   me: User;
   venue: Venue;
   users: Map<string, User>;
   usersVersion: number;
   now: number;
-  canCreate: boolean;
   onEnterRoom: (roomId: string) => void;
   onExit: () => void;
   onStairs: (floor: number) => void;
   onOpenAgenda: () => void;
-  onCreateRoom: () => void;
 }) {
-  const floors = useMemo(() => venueFloors(venue.rooms), [venue]);
+  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms), [venue]);
   const floor = Math.min(me.floor, floors.length - 1);
   const map = floors[floor]!;
   const scene = useRef<SceneHandle>(null);
@@ -48,7 +44,7 @@ export default function Hall({
       {
         live: Boolean(roomSchedule(venue, r.id, now).current),
         count: everyone.filter((u) => u.roomId === r.id).length,
-        label: themeLabel(r.theme),
+        label: themeLabel(venue.theme),
       },
     ]),
   );
@@ -80,37 +76,51 @@ export default function Hall({
           onDoor={(door) => onEnterRoom(door.id)}
           onExit={onExit}
           onStairs={onStairs}
+          media={{ sponsors: venue.sponsors, title: venue.name }}
           handle={scene}
           label={`${venue.name}, ${floorName(floor)}`}
         />
         <p className="scene-hint">
-          {floor === 0
-            ? "Hay salas a tu izquierda y a tu derecha. Sube por la escalera para ver más."
-            : "Cruza una puerta para entrar a esa sala. La escalera te lleva al piso de abajo."}
+          Cruza una puerta para entrar a esa sala. Reacciona con las teclas <kbd>1</kbd>–<kbd>5</kbd>.
         </p>
-        <span className="floor-badge">{floorName(floor)}</span>
+        {floors.length > 1 && <span className="floor-badge">{floorName(floor)}</span>}
         <SayBar />
       </div>
 
       <aside className="side">
         <section>
-          <div className="side-head">
-            <div>
-              <p className="eyebrow">Sala {venue.id}</p>
-              <h2>{venue.name}</h2>
-            </div>
-            <button className="btn primary sm" onClick={onCreateRoom} disabled={!canCreate} title={canCreate ? "" : "Inicia sesión para crear una sala"}>
-              ＋ Crear sala
-            </button>
-          </div>
-          {!canCreate && <p className="muted small">Inicia sesión en recepción para crear tu propia sala.</p>}
+          <p className="eyebrow">
+            Evento {venue.id} · {themeLabel(venue.theme)}
+          </p>
+          <h2 className="side-event">{venue.name}</h2>
+          <p className="muted small">Organiza {venue.organizer}</p>
+          {venue.tagline && <p className="small side-tagline">{venue.tagline}</p>}
         </section>
+
+        {venue.sponsors.length > 0 && (
+          <section>
+            <h3 className="side-title">Patrocinadores</h3>
+            <ul className="sponsor-grid">
+              {venue.sponsors.map((sp) => (
+                <li key={sp.id}>
+                  {sp.url ? (
+                    <a href={sp.url} target="_blank" rel="noreferrer noopener" title={sp.name}>
+                      <img src={sp.logoUrl} alt={sp.name} />
+                    </a>
+                  ) : (
+                    <img src={sp.logoUrl} alt={sp.name} title={sp.name} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {floors.map((m, i) => (
           <section key={i}>
             <h3 className="side-title">
-              {floorName(i)}
-              {i === floor && <span className="here">Estás aquí</span>}
+              {floors.length > 1 ? `Salas · ${floorName(i)}` : "Salas"}
+              {floors.length > 1 && i === floor && <span className="here">Estás aquí</span>}
             </h3>
             <ul className="room-list">
               {m.doors.map((d) => {
@@ -125,9 +135,8 @@ export default function Hall({
                         {room.name} {s.live && <span className="status live">En vivo</span>}
                       </p>
                       <p className="muted small">
-                        {current ? current.title : room.topic} · {s.label}
+                        {current ? current.title : room.topic}
                         {s.count > 0 && ` · ${s.count} dentro`}
-                        {room.createdBy && ` · de ${room.createdBy}`}
                       </p>
                     </div>
                     <button className="btn sm" onClick={() => goTo(d.id)}>
@@ -140,28 +149,30 @@ export default function Hall({
           </section>
         ))}
 
-        <section>
-          <h3 className="side-title">A continuación</h3>
-          <ul className="upcoming-list">
-            {upcoming.map((t) => (
-              <li key={t.id}>
-                <span className="upcoming-time">{formatTime(t.start)}</span>
-                <div>
-                  <p>{t.title}</p>
-                  <p className="muted small">
-                    {roomById.get(t.roomId)?.name} · {minutesUntil(t.start, now)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <button className="link" onClick={onOpenAgenda}>
-            Ver agenda completa
-          </button>
-        </section>
+        {upcoming.length > 0 && (
+          <section>
+            <h3 className="side-title">A continuación</h3>
+            <ul className="upcoming-list">
+              {upcoming.map((t) => (
+                <li key={t.id}>
+                  <span className="upcoming-time">{formatTime(t.start)}</span>
+                  <div>
+                    <p>{t.title}</p>
+                    <p className="muted small">
+                      {roomById.get(t.roomId)?.name} · {minutesUntil(t.start, now)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <button className="link" onClick={onOpenAgenda}>
+              Ver agenda completa
+            </button>
+          </section>
+        )}
 
         <section>
-          <h3 className="side-title">En este edificio ({everyone.length})</h3>
+          <h3 className="side-title">En el evento ({everyone.length})</h3>
           <ul className="people-list">
             {everyone.map((u) => (
               <li key={u.id}>

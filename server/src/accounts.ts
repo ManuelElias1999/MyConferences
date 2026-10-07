@@ -50,7 +50,7 @@ export function createAccountStore(dataDir: string) {
   const failures = new Map<string, { count: number; until: number }>();
 
   const byEmail = (email: string) => store.accounts.find((a) => a.email === email);
-  const toAccount = ({ id, email, name, look }: StoredAccount): Account => ({ id, email, name, look });
+  const toAccount = ({ id, email, name, look, company }: StoredAccount): Account => ({ id, email, name, look, company: company ?? null });
 
   const sign = (payload: string) => createHmac("sha256", secret).update(payload).digest("base64url");
 
@@ -76,9 +76,10 @@ export function createAccountStore(dataDir: string) {
   const cleanName = (raw: unknown) => (typeof raw === "string" ? raw.trim().replace(/\s+/g, " ").slice(0, 24) : "");
 
   return {
-    async register(input: { email?: unknown; password?: unknown; name?: unknown }) {
+    async register(input: { email?: unknown; password?: unknown; name?: unknown; company?: unknown }) {
       const email = normalizeEmail(input.email);
       const name = cleanName(input.name);
+      const company = typeof input.company === "string" ? input.company.trim().replace(/\s+/g, " ").slice(0, 60) : "";
       const password = typeof input.password === "string" ? input.password : "";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AccountError("Escribe un correo válido");
       if (!name) throw new AccountError("Escribe el nombre de tu personaje");
@@ -89,6 +90,7 @@ export function createAccountStore(dataDir: string) {
         email,
         name,
         look: DEFAULT_LOOK,
+        company: company ? { name: company } : null,
         passwordHash: await hash(password),
         createdAt: Date.now(),
       };

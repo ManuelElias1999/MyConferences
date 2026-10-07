@@ -77,3 +77,20 @@ export function toEmbedUrl(raw: string): string {
     return raw;
   }
 }
+
+/** Llamada al panel de empresa con la sesión guardada. */
+export async function companyApi<T>(path: string, init: { method?: string; body?: unknown; file?: File; headers?: Record<string, string> } = {}): Promise<T> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${loadToken() ?? ""}`, ...init.headers };
+  let body: BodyInit | undefined;
+  if (init.file) {
+    headers["Content-Type"] = init.file.type;
+    body = init.file;
+  } else if (init.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(init.body);
+  }
+  const res = await fetch(`/api/company${path}`, { method: init.method ?? "GET", headers, body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "No se pudo conectar con el servidor");
+  return data as T;
+}

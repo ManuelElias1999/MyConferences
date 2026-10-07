@@ -1228,6 +1228,292 @@ kbd {
   outline-offset: 2px;
 }
 
+/* ---------- Reacciones, avisos y patrocinadores ---------- */
+
+.emotes {
+  display: flex;
+  gap: 2px;
+}
+
+.emotes button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 0.1s, background 0.15s;
+}
+
+.emotes button:hover {
+  background: rgb(255 255 255 / 0.14);
+  transform: translateY(-2px);
+}
+
+.stage-bar .emotes button:hover {
+  background: var(--surface-2);
+}
+
+.stage-status {
+  margin-right: auto;
+}
+
+.say-bar {
+  width: min(600px, calc(100% - 32px));
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 64px;
+  z-index: 40;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 12px;
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.toast .btn {
+  color: #fff;
+}
+
+.side-event {
+  margin-top: 4px;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.side-tagline {
+  margin-top: 6px;
+}
+
+.sponsor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.sponsor-grid li {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.sponsor-grid img {
+  display: block;
+  width: 100%;
+  height: 44px;
+  object-fit: contain;
+}
+
+.sponsor-grid.editable li {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ---------- Panel de empresa ---------- */
+
+.company-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.company-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background: var(--navy);
+  color: #fff;
+}
+
+.company-head .eyebrow {
+  color: rgb(255 255 255 / 0.6);
+}
+
+.company-head h1 {
+  font-size: 1.3rem;
+}
+
+.company-head .btn {
+  color: #fff;
+}
+
+.company-head .btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.company-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+.event-list {
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.event-card {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.event-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.event-card.new {
+  justify-items: center;
+  border-style: dashed;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.event-number {
+  font: 700 0.8rem ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--accent);
+}
+
+.editor-col {
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  padding: 20px 24px 40px;
+}
+
+.share {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), color-mix(in srgb, var(--primary) 14%, var(--surface)));
+}
+
+.share-number {
+  font: 700 2.2rem ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.12em;
+}
+
+.access,
+.rooms-editor {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.access legend,
+.rooms-editor legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500 !important;
+}
+
+.check input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  resize: vertical;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-row input {
+  flex: 1;
+}
+
+.room-row select {
+  width: 120px;
+  font-weight: 700;
+}
+
+.code-chip {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font: 700 0.8rem ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.saved {
+  align-self: center;
+  margin-right: auto;
+  color: #047857;
+  font-weight: 700;
+}
+
+.btn.danger {
+  color: var(--danger);
+}
+
+.sponsors-editor {
+  display: grid;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.sponsor-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sponsor-form input {
+  flex: 1 1 180px;
+}
+
 /* ---------- Agenda ---------- */
 
 .agenda-grid {
@@ -1393,7 +1679,21 @@ kbd {
   }
 
   .editor,
-  .form-row {
+  .form-row,
+  .company-body {
     grid-template-columns: 1fr;
+  }
+
+  .event-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .room-row {
+    flex-wrap: wrap;
+  }
+
+  .say-bar .emotes {
+    display: none;
   }
 }

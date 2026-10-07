@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { isWalkable, onSpan, sameTile, spanTiles, type Dir, type Door, type Npc, type SceneMap, type Span, type Tile } from "../../shared/maps.ts";
+import { EMOTES } from "../../shared/themes.ts";
 import type { Bubble, Look, User } from "../../shared/types.ts";
 import { avatarHeight, drawAvatar } from "./avatar.ts";
 import { socket } from "./lib.ts";
@@ -10,6 +11,7 @@ import {
   drawPlaques,
   drawScreenContent,
   drawSigns,
+  drawSponsorScreens,
   feet,
   findPath,
   furniDrawables,
@@ -18,11 +20,13 @@ import {
   T,
   type DoorStatus,
   type Drawable,
+  type Media,
 } from "./world.ts";
 
-const SPEED = 4.6; // baldosas por segundo
-const REMOTE_SPEED = 5;
+const SPEED = 6.5; // baldosas por segundo
+const REMOTE_SPEED = 7;
 const BUBBLE_MS = 7000;
+const EMOTE_MS = 2600;
 
 const KEY_DIRS: Record<string, Dir> = {
   ArrowUp: "up",
@@ -54,6 +58,8 @@ export interface SceneProps {
   names: "all" | "hover";
   doorStatus?: Map<string, DoorStatus>;
   screen?: { color: string; title: string; live: boolean };
+  /** Logos que rotan en las pantallas y tótems de patrocinadores. */
+  media?: Media;
   locked?: boolean;
   onDoor?: (door: Door) => void;
   onExit?: () => void;
@@ -88,6 +94,7 @@ export default function Scene(props: SceneProps) {
   const my = useRef<MyState>({ x: me.x, y: me.y, dir: "down", walk: 0, moving: false, seg: null, path: [], then: null });
   const others = useRef(new Map<string, Walker>());
   const bubbles = useRef(new Map<string, { text: string; at: number }>());
+  const emotes = useRef(new Map<string, { emoji: string; at: number }>());
   const keys = useRef<Dir[]>([]);
   const view = useRef({ zoom: 1, camX: 0, camY: 0, w: 0, h: 0 });
   const hover = useRef<{ tile: Tile | null; user: string | null; npc: string | null; door: string | null }>({
@@ -128,9 +135,12 @@ export default function Scene(props: SceneProps) {
 
   useEffect(() => {
     const onBubble = (b: Bubble) => bubbles.current.set(b.userId, { text: b.text, at: performance.now() });
+    const onEmote = (e: { userId: string; emoji: string }) => emotes.current.set(e.userId, { emoji: e.emoji, at: performance.now() });
     socket.on("bubble", onBubble);
+    socket.on("emote", onEmote);
     return () => {
       socket.off("bubble", onBubble);
+      socket.off("emote", onEmote);
     };
   }, []);
 
@@ -147,6 +157,9 @@ export default function Scene(props: SceneProps) {
         keys.current = [dir, ...keys.current.filter((d) => d !== dir)];
         my.current.path = [];
         my.current.then = null;
+      } else if (/^[1-5]$/.test(k)) {
+        // Reacciones rápidas con las teclas 1 a 5, como en Gather.
+        socket.emit("emote", EMOTES[Number(k) - 1]!);
       } else if (k === "x") {
         const npc = nearbyNpc();
         if (npc) live.current.onNpc?.(npc);
@@ -173,7 +186,7 @@ export default function Scene(props: SceneProps) {
     const ctx = canvas.getContext("2d")!;
     const STATIC_SCALE = 2;
     const backdrop = renderStatic(map, STATIC_SCALE);
-    const furni = furniDrawables(map);
+    const furni = furniDrawables(map, () => live.current.media ?? { sponsors: [], title: "" });
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -353,7 +366,23 @@ export default function Scene(props: SceneProps) {
       ctx.drawImage(backdrop, 0, 0, map.w * T, map.h * T);
       drawAnimatedDecor(ctx, map, t);
       drawSigns(ctx, map);
+      drawSponsorScreens(ctx, map, p.media ?? { sponsors: [], title: "" }, Date.now());
       if (p.screen) drawScreenContent(ctx, map, p.screen.color, p.screen.title, p.screen.live);
+
+      // Camino que va a recorrer el personaje, con puntos como en Gather.
+      const s0 = my.current;
+      if (s0.path.length) {
+        ctx.fillStyle = "rgba(91, 91, 240, 0.45)";
+        for (const step of s0.path) {
+          ctx.beginPath();
+          ctx.arc((step.x + 0.5) * T, (step.y + 0.5) * T, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const goal = s0.path[s0.path.length - 1]!;
+        ctx.strokeStyle = "rgba(91, 91, 240, 0.8)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(goal.x * T + 4, goal.y * T + 4, T - 8, T - 8);
+      }
 
       const h = hover.current;
       if (h.tile && !p.locked && isWalkable(map, h.tile.x, h.tile.y)) {
@@ -374,12 +403,14 @@ export default function Scene(props: SceneProps) {
       for (const u of visible) addAvatar(u.id, u.name, u.look, others.current.get(u.id)!, false);
       addAvatar(p.me.id, p.me.name, p.me.look, my.current, true);
       items.sort((a, b) => a.key - b.key);
-      for (const it of items) it.draw(ctx, t);
+      const wall = Date.now();
+      for (const it of items) it.draw(ctx, wall);
 
       drawPlaques(ctx, map, p.doorStatus ?? null, h.door);
 
       for (const l of labels) {
-        if (p.names === "all" || l.mine || h.user === l.id || h.npc === l.id || map.npcs.some((n) => n.id === l.id)) {
+        const isNpc = map.npcs.some((n) => n.id === l.id);
+        if ((p.names === "all" && !isNpc) || l.mine || h.user === l.id || h.npc === l.id) {
           drawName(ctx, l.x, l.y - avatarHeight(l.sitting) - 8, l.mine ? `${l.name} (tú)` : l.name, l.mine);
         }
       }
@@ -404,6 +435,22 @@ export default function Scene(props: SceneProps) {
       }
 
       const now = performance.now();
+      for (const l of labels) {
+        const e = emotes.current.get(l.id);
+        if (!e) continue;
+        const age = now - e.at;
+        if (age > EMOTE_MS) {
+          emotes.current.delete(l.id);
+          continue;
+        }
+        const rise = Math.min(1, age / 250);
+        ctx.save();
+        ctx.globalAlpha = age > EMOTE_MS - 400 ? (EMOTE_MS - age) / 400 : 1;
+        ctx.font = "20px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(e.emoji, l.x + 16, l.y - avatarHeight(l.sitting) - 6 - rise * 10 - Math.sin(age / 120) * 2);
+        ctx.restore();
+      }
       for (const l of labels) {
         const b = bubbles.current.get(l.id);
         if (!b) continue;

@@ -16,6 +16,8 @@ export default function AuthDialog({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isCompany, setIsCompany] = useState(false);
+  const [company, setCompany] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const registering = mode === "register";
@@ -25,7 +27,10 @@ export default function AuthDialog({
     setBusy(true);
     setError("");
     try {
-      const result = await authRequest(mode, registering ? { name, email, password } : { email, password });
+      const result = await authRequest(
+        mode,
+        registering ? { name, email, password, ...(isCompany ? { company } : {}) } : { email, password },
+      );
       onDone(result, registering);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Algo salió mal");
@@ -45,6 +50,18 @@ export default function AuthDialog({
           <label>
             Nombre del personaje
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={24} required autoFocus placeholder="Ana" />
+          </label>
+        )}
+        {registering && (
+          <label className="check">
+            <input type="checkbox" checked={isCompany} onChange={(e) => setIsCompany(e.target.checked)} />
+            Es una cuenta de empresa: quiero organizar eventos
+          </label>
+        )}
+        {registering && isCompany && (
+          <label>
+            Nombre de la empresa
+            <input value={company} onChange={(e) => setCompany(e.target.value)} maxLength={60} required placeholder="Acme Tech" />
           </label>
         )}
         <label>

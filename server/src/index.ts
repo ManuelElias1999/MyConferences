@@ -8,12 +8,14 @@ import express from "express";
 import { Server } from "socket.io";
 import { DEFAULT_LOOK } from "../../shared/look.ts";
 import { inFront, isWalkable, receptionMap, roomMap, stairsArrival, venueFloors, type SceneMap, type Tile } from "../../shared/maps.ts";
-import { isTheme, ROOM_COLORS } from "../../shared/themes.ts";
+import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   Account,
   ChatMessage,
   ClientToServerEvents,
+  CompanyEvent,
   Question,
+  Room,
   RtcSignal,
   ServerToClientEvents,
   Stage,
@@ -21,20 +23,24 @@ import type {
   Venue,
 } from "../../shared/types.ts";
 import { AccountError, createAccountStore } from "./accounts.ts";
-import { createRoomStore } from "./rooms.ts";
+import { createEventStore, type StoredEvent } from "./events.ts";
 import { createVenues } from "./seed.ts";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const MAX_CHAT = 200;
+const MAX_ROOMS = 12;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR ?? path.join(here, "../data"));
 const uploadsDir = path.resolve(here, "../uploads");
+const logosDir = path.join(uploadsDir, "logos");
+const assetsDir = path.resolve(here, "../assets");
 const clientDist = path.resolve(here, "../../client/dist");
-mkdirSync(uploadsDir, { recursive: true });
+mkdirSync(logosDir, { recursive: true });
 
 const accounts = createAccountStore(dataDir);
+const companyEvents = createEventStore(dataDir);
 
-// ---------- Salones y salas ----------
+// ---------- Eventos y salas ----------
 
 interface RoomState {
   stage: Stage;
@@ -47,15 +53,16 @@ interface RoomState {
 interface VenueState {
   venue: Venue;
   whitelist: Set<string> | null;
-  /** Un mapa por piso del edificio. */
+  /** Un mapa por piso del lugar del evento. */
   floors: SceneMap[];
   rooms: Map<string, RoomState>;
+  /** Cuenta de la empresa dueña del evento (null en los de ejemplo). */
+  ownerId: string | null;
 }
 
 const RECEPTION = receptionMap();
 // Todas las salas comparten la distribución de asientos; el estilo solo cambia la decoración.
 const ROOM_MAP = roomMap("minimal", "#000");
-const MAX_ROOMS_PER_ACCOUNT = 10;
 
 const newRoomState = (): RoomState => ({
   stage: { mode: "slides", slidesUrl: null, slidesName: null, slide: 1, streamUrl: null, presenterId: null, live: null },
@@ -64,36 +71,34 @@ const newRoomState = (): RoomState => ({
   seats: new Map(),
 });
 
-const createdRooms = createRoomStore(dataDir);
+const venues = new Map<string, VenueState>();
+const speakerCodes = new Map<string, string>();
 
-const venues = new Map<string, VenueState>(
-  createVenues(dataDir).map(({ venue, whitelist }) => {
-    // Las salas que crearon los usuarios se suman al final, después de las del programa.
-    for (const c of createdRooms.list()) if (c.venueId === venue.id) venue.rooms.push(c.room);
-    return [
-      venue.id,
-      { venue, whitelist, floors: venueFloors(venue.rooms), rooms: new Map(venue.rooms.map((r) => [r.id, newRoomState()])) },
-    ];
-  }),
-);
+/** Registra (o actualiza) un evento en memoria, conservando el estado de las salas que siguen. */
+function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<string, string> = {}, ownerId: string | null = null) {
+  const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
+  for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
+  for (const id of rooms.keys()) if (!venue.rooms.some((r) => r.id === id)) rooms.delete(id);
+  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms), rooms, ownerId });
+  for (const r of venue.rooms) {
+    const key = `${venue.id}/${r.id}`;
+    const code = codes[r.id] ?? speakerCodes.get(key) ?? randomBytes(3).toString("hex").toUpperCase();
+    speakerCodes.set(key, code);
+  }
+}
 
 /**
- * Códigos de expositor por sala. Se pueden fijar con
+ * Códigos de ponente de los eventos de ejemplo. Se pueden fijar con
  * SPEAKER_CODES="101/stellar:ABC123,202/soroban:DEF456"; si no, se generan al arrancar.
  */
-const speakerCodes = new Map<string, string>();
+const fixedCodes = new Map<string, Record<string, string>>();
 for (const pair of (process.env.SPEAKER_CODES ?? "").split(",").filter(Boolean)) {
   const [key, code] = pair.split(":");
   const [venueId, roomId] = (key ?? "").split("/");
-  if (venueId && roomId && venues.get(venueId)?.rooms.has(roomId) && code) speakerCodes.set(`${venueId}/${roomId}`, code.trim().toUpperCase());
+  if (venueId && roomId && code) fixedCodes.set(venueId, { ...fixedCodes.get(venueId), [roomId]: code.trim().toUpperCase() });
 }
-for (const c of createdRooms.list()) speakerCodes.set(`${c.venueId}/${c.room.id}`, c.speakerCode);
-for (const { venue } of venues.values()) {
-  for (const room of venue.rooms) {
-    const key = `${venue.id}/${room.id}`;
-    if (!speakerCodes.has(key)) speakerCodes.set(key, randomBytes(3).toString("hex").toUpperCase());
-  }
-}
+for (const { venue, whitelist } of createVenues(dataDir)) applyVenue(venue, whitelist, fixedCodes.get(venue.id));
+for (const e of companyEvents.list()) applyVenue(e.venue, e.venue.private ? new Set(e.whitelist) : null, e.speakerCodes, e.ownerId);
 
 const clean = (text: unknown, max: number) =>
   typeof text === "string" ? text.trim().replace(/\s+/g, " ").slice(0, max) : "";
@@ -183,9 +188,212 @@ app.post(
   },
 );
 
+app.use("/assets", express.static(assetsDir, { maxAge: "1d" }));
+
+// ---------- Panel de empresa ----------
+
+/** Cuenta de empresa que hace la petición, o responde con el error. */
+function companyFrom(req: express.Request, res: express.Response): Account | null {
+  const account = accounts.verify(String(req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
+  if (!account) {
+    res.status(401).json({ error: "Inicia sesión de nuevo" });
+    return null;
+  }
+  if (!account.company) {
+    res.status(403).json({ error: "Solo las cuentas de empresa pueden organizar eventos" });
+    return null;
+  }
+  return account;
+}
+
+function ownedEvent(req: express.Request, res: express.Response) {
+  const account = companyFrom(req, res);
+  if (!account) return null;
+  const entry = companyEvents.get(String(req.params.id));
+  if (!entry || entry.ownerId !== account.id) {
+    res.status(404).json({ error: "Evento no encontrado" });
+    return null;
+  }
+  return { account, entry };
+}
+
+const toCompanyEvent = (e: StoredEvent): CompanyEvent => ({ venue: e.venue, whitelist: e.whitelist, speakerCodes: e.speakerCodes });
+
+const slug = (text: string) =>
+  text.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "sala";
+
+/** Valida lo que manda el panel y arma las salas, conservando ids y códigos de las que ya existían. */
+function readEventInput(body: Record<string, unknown>, previous: StoredEvent | null) {
+  const name = clean(body.name, 60);
+  if (!name) return { error: "Ponle un nombre al evento" };
+  if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
+  const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
+  if (!rawRooms.length) return { error: "El evento necesita al menos una sala" };
+  const whitelist = [
+    ...new Set(
+      (Array.isArray(body.whitelist) ? body.whitelist : [])
+        .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
+        .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)),
+    ),
+  ].slice(0, 5000);
+  const rooms: Room[] = [];
+  const codes: Record<string, string> = {};
+  for (const raw of rawRooms as Record<string, unknown>[]) {
+    const roomName = clean(raw?.name, 40);
+    if (!roomName) return { error: "Todas las salas necesitan un nombre" };
+    const kept = typeof raw.id === "string" && previous?.venue.rooms.some((r) => r.id === raw.id) ? raw.id : null;
+    let id = kept ?? slug(roomName);
+    if (!kept) for (let i = 2; rooms.some((r) => r.id === id) || previous?.venue.rooms.some((r) => r.id === id); i++) id = `${slug(roomName)}-${i}`;
+    rooms.push({
+      id,
+      name: roomName,
+      topic: clean(raw.topic, 80) || "Charla abierta",
+      color: typeof raw.color === "string" && ROOM_COLORS.includes(raw.color) ? raw.color : ROOM_COLORS[rooms.length % ROOM_COLORS.length]!,
+    });
+    codes[id] = previous?.speakerCodes[id] ?? randomBytes(3).toString("hex").toUpperCase();
+  }
+  return {
+    name,
+    tagline: clean(body.tagline, 120),
+    theme: body.theme,
+    private: body.private !== false,
+    whitelist,
+    rooms,
+    codes,
+  };
+}
+
+function newEventNumber() {
+  let id = "";
+  do id = String(Math.floor(1000 + Math.random() * 9000));
+  while (venues.has(id));
+  return id;
+}
+
+/** Saca a todos los que estén dentro de un evento y los devuelve a recepción. */
+function evictVenue(venueId: string, reason: string) {
+  const moved: User[] = [];
+  for (const conn of connections.values()) {
+    const u = conn.user;
+    const sock = io.sockets.sockets.get(u.id);
+    if (u.venueId !== venueId || !sock) continue;
+    for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
+    const spot = spawnNear(RECEPTION, RECEPTION.spawn);
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    sock.join("reception");
+    sock.to("reception").emit("userJoined", u);
+    moved.push(u);
+  }
+  const users = usersIn(null);
+  for (const u of moved) io.to(u.id).emit("evicted", { user: u, users, reason });
+}
+
+const json = express.json({ limit: "200kb" });
+
+app.get("/api/company/events", (req, res) => {
+  const account = companyFrom(req, res);
+  if (!account) return;
+  res.json(companyEvents.list().filter((e) => e.ownerId === account.id).map(toCompanyEvent));
+});
+
+app.post("/api/company/events", json, async (req, res) => {
+  const account = companyFrom(req, res);
+  if (!account) return;
+  const input = readEventInput(req.body ?? {}, null);
+  if ("error" in input) return res.status(400).json({ error: input.error });
+  const venue: Venue = {
+    id: newEventNumber(),
+    name: input.name,
+    tagline: input.tagline,
+    private: input.private,
+    theme: input.theme,
+    organizer: account.company!.name,
+    rooms: input.rooms,
+    talks: [],
+    sponsors: [],
+  };
+  const entry: StoredEvent = { ownerId: account.id, venue, whitelist: input.whitelist, speakerCodes: input.codes, createdAt: Date.now() };
+  await companyEvents.save(entry);
+  applyVenue(venue, venue.private ? new Set(input.whitelist) : null, input.codes, account.id);
+  res.json(toCompanyEvent(entry));
+});
+
+app.put("/api/company/events/:id", json, async (req, res) => {
+  const owned = ownedEvent(req, res);
+  if (!owned) return;
+  const { entry } = owned;
+  const input = readEventInput(req.body ?? {}, entry);
+  if ("error" in input) return res.status(400).json({ error: input.error });
+  // No se borra una sala con gente adentro.
+  const removed = entry.venue.rooms.filter((r) => !input.rooms.some((n) => n.id === r.id));
+  const busy = removed.find((r) => [...connections.values()].some((c) => c.user.venueId === entry.venue.id && c.user.roomId === r.id));
+  if (busy) return res.status(409).json({ error: `Hay personas en ${busy.name}. Espera a que salgan para quitarla.` });
+  entry.venue = { ...entry.venue, name: input.name, tagline: input.tagline, private: input.private, theme: input.theme, rooms: input.rooms };
+  entry.whitelist = input.whitelist;
+  entry.speakerCodes = input.codes;
+  await companyEvents.save(entry);
+  applyVenue(entry.venue, entry.venue.private ? new Set(input.whitelist) : null, input.codes, entry.ownerId);
+  io.to(venueChannel(entry.venue.id)).emit("venueUpdated", entry.venue);
+  res.json(toCompanyEvent(entry));
+});
+
+app.delete("/api/company/events/:id", async (req, res) => {
+  const owned = ownedEvent(req, res);
+  if (!owned) return;
+  const id = owned.entry.venue.id;
+  evictVenue(id, "La empresa cerró el evento.");
+  for (const s of owned.entry.venue.sponsors) if (s.logoUrl.startsWith("/uploads/")) unlink(path.join(uploadsDir, s.logoUrl.slice(9))).catch(() => {});
+  venues.delete(id);
+  await companyEvents.remove(id);
+  res.json({ ok: true });
+});
+
+/** Logos: PNG, JPEG o WebP (sin SVG, que puede llevar scripts). */
+const IMAGE_TYPES: Record<string, { ext: string; magic: (b: Buffer) => boolean }> = {
+  "image/png": { ext: "png", magic: (b) => b.subarray(0, 4).toString("hex") === "89504e47" },
+  "image/jpeg": { ext: "jpg", magic: (b) => b.subarray(0, 3).toString("hex") === "ffd8ff" },
+  "image/webp": { ext: "webp", magic: (b) => b.subarray(8, 12).toString() === "WEBP" },
+};
+
+app.post("/api/company/events/:id/sponsors", express.raw({ type: Object.keys(IMAGE_TYPES), limit: "2mb" }), async (req, res) => {
+  const owned = ownedEvent(req, res);
+  if (!owned) return;
+  const { entry } = owned;
+  const type = IMAGE_TYPES[String(req.header("content-type")).split(";")[0]!];
+  const body = req.body;
+  if (!type || !Buffer.isBuffer(body) || !type.magic(body)) return res.status(400).json({ error: "El logo debe ser una imagen PNG, JPG o WebP" });
+  if (entry.venue.sponsors.length >= 12) return res.status(400).json({ error: "Puedes tener hasta 12 patrocinadores" });
+  const name = clean(decodeURIComponent(String(req.header("x-sponsor-name") ?? "")), 60);
+  if (!name) return res.status(400).json({ error: "Escribe el nombre del patrocinador" });
+  const fileName = `${entry.venue.id}-${randomUUID()}.${type.ext}`;
+  await writeFile(path.join(logosDir, fileName), body);
+  entry.venue = {
+    ...entry.venue,
+    sponsors: [...entry.venue.sponsors, { id: randomUUID(), name, logoUrl: `/uploads/logos/${fileName}`, url: safeUrl(decodeURIComponent(String(req.header("x-sponsor-url") ?? ""))) }],
+  };
+  await companyEvents.save(entry);
+  applyVenue(entry.venue, venues.get(entry.venue.id)!.whitelist, entry.speakerCodes, entry.ownerId);
+  io.to(venueChannel(entry.venue.id)).emit("venueUpdated", entry.venue);
+  res.json(toCompanyEvent(entry));
+});
+
+app.delete("/api/company/events/:id/sponsors/:sponsorId", async (req, res) => {
+  const owned = ownedEvent(req, res);
+  if (!owned) return;
+  const { entry } = owned;
+  const sponsor = entry.venue.sponsors.find((s) => s.id === req.params.sponsorId);
+  if (!sponsor) return res.status(404).json({ error: "Patrocinador no encontrado" });
+  if (sponsor.logoUrl.startsWith("/uploads/")) unlink(path.join(uploadsDir, sponsor.logoUrl.slice(9))).catch(() => {});
+  entry.venue = { ...entry.venue, sponsors: entry.venue.sponsors.filter((s) => s.id !== sponsor.id) };
+  await companyEvents.save(entry);
+  applyVenue(entry.venue, venues.get(entry.venue.id)!.whitelist, entry.speakerCodes, entry.ownerId);
+  io.to(venueChannel(entry.venue.id)).emit("venueUpdated", entry.venue);
+  res.json(toCompanyEvent(entry));
+});
+
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.get(/^(?!\/(api|uploads|socket\.io)\/).*/, (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
+  app.get(/^(?!\/(api|uploads|assets|socket\.io)\/).*/, (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
 }
 
 // ---------- Tiempo real ----------
@@ -209,7 +417,8 @@ const usersIn = (venueId: string | null) =>
 function sceneMapFor(u: User): SceneMap {
   if (!u.venueId) return RECEPTION;
   if (u.roomId) return ROOM_MAP;
-  const floors = venues.get(u.venueId)!.floors;
+  const floors = venues.get(u.venueId)?.floors;
+  if (!floors) return RECEPTION;
   return floors[u.floor] ?? floors[0]!;
 }
 
@@ -319,13 +528,14 @@ io.on("connection", (socket) => {
     if (u.venueId) return ack({ ok: false, error: "Ya estás dentro de un salón" });
     const id = clean(number, 10).replace(/\D/g, "");
     const state = venues.get(id);
-    if (!state) return ack({ ok: false, error: `No encuentro la sala ${id || number}. ¿Puedes revisar el número?` });
-    if (state.whitelist) {
+    if (!state) return ack({ ok: false, error: `No encuentro el evento ${id || number}. ¿Puedes revisar el número?` });
+    // La empresa dueña siempre puede entrar a su evento.
+    if (state.whitelist && state.ownerId !== conn.account?.id) {
       if (!conn.account) {
-        return ack({ ok: false, error: `La sala ${id} es privada. Inicia sesión con tu cuenta para que revise la lista de invitados.` });
+        return ack({ ok: false, error: `El evento ${id} es privado. Inicia sesión con tu cuenta para que revise la lista de invitados.` });
       }
       if (!state.whitelist.has(conn.account.email)) {
-        return ack({ ok: false, error: `Lo siento, ${conn.account.email} no está en la lista de invitados de la sala ${id}.` });
+        return ack({ ok: false, error: `Lo siento, ${conn.account.email} no está en la lista de invitados del evento ${id}.` });
       }
     }
 
@@ -426,38 +636,12 @@ io.on("connection", (socket) => {
     ack({ ok: true, data: { user: u } });
   });
 
-  socket.on("createRoom", async (req, ack) => {
-    const u = conn?.user;
-    const account = conn?.account;
-    if (!u || !account) return ack({ ok: false, error: "Inicia sesión para crear una sala" });
-    const state = u.venueId ? venues.get(u.venueId) : null;
-    if (!state) return ack({ ok: false, error: "Entra a un salón para crear una sala en él" });
-    const name = clean(req?.name, 40);
-    const topic = clean(req?.topic, 80);
-    if (!name) return ack({ ok: false, error: "Ponle un nombre a la sala" });
-    if (!isTheme(req?.theme)) return ack({ ok: false, error: "Elige un estilo para la sala" });
-    if (createdRooms.countByOwner(account.id) >= MAX_ROOMS_PER_ACCOUNT) {
-      return ack({ ok: false, error: `Puedes crear hasta ${MAX_ROOMS_PER_ACCOUNT} salas` });
-    }
-    const base = name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "sala";
-    let id = base;
-    for (let i = 2; state.rooms.has(id); i++) id = `${base}-${i}`;
-    const room = {
-      id,
-      name,
-      topic: topic || "Charla abierta",
-      color: ROOM_COLORS.includes(req.color) ? req.color : ROOM_COLORS[0]!,
-      theme: req.theme,
-      createdBy: account.name,
-    };
-    const speakerCode = randomBytes(3).toString("hex").toUpperCase();
-    await createdRooms.add({ venueId: state.venue.id, room, speakerCode, ownerId: account.id, createdAt: Date.now() });
-    state.venue.rooms.push(room);
-    state.rooms.set(id, newRoomState());
-    state.floors = venueFloors(state.venue.rooms);
-    speakerCodes.set(`${state.venue.id}/${id}`, speakerCode);
-    io.to(venueChannel(state.venue.id)).emit("venueUpdated", state.venue);
-    ack({ ok: true, data: { venue: state.venue, room, speakerCode } });
+  socket.on("emote", (emoji) => {
+    if (!conn || !EMOTES.includes(emoji)) return;
+    const now = Date.now();
+    if (now - lastSaid < 400) return;
+    lastSaid = now;
+    io.to(sceneChannel(conn.user)).emit("emote", { userId: conn.user.id, emoji });
   });
 
   socket.on("claimSpeaker", (code, ack) => {

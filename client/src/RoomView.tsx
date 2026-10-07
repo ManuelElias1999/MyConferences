@@ -4,6 +4,7 @@ import type { ChatMessage, Question, Room, RoomSnapshot, Stage, StageMode, User,
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { useBroadcaster, useLiveViewer } from "./live.ts";
 import { formatTime, minutesUntil, roomSchedule, socket, toEmbedUrl } from "./lib.ts";
+import { EmoteButtons } from "./SayBar.tsx";
 import Scene, { type SceneHandle } from "./Scene.tsx";
 
 // pdf.js pesa bastante: se carga solo cuando hay diapositivas que mostrar.
@@ -35,7 +36,7 @@ export default function RoomView({
   onLeave: () => void;
   onClaim: (code: string) => Promise<void>;
 }) {
-  const map = useMemo(() => roomMap(room.theme, room.color), [room.theme, room.color]);
+  const map = useMemo(() => roomMap(venue.theme, room.color), [venue.theme, room.color]);
   const scene = useRef<SceneHandle>(null);
   const [phase, setPhase] = useState<"entering" | "seated">("entering");
   const [stage, setStage] = useState<Stage>(snapshot.stage);
@@ -134,7 +135,8 @@ export default function RoomView({
         </div>
 
         <div className="stage-bar">
-          <span className="muted small">
+          <EmoteButtons />
+          <span className="muted small stage-status">
             {presenter ? `Presenta: ${presenter.name}` : "El ponente aún no está en la sala"}
             {stage.live?.audio && " · 🎙 hablando"}
             {stage.mode === "slides" && stage.slidesUrl && pageCount > 0 && ` · Diapositiva ${stage.slide} de ${pageCount}`}
@@ -155,6 +157,7 @@ export default function RoomView({
             camera={phase === "entering" ? "follow" : "fit"}
             names="hover"
             screen={{ color: room.color, title: current?.title ?? room.name, live: Boolean(current) }}
+            media={{ sponsors: venue.sponsors, title: venue.organizer }}
             locked={phase === "entering"}
             onDoor={onLeave}
             handle={scene}

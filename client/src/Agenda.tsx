@@ -18,7 +18,7 @@ export default function Agenda({
   onClose: () => void;
 }) {
   return (
-    <Modal title={`Agenda · Sala ${venue.id}`} onClose={onClose}>
+    <Modal title={`Agenda · ${venue.name}`} onClose={onClose}>
       <div className="agenda-grid">
         {venue.rooms.map((room) => (
           <section key={room.id} className="agenda-col" style={{ "--room": room.color } as React.CSSProperties}>

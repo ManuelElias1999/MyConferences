@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Account, Room, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
+import type { Account, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
-import CreateRoom, { RoomCreated } from "./CreateRoom.tsx";
+import CompanyPanel from "./CompanyPanel.tsx";
 import AuthDialog from "./AuthDialog.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
@@ -27,8 +27,8 @@ export default function App() {
   const [auth, setAuth] = useState<"login" | "register" | null>(null);
   const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<{ room: Room; speakerCode: string } | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [notice, setNotice] = useState("");
   const [now, setNow] = useState(Date.now());
 
   // Las posiciones cambian muchas veces por segundo: viven en un ref que los mapas
@@ -51,6 +51,12 @@ export default function App() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 8000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const transition = useCallback((change: () => void) => {
     setFading(true);
@@ -136,6 +142,14 @@ export default function App() {
     const onVenue = (venue: Venue) => {
       setPlace((p) => (p.kind !== "reception" && p.venue.id === venue.id ? { ...p, venue } : p));
     };
+    // La empresa cerró el evento: todos vuelven a recepción.
+    const onEvicted = ({ user, users, reason }: { user: User; users: User[]; reason: string }) => {
+      speakerCode.current = null;
+      setMe(user);
+      replaceUsers(users);
+      setPlace({ kind: "reception" });
+      setNotice(reason);
+    };
     const onMoved = ({ id, x, y }: { id: string; x: number; y: number }) => {
       const u = usersRef.current.get(id);
       if (u) {
@@ -150,6 +164,7 @@ export default function App() {
     socket.on("userLeft", onLeft);
     socket.on("moved", onMoved);
     socket.on("venueUpdated", onVenue);
+    socket.on("evicted", onEvicted);
     // El socket pudo conectarse antes de registrar los listeners.
     if (socket.connected) onConnect();
     return () => {
@@ -160,6 +175,7 @@ export default function App() {
       socket.off("userLeft", onLeft);
       socket.off("moved", onMoved);
       socket.off("venueUpdated", onVenue);
+      socket.off("evicted", onEvicted);
     };
   }, [enterRoom]);
 
@@ -260,7 +276,7 @@ export default function App() {
           <span>Recepción</span>
           {venue && (
             <span>
-              Sala {venue.id} · {venue.name}
+              {venue.name}
             </span>
           )}
           {room && <span>{room.name}</span>}
@@ -268,9 +284,11 @@ export default function App() {
         <div className="topbar-actions">
           {venue && (
             <>
-              <button className="btn ghost sm" onClick={() => setAgendaOpen(true)}>
-                Agenda
-              </button>
+              {venue.talks.length > 0 && (
+                <button className="btn ghost sm" onClick={() => setAgendaOpen(true)}>
+                  Agenda
+                </button>
+              )}
               <button className="btn ghost sm" onClick={leaveVenue}>
                 Volver a recepción
               </button>
@@ -284,6 +302,11 @@ export default function App() {
             {!account && <small className="badge">Invitado</small>}
             {me.speakerFor && me.speakerFor === room?.id && <small className="badge">Ponente</small>}
           </span>
+          {account?.company && (
+            <button className="btn primary sm" onClick={() => setPanelOpen(true)}>
+              Panel de empresa
+            </button>
+          )}
           {account && (
             <button className="btn sm" onClick={() => setEditor({ welcome: false })}>
               Mi personaje
@@ -321,11 +344,9 @@ export default function App() {
           usersVersion={usersVersion}
           now={now}
           onEnterRoom={(roomId) => enterRoom(roomId, place.venue)}
-          canCreate={Boolean(account)}
           onExit={leaveVenue}
           onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
-          onCreateRoom={() => setCreating(true)}
         />
       )}
       {place.kind === "room" && room && (
@@ -358,28 +379,24 @@ export default function App() {
           }}
         />
       )}
-      {creating && venue && (
-        <CreateRoom
-          venue={venue}
-          onClose={() => setCreating(false)}
-          onCreated={(result) => {
-            setCreating(false);
-            setCreated(result);
-            // Al entrar a su sala, quien la creó queda como ponente automáticamente.
-            speakerCode.current = { room: `${venue.id}/${result.room.id}`, code: result.speakerCode };
+      {panelOpen && account?.company && (
+        <CompanyPanel
+          account={account}
+          canVisit={place.kind === "reception"}
+          onClose={() => setPanelOpen(false)}
+          onVisit={(id) => {
+            setPanelOpen(false);
+            requestVenue(id).catch((err: Error) => setNotice(err.message));
           }}
         />
       )}
-      {created && venue && (
-        <RoomCreated
-          room={created.room}
-          speakerCode={created.speakerCode}
-          onClose={() => setCreated(null)}
-          onGo={() => {
-            setCreated(null);
-            enterRoom(created.room.id, venue);
-          }}
-        />
+      {notice && (
+        <div className="toast" role="status">
+          {notice}
+          <button className="btn ghost sm" onClick={() => setNotice("")} aria-label="Cerrar aviso">
+            ✕
+          </button>
+        </div>
       )}
       {auth && <AuthDialog initialMode={auth} onDone={onAuthDone} onClose={() => setAuth(null)} />}
       {editor && account && (

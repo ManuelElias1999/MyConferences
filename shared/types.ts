@@ -20,6 +20,8 @@ export interface Account {
   email: string;
   name: string;
   look: Look;
+  /** Si es una cuenta de empresa, puede organizar eventos. */
+  company: { name: string } | null;
 }
 
 export interface Room {
@@ -27,9 +29,14 @@ export interface Room {
   name: string;
   topic: string;
   color: string;
-  theme: ThemeId;
-  /** Nombre de quien la creó, si no es una sala del programa oficial. */
-  createdBy: string | null;
+}
+
+/** Patrocinador de un evento: su logo rota en las pantallas del lugar. */
+export interface Sponsor {
+  id: string;
+  name: string;
+  logoUrl: string;
+  url: string | null;
 }
 
 export interface Talk {
@@ -43,18 +50,41 @@ export interface Talk {
   end: number;
 }
 
-/** Lo que se muestra en recepción antes de entrar: los salones privados no aparecen. */
+/** Lo que se muestra en recepción antes de entrar: los eventos privados no aparecen. */
 export interface VenueSummary {
   id: string;
   name: string;
   tagline: string;
 }
 
-/** Un salón (se elige por su número en recepción) con sus salas y su agenda. */
+/** Un evento (se elige por su número en recepción): su lugar, salas, agenda y patrocinadores. */
 export interface Venue extends VenueSummary {
   private: boolean;
+  /** Estilo de todo el lugar del evento: pasillos y salas. */
+  theme: ThemeId;
+  /** Empresa que organiza el evento. */
+  organizer: string;
   rooms: Room[];
   talks: Talk[];
+  sponsors: Sponsor[];
+}
+
+/** Lo que la empresa ve y edita de su evento en el panel. */
+export interface CompanyEvent {
+  venue: Venue;
+  whitelist: string[];
+  speakerCodes: Record<string, string>;
+}
+
+/** Lo que la empresa envía al crear o editar un evento. */
+export interface EventInput {
+  name: string;
+  tagline: string;
+  theme: ThemeId;
+  private: boolean;
+  whitelist: string[];
+  /** Salas existentes llevan su id; las nuevas, no. */
+  rooms: { id?: string; name: string; topic: string; color: string }[];
 }
 
 export interface User {
@@ -67,7 +97,7 @@ export interface User {
   venueId: string | null;
   /** Sala del salón en la que está, o null si está caminando por el salón. */
   roomId: string | null;
-  /** Piso del edificio en el que camina (0 es la planta baja). */
+  /** Piso del lugar en el que camina (0 es la planta baja). */
   floor: number;
   /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
@@ -156,10 +186,8 @@ export interface ClientToServerEvents {
   leaveRoom: (ack: Ack<{ user: User }>) => void;
   /** Subir o bajar por la escalera. */
   changeFloor: (floor: number, ack: Ack<{ user: User }>) => void;
-  createRoom: (
-    req: { name: string; topic: string; theme: ThemeId; color: string },
-    ack: Ack<{ venue: Venue; room: Room; speakerCode: string }>,
-  ) => void;
+  /** Reacción rápida (👋 👏 ❤️ 😂 🎉) sobre el personaje. */
+  emote: (emoji: string) => void;
   claimSpeaker: (code: string, ack: Ack<{ user: User }>) => void;
   chat: (text: string) => void;
   ask: (text: string) => void;
@@ -176,8 +204,11 @@ export interface ServerToClientEvents {
   userJoined: (user: User) => void;
   userLeft: (userId: string) => void;
   userUpdated: (user: User) => void;
-  /** Alguien creó una sala: llega el salón con la lista de salas actualizada. */
+  /** La empresa editó su evento: llega con salas y patrocinadores actualizados. */
   venueUpdated: (venue: Venue) => void;
+  /** El evento se cerró: quien estaba dentro vuelve a recepción. */
+  evicted: (data: { user: User; users: User[]; reason: string }) => void;
+  emote: (data: { userId: string; emoji: string }) => void;
   moved: (pos: { id: string; x: number; y: number }) => void;
   bubble: (bubble: Bubble) => void;
   chat: (msg: ChatMessage) => void;

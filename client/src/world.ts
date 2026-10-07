@@ -14,6 +14,7 @@ import {
   type Tile,
 } from "../../shared/maps.ts";
 import type { ThemeId } from "../../shared/themes.ts";
+import type { Sponsor } from "../../shared/types.ts";
 import { shade } from "./avatar.ts";
 
 export const T = 32;
@@ -782,6 +783,14 @@ export function renderStatic(map: SceneMap, scale: number) {
         ctx.fillRect(cx - 3, 2 * T - 8, 6, 8);
         break;
       }
+      case "sponsors": {
+        const x = d.x * T + 3;
+        const w = (d.w ?? 2) * T - 6;
+        frame(ctx, x - 2, T + 4, w + 4, 2 * T - 12, "#1f2433");
+        ctx.fillStyle = "#3a3f4d";
+        ctx.fillRect(x + w / 2 - 6, 3 * T - 9, 12, 5);
+        break;
+      }
       case "screen": {
         const x = d.x * T + 4;
         const w = (d.w ?? 4) * T - 8;
@@ -926,7 +935,7 @@ const CHAIR: Record<StyleId, { frame: string; seat: string }> = {
   lobby: { frame: "#2f3440", seat: "#5b7fd6" },
 };
 
-export function furniDrawables(map: SceneMap): Drawable[] {
+export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
   const out: Drawable[] = [];
   const add = (key: number, draw: Drawable["draw"]) => out.push({ key, draw });
   for (const f of map.furni) {
@@ -1311,6 +1320,18 @@ export function furniDrawables(map: SceneMap): Drawable[] {
           ctx.fillRect(cx - 4, py + 10, 8, 6);
         });
         break;
+      case "totem": {
+        const slot = 10 + x;
+        add(y + 1, (ctx, t) => {
+          shadowUnder(ctx, cx, base - 3, 12);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(cx - 2, base - 12, 4, 9);
+          ctx.fillRect(cx - 9, base - 5, 18, 3);
+          frame(ctx, cx - 14, base - 48, 28, 37, "#1f2433");
+          sponsorSlide(ctx, cx - 12, base - 46, 24, 33, media?.() ?? { sponsors: [], title: "" }, t, slot);
+        });
+        break;
+      }
       case "rug":
       case "carpet":
         break;
@@ -1349,44 +1370,136 @@ export interface DoorStatus {
   label: string;
 }
 
-/** Placas de las puertas (nombre, estilo y si está en vivo), de las escaleras y de la salida. */
+/** Etiquetas pequeñas sobre el muro, encima de cada puerta, y las de escaleras y salida. */
 export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status: Map<string, DoorStatus> | null, hovered: string | null) {
   for (const door of map.doors) {
-    if (door.id === "salida") continue;
+    if (door.id === "salida" || door.side !== "top") continue;
     const s = status?.get(door.id);
-    const sub = [s?.live ? "● EN VIVO" : "", s?.count ? `${s.count} dentro` : "", s?.label ?? ""].filter(Boolean).join(" · ");
-    let cx: number;
-    let y: number;
-    if (door.side === "top") {
-      cx = (door.x + door.w / 2) * T;
-      y = 2;
-    } else {
-      // En los muros laterales la placa cuelga dentro del pasillo, sobre la puerta.
-      cx = door.side === "left" ? 2.4 * T : (map.w - 2.4) * T;
-      y = door.y * T - 34;
+    const cx = (door.x + door.w / 2) * T;
+    ctx.font = `700 9px ${FONT}`;
+    const text = s?.count ? `${door.label} · ${s.count}` : door.label;
+    const maxW = door.w * T + 22;
+    const width = Math.min(maxW, ctx.measureText(text).width + (s?.live ? 22 : 14));
+    const x = cx - width / 2;
+    const y = T - 9;
+    ctx.fillStyle = door.id === hovered ? shade(door.color, 0.15) : door.color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, 14, 7);
+    ctx.fill();
+    let tx = x + 7;
+    if (s?.live) {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(tx + 2, y + 7, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      tx += 8;
     }
-    plaque(ctx, cx, y, door.label, sub || "Entrar", door.color, door.id === hovered, Boolean(s?.live));
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(text, tx, y + 10, width - (tx - x) - 6);
   }
   const exits: (Span & { label: string })[] = [
-    ...map.stairs.map((s) => ({ ...s, label: `${s.side === "top" ? "▲" : "▼"} ${s.label}` })),
-    ...(map.exit ? [{ ...map.exit, label: "▼ Recepción" }] : []),
-    ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "▼ Salida" })),
+    ...map.stairs.map((s) => ({ ...s, label: `${s.label.startsWith("Subir") ? "▲" : "▼"} ${s.label}` })),
+    ...(map.exit ? [{ ...map.exit, label: "Recepción" }] : []),
+    ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" })),
   ];
   for (const e of exits) {
     const tiles = spanTiles(e);
     const cx = ((tiles[0]!.x + tiles[tiles.length - 1]!.x + 1) / 2) * T;
-    const y = e.side === "top" ? 3 * T + 4 : e.y * T - 20;
-    ctx.font = `700 10px ${FONT}`;
-    const width = ctx.measureText(e.label).width + 16;
-    ctx.fillStyle = "rgba(30,30,45,0.78)";
+    const y = e.side === "top" ? 3 * T + 4 : e.y * T - 14;
+    ctx.font = `700 9px ${FONT}`;
+    const width = ctx.measureText(e.label).width + 14;
+    ctx.fillStyle = "rgba(30,30,45,0.7)";
     ctx.beginPath();
-    ctx.roundRect(cx - width / 2, y, width, 16, 8);
+    ctx.roundRect(cx - width / 2, y, width, 13, 6.5);
     ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
-    ctx.fillText(e.label, cx, y + 11.5);
+    ctx.fillText(e.label, cx, y + 9.5);
     ctx.textAlign = "left";
   }
+}
+
+// ---------- Patrocinadores ----------
+
+const logoCache = new Map<string, HTMLImageElement>();
+
+/** Imagen del logo, o null mientras carga. */
+function logoImage(url: string) {
+  let img = logoCache.get(url);
+  if (!img) {
+    img = new Image();
+    img.src = url;
+    logoCache.set(url, img);
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
+
+export interface Media {
+  sponsors: Sponsor[];
+  /** Texto para las pantallas cuando el evento no tiene patrocinadores. */
+  title: string;
+}
+
+const SLIDE_MS = 5000;
+
+/** Pinta en un rectángulo el logo que toca según el tiempo, con un fundido suave entre logos. */
+function sponsorSlide(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, media: Media, t: number, slot: number) {
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x, y, w, h);
+  if (!media.sponsors.length) {
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, "#5b5bf0");
+    g.addColorStop(1, "#06c38d");
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${w > 80 ? 11 : 8}px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(media.title, x + w / 2, y + h / 2 + 4, w - 8);
+    ctx.textAlign = "left";
+    return;
+  }
+  const n = media.sponsors.length;
+  const index = (Math.floor(t / SLIDE_MS) + slot) % n;
+  const sponsor = media.sponsors[index]!;
+  const img = logoImage(sponsor.logoUrl);
+  const into = t % SLIDE_MS;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, into / 350);
+  if (img) {
+    const pad = 4;
+    const scale = Math.min((w - pad * 2) / img.naturalWidth, (h - pad * 2) / img.naturalHeight);
+    const iw = img.naturalWidth * scale;
+    const ih = img.naturalHeight * scale;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+    ctx.imageSmoothingEnabled = false;
+  } else {
+    ctx.fillStyle = "#1f2433";
+    ctx.font = `700 9px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.fillText(sponsor.name, x + w / 2, y + h / 2 + 3, w - 6);
+    ctx.textAlign = "left";
+  }
+  ctx.restore();
+}
+
+/** Pantallas de patrocinadores en el muro del fondo. */
+export function drawSponsorScreens(ctx: CanvasRenderingContext2D, map: SceneMap, media: Media, t: number) {
+  map.decor
+    .filter((d) => d.kind === "sponsors")
+    .forEach((d, i) => {
+      const x = d.x * T + 3;
+      const w = (d.w ?? 2) * T - 6;
+      sponsorSlide(ctx, x, T + 6, w, 2 * T - 16, media, t, i);
+      if (media.sponsors.length && w > 80) {
+        ctx.font = `700 7px ${FONT}`;
+        ctx.fillStyle = "rgba(31,36,51,0.55)";
+        ctx.textAlign = "center";
+        ctx.fillText("PATROCINADORES", x + w / 2, 3 * T - 12);
+        ctx.textAlign = "left";
+      }
+    });
 }
 
 export function drawSigns(ctx: CanvasRenderingContext2D, map: SceneMap) {

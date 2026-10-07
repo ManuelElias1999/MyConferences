@@ -35,7 +35,7 @@ export default function Reception({
       setDialog({ step: "ok", text: `¡Todo en orden! Te acompaño a ${name}.` });
     } catch (err) {
       const text = err instanceof Error ? err.message : "No pude revisar esa sala.";
-      setDialog({ step: "error", text, needsLogin: !me.registered && /privada/.test(text) });
+      setDialog({ step: "error", text, needsLogin: !me.registered && /privado/.test(text) });
     }
   };
 
@@ -62,7 +62,7 @@ export default function Reception({
             <p className="npc-name">Recepcionista</p>
             {dialog.step === "ask" && (
               <>
-                <p>¡Hola, {me.name}! ¿A qué número de sala quieres ir?</p>
+                <p>¡Hola, {me.name}! ¿Cuál es el número de tu evento?</p>
                 <form
                   className="npc-form"
                   onSubmit={(e) => {
@@ -76,7 +76,7 @@ export default function Reception({
                     inputMode="numeric"
                     maxLength={6}
                     placeholder="Ej. 101"
-                    aria-label="Número de sala"
+                    aria-label="Número del evento"
                     autoFocus
                   />
                   <button className="btn primary" disabled={!number}>
@@ -85,7 +85,7 @@ export default function Reception({
                 </form>
                 {venues.length > 0 && (
                   <p className="npc-hint">
-                    Salas abiertas hoy:{" "}
+                    Eventos abiertos hoy:{" "}
                     {venues.map((v) => (
                       <button key={v.id} type="button" className="chip" onClick={() => ask(v.id)}>
                         {v.id} · {v.name}
@@ -93,7 +93,7 @@ export default function Reception({
                     ))}
                   </p>
                 )}
-                {!me.registered && <p className="npc-hint">Las salas privadas revisan tu correo: inicia sesión antes de pedirlas.</p>}
+                {!me.registered && <p className="npc-hint">Los eventos privados revisan tu correo: inicia sesión antes de pedirlos.</p>}
               </>
             )}
             {dialog.step === "checking" && <p>Déjame revisar la lista…</p>}
@@ -125,7 +125,7 @@ export default function Reception({
           Camina con <kbd>↑</kbd>
           <kbd>↓</kbd>
           <kbd>←</kbd>
-          <kbd>→</kbd> o haciendo clic. Acércate a la recepcionista para pedir tu sala.
+          <kbd>→</kbd> o haciendo clic. Acércate a la recepcionista para entrar a tu evento.
         </p>
       )}
 

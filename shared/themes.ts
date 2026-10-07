@@ -1,4 +1,4 @@
-// Estilos de sala que se pueden elegir al crearla.
+// Estilos que una empresa elige para el lugar de su evento.
 
 export type ThemeId = "tech" | "minimal" | "rustic" | "medieval" | "garden";
 
@@ -14,3 +14,5 @@ export const isTheme = (value: unknown): value is ThemeId => THEMES.some((t) => 
 
 /** Colores que se pueden elegir para la sala (puerta, placa y detalles). */
 export const ROOM_COLORS = ["#3b82f6", "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6", "#8b5cf6", "#b45309", "#64748b"];
+
+export const EMOTES = ["👋", "👏", "❤️", "😂", "🎉"];
