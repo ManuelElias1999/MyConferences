@@ -93,6 +93,15 @@ const venues = new Map<string, VenueState>();
 const speakerCodes = new Map<string, string>();
 
 /** Registra (o actualiza) un evento en memoria, conservando el estado de las salas que siguen. */
+/** Papel de cada correo en cada evento: organizador o mentor. */
+const venueRoles = new Map<string, Map<string, "staff" | "mentor">>();
+function setRoles(venueId: string, staff: string[] = [], mentors: string[] = []) {
+  const roles = new Map<string, "staff" | "mentor">();
+  for (const e of mentors) roles.set(e, "mentor");
+  for (const e of staff) roles.set(e, "staff");
+  venueRoles.set(venueId, roles);
+}
+
 function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<string, string> = {}, ownerId: string | null = null) {
   const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
   for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
@@ -240,14 +249,6 @@ function ownedEvent(req: express.Request, res: express.Response) {
 
 const toCompanyEvent = (e: StoredEvent): CompanyEvent => ({ venue: e.venue, whitelist: e.whitelist, speakerCodes: e.speakerCodes, staff: e.staff ?? [], mentors: e.mentors ?? [] });
 
-/** Papel de cada correo en cada evento: organizador o mentor. */
-const venueRoles = new Map<string, Map<string, "staff" | "mentor">>();
-function setRoles(venueId: string, staff: string[] = [], mentors: string[] = []) {
-  const roles = new Map<string, "staff" | "mentor">();
-  for (const e of mentors) roles.set(e, "mentor");
-  for (const e of staff) roles.set(e, "staff");
-  venueRoles.set(venueId, roles);
-}
 
 const slug = (text: string) =>
   text.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "sala";
