@@ -151,8 +151,8 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
           <p className="small call-lead">
             {zone
               ? current.members.length < 2
-                ? "Estás en la mesa. Quien se siente aquí se suma a la conversación."
-                : "Solo se escucha y se ve a quienes están en este rectángulo."
+                ? "Estás aquí. Quien entre a este espacio se suma a la conversación."
+                : "Solo se escucha y se ve a quienes están en este espacio."
               : current.members.length < 2
                 ? "Esperando a que acepten la invitación…"
                 : "Solo ustedes se escuchan. El resto del evento está en silencio."}
@@ -213,7 +213,7 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
               </button>
             )}
             <button className="btn sm danger" onClick={call.leave}>
-              {zone ? "Salir de la mesa" : "Salir"}
+              {zone ? "Salir de la conversación" : "Salir"}
             </button>
           </div>
           {[...call.remotes].map(([id, r]) => (r.audio ? <Voice key={id} stream={r.audio} /> : null))}

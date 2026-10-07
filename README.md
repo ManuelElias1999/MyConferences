@@ -28,7 +28,12 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
-  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta, pantallas con la cuenta regresiva y una avenida con las salas de charla (presentación de proyectos, talleres, mentorías…). Los equipos trabajan en **salas de equipos de 100 personas**, cada una con 28 mesas: 5 de 6 personas, 12 de 4 y 11 de 2. Cada mesa es un rectángulo marcado en el piso: al entrar te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro. Al crear el hackathon se elige el cupo (100, 200, 300, 400 o 500): se habilita una sala de equipos por cada 100 personas (las dos primeras en la planta baja y las otras tres arriba) y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren.
+  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva.
+    - **Entrada corta**: se entra a un gran **lobby-feria** con stands de patrocinadores en toda la pared (los puestos libres dicen «espacio disponible»), zona de juegos (arcades, ping-pong, futbolito), snacks y café, y **rincones de charla** con sillones, cada uno con su propia conversación.
+    - Arriba del lobby, la **avenida** con el auditorio y las salas de charla; debajo, con entrada directa desde el lobby, las **salas de equipos de 100 personas** con 28 mesas cada una (5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro.
+    - El **ascensor** es inconfundible: marco amarillo con franjas, letrero luminoso «ASCENSOR» y un cartel amarillo grande que dice adónde lleva.
+    - En el piso de arriba hay otro lobby con stands y rincones, las salas de equipos 4 y 5, la **sala de mentores** (madera, plantas, biblioteca y seis estaciones de mentoría de hasta 4 personas) y la **sala de organizadores**, a la que solo entra su equipo.
+    - Al crear el hackathon se elige el cupo (100 a 500): se habilita una sala de equipos por cada 100 personas y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. También se cargan los correos de **organizadores** (⭐, entran a su sala y al evento aunque sea privado) y **mentores** (🧭, aparecen en «Mentores conectados»).
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
   - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.
@@ -59,7 +64,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 | 202 | Stellar Builders Day (auditorio + 8 salas) | Medieval | Privado |
 | 303 | Demo Day · Inversores (auditorio + 8 salas) | Minimalista | Privado |
 | 404 | Stellar Hub LatAm (auditorio + 8 salas) | Stellar | Abierto |
-| 505 | Hack Night LatAm (auditorio + 8 salas, cupo de 200: dos salas de equipos con 56 mesas) | Hackathon | Abierto |
+| 505 | Hack Night LatAm (auditorio + 8 salas, 8 patrocinadores, cupo de 200: dos salas de equipos con 56 mesas) | Hackathon | Abierto |
 
 Se definen en `server/src/seed.ts`. Sus patrocinadores son marcas ficticias con logos de ejemplo en `server/assets/logos`. La gente que conversa en los pasillos es decorativa: da ambiente y no son personas conectadas.
 

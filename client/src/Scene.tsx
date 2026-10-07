@@ -500,8 +500,10 @@ export default function Scene(props: SceneProps) {
       for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
       for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir, c.sit);
       // 🎧: está en una charla privada.
-      for (const u of visible) addAvatar(u.id, u.inCall ? `${u.name} 🎧` : u.name, u.look, others.current.get(u.id)!, false, true);
-      addAvatar(p.me.id, p.me.inCall ? `${p.me.name} 🎧` : p.me.name, p.me.look, my.current, true, true);
+      // ⭐ organizador, 🧭 mentor, 🎧 en una charla privada.
+      const tagged = (u: User) => `${u.role === "staff" ? "⭐ " : u.role === "mentor" ? "🧭 " : ""}${u.name}${u.inCall ? " 🎧" : ""}`;
+      for (const u of visible) addAvatar(u.id, tagged(u), u.look, others.current.get(u.id)!, false, true);
+      addAvatar(p.me.id, tagged(p.me), p.me.look, my.current, true, true);
       items.sort((a, b) => a.key - b.key);
       for (const it of items) it.draw(ctx, wall);
 

@@ -26,6 +26,11 @@ const PITCH: Record<string, string> = {
   "orbit-cloud": "Servidores y bases de datos que escalan solos. Si te registras en el evento, tienes USD 300 de crédito.",
   devforge: "Integración continua y despliegues sin configurar nada. Pasa a ver la demo de pipelines en 30 segundos.",
   "pixel-bank": "La cuenta para startups: tarjetas virtuales, pagos internacionales y reportes automáticos para tu contador.",
+  bytelabs: "Te prestamos GPUs durante el hackathon. Pasa por el stand y te damos acceso para tu equipo.",
+  "nimbus-ai": "APIs de modelos de lenguaje con 1 millón de tokens gratis para los equipos del hackathon.",
+  quanta: "Búsqueda vectorial lista en 3 líneas de código. Premio especial al mejor proyecto que la use.",
+  ledgerx: "Contabilidad automática para startups. Buscamos talento: deja tu CV en el stand.",
+  "pulse-api": "Monitoreo y alertas para tu API en tiempo real. Tenemos stickers y café.",
 };
 
 const logo = (id: string, name: string, url: string | null = null): Sponsor => ({ id, name, logoUrl: `/assets/logos/${id}.svg`, url, pitch: PITCH[id] ?? "" });
@@ -275,7 +280,16 @@ const seeds: VenueSeed[] = [
     theme: "hackathon",
     capacity: 200,
     organizer: "MyConferences",
-    sponsors: [logo("devforge", "DevForge"), logo("orbit-cloud", "Orbit Cloud"), logo("novapay", "NovaPay")],
+    sponsors: [
+      logo("nimbus-ai", "Nimbus AI"),
+      logo("bytelabs", "ByteLabs"),
+      logo("devforge", "DevForge"),
+      logo("orbit-cloud", "Orbit Cloud"),
+      logo("quanta", "Quanta"),
+      logo("novapay", "NovaPay"),
+      logo("ledgerx", "LedgerX"),
+      logo("pulse-api", "Pulse API"),
+    ],
     rooms: [
       { id: "auditorio", name: "Auditorio principal", topic: "Apertura, keynotes y premios", color: "#ff7a1a", main: true },
       { id: "demos", name: "Presentación de proyectos", topic: "Demo day de los equipos", color: "#ef4444", main: false },

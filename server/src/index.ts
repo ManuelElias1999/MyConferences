@@ -10,6 +10,7 @@ import { DEFAULT_LOOK } from "../../shared/look.ts";
 import {
   floorOfRoom,
   inFront,
+  inRestricted,
   inZone,
   interiorFor,
   isWalkable,
@@ -115,7 +116,10 @@ for (const pair of (process.env.SPEAKER_CODES ?? "").split(",").filter(Boolean))
   if (venueId && roomId && code) fixedCodes.set(venueId, { ...fixedCodes.get(venueId), [roomId]: code.trim().toUpperCase() });
 }
 for (const { venue, whitelist } of createVenues(dataDir)) applyVenue(venue, whitelist, fixedCodes.get(venue.id));
-for (const e of companyEvents.list()) applyVenue(e.venue, e.venue.private ? new Set(e.whitelist) : null, e.speakerCodes, e.ownerId);
+for (const e of companyEvents.list()) {
+  applyVenue(e.venue, e.venue.private ? new Set(e.whitelist) : null, e.speakerCodes, e.ownerId);
+  setRoles(e.venue.id, e.staff, e.mentors);
+}
 
 const clean = (text: unknown, max: number) =>
   typeof text === "string" ? text.trim().replace(/\s+/g, " ").slice(0, max) : "";
@@ -234,7 +238,16 @@ function ownedEvent(req: express.Request, res: express.Response) {
   return { account, entry };
 }
 
-const toCompanyEvent = (e: StoredEvent): CompanyEvent => ({ venue: e.venue, whitelist: e.whitelist, speakerCodes: e.speakerCodes });
+const toCompanyEvent = (e: StoredEvent): CompanyEvent => ({ venue: e.venue, whitelist: e.whitelist, speakerCodes: e.speakerCodes, staff: e.staff ?? [], mentors: e.mentors ?? [] });
+
+/** Papel de cada correo en cada evento: organizador o mentor. */
+const venueRoles = new Map<string, Map<string, "staff" | "mentor">>();
+function setRoles(venueId: string, staff: string[] = [], mentors: string[] = []) {
+  const roles = new Map<string, "staff" | "mentor">();
+  for (const e of mentors) roles.set(e, "mentor");
+  for (const e of staff) roles.set(e, "staff");
+  venueRoles.set(venueId, roles);
+}
 
 const slug = (text: string) =>
   text.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "sala";
@@ -268,13 +281,15 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
   if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
   const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
   if (rawRooms.length < MIN_ROOMS) return { error: `El evento necesita el auditorio principal y al menos ${MIN_ROOMS - 1} salas` };
-  const whitelist = [
-    ...new Set(
-      (Array.isArray(body.whitelist) ? body.whitelist : [])
-        .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
-        .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)),
-    ),
-  ].slice(0, 5000);
+  const emails = (list: unknown, max: number) =>
+    [
+      ...new Set(
+        (Array.isArray(list) ? list : [])
+          .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
+          .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)),
+      ),
+    ].slice(0, max);
+  const whitelist = emails(body.whitelist, 5000);
   const rooms: Room[] = [];
   const talks: Talk[] = [];
   const codes: Record<string, string> = {};
@@ -303,6 +318,8 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     tagline: clean(body.tagline, 120),
     theme: body.theme,
     private: body.private !== false,
+    staff: emails(body.staff, 200),
+    mentors: emails(body.mentors, 500),
     capacity: body.theme === "hackathon" ? (HACKATHON_CAPACITIES.includes(Number(body.capacity)) ? Number(body.capacity) : 100) : undefined,
     whitelist,
     rooms,
@@ -328,7 +345,7 @@ function evictVenue(venueId: string, reason: string) {
     leaveCall(u.id);
     for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, x: spot.x, y: spot.y });
     sock.join("reception");
     sock.to("reception").emit("userJoined", u);
     moved.push(u);
@@ -376,7 +393,8 @@ app.post("/api/company/events", json, async (req, res) => {
     talks: input.talks,
     sponsors: [],
   };
-  const entry: StoredEvent = { ownerId: account.id, venue, whitelist: input.whitelist, speakerCodes: input.codes, createdAt: Date.now() };
+  const entry: StoredEvent = { ownerId: account.id, venue, whitelist: input.whitelist, speakerCodes: input.codes, createdAt: Date.now(), staff: input.staff, mentors: input.mentors };
+  setRoles(venue.id, input.staff, input.mentors);
   await companyEvents.save(entry);
   applyVenue(venue, venue.private ? new Set(input.whitelist) : null, input.codes, account.id);
   res.json(toCompanyEvent(entry));
@@ -403,6 +421,9 @@ app.put("/api/company/events/:id", json, async (req, res) => {
     talks: input.talks,
   };
   entry.whitelist = input.whitelist;
+  entry.staff = input.staff;
+  entry.mentors = input.mentors;
+  setRoles(entry.venue.id, input.staff, input.mentors);
   entry.speakerCodes = input.codes;
   await companyEvents.save(entry);
   applyVenue(entry.venue, entry.venue.private ? new Set(input.whitelist) : null, input.codes, entry.ownerId);
@@ -605,6 +626,8 @@ function syncZone(u: User) {
   if (zoneOptOut.has(u.id) && zoneOptOut.get(u.id) !== key) zoneOptOut.delete(u.id);
   if (current?.startsWith("zone:") && current !== key) leaveCall(u.id);
   if (!key || !zone || callOfUser.get(u.id) === key || zoneOptOut.get(u.id) === key) return;
+  // La sala de organizadores es solo para su equipo.
+  if (zone.staff && u.role !== "staff") return;
   let call = calls.get(key);
   if (call && call.members.size >= zone.seats) {
     io.to(u.id).emit("callNotice", `${zone.label} está completa (${zone.seats} personas). Prueba otra mesa.`);
@@ -666,6 +689,7 @@ io.on("connection", (socket) => {
       roomId: null,
       speakerFor: null,
       inCall: false,
+      role: null,
       x: spot.x,
       y: spot.y,
     };
@@ -705,6 +729,8 @@ io.on("connection", (socket) => {
     const x = Number(pos?.x);
     const y = Number(pos?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    // A la sala de organizadores solo entra su equipo.
+    if (u.role !== "staff" && inRestricted(map, { x: Math.round(x), y: Math.round(y) })) return;
     u.x = Math.max(0, Math.min(map.w - 1, Math.round(x * 100) / 100));
     u.y = Math.max(0, Math.min(map.h - 1, Math.round(y * 100) / 100));
     socket.to(sceneChannel(u)).volatile.emit("moved", { id: u.id, x: u.x, y: u.y });
@@ -730,7 +756,8 @@ io.on("connection", (socket) => {
     const state = venues.get(id);
     if (!state) return ack({ ok: false, error: `No encuentro el evento ${id || number}. ¿Puedes revisar el número?` });
     // La empresa dueña siempre puede entrar a su evento.
-    if (state.whitelist && state.ownerId !== conn.account?.id) {
+    const role = conn.account ? (state.ownerId === conn.account.id ? "staff" : (venueRoles.get(id)?.get(conn.account.email) ?? null)) : null;
+    if (state.whitelist && !role) {
       if (!conn.account) {
         return ack({ ok: false, error: `El evento ${id} es privado. Inicia sesión con tu cuenta para que revise la lista de invitados.` });
       }
@@ -743,7 +770,7 @@ io.on("connection", (socket) => {
     socket.to("reception").emit("userLeft", u.id);
     const ground = state.floors[0]!;
     const spot = spawnNear(ground, ground.spawn);
-    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, role, x: spot.x, y: spot.y });
     socket.join([venueChannel(id), hallChannel(id, 0)]);
     socket.to(venueChannel(id)).emit("userJoined", u);
     ack({ ok: true, data: { venue: state.venue, user: u, users: usersIn(id) } });
@@ -772,7 +799,7 @@ io.on("connection", (socket) => {
     socket.leave(hallChannel(venueId, u.floor));
     socket.to(venueChannel(venueId)).emit("userLeft", u.id);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, role: null, x: spot.x, y: spot.y });
     socket.join("reception");
     socket.to("reception").emit("userJoined", u);
     ack({ ok: true, data: { user: u, users: usersIn(null) } });

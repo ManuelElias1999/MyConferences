@@ -13,6 +13,9 @@ export interface StoredEvent {
   /** Código de ponente de cada sala. */
   speakerCodes: Record<string, string>;
   createdAt: number;
+  /** Correos del equipo organizador y de los mentores. */
+  staff?: string[];
+  mentors?: string[];
 }
 
 export function createEventStore(dataDir: string) {

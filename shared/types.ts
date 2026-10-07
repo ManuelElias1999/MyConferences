@@ -87,6 +87,9 @@ export interface CompanyEvent {
   venue: Venue;
   whitelist: string[];
   speakerCodes: Record<string, string>;
+  /** Correos del equipo organizador y de los mentores. */
+  staff: string[];
+  mentors: string[];
 }
 
 /** Lo que la empresa envía al crear o editar un evento. */
@@ -98,6 +101,9 @@ export interface EventInput {
   whitelist: string[];
   /** Solo en hackathons: participantes esperados (100 a 500). */
   capacity?: number;
+  /** Correos del equipo organizador (entran a su sala) y de los mentores. */
+  staff?: string[];
+  mentors?: string[];
   /** La primera es el auditorio principal. Salas existentes llevan su id; las nuevas, no. */
   rooms: { id?: string; name: string; topic: string; color: string; theme?: ThemeId | null; talks: TalkInput[] }[];
 }
@@ -127,6 +133,8 @@ export interface User {
   speakerFor: string | null;
   /** Está en una charla privada por micrófono (los demás no la escuchan). */
   inCall: boolean;
+  /** Su papel en el evento en el que está: organizador o mentor. */
+  role: "staff" | "mentor" | null;
   /** Posición en baldosas del mapa en el que está. */
   x: number;
   y: number;

@@ -112,6 +112,8 @@ function EventEditor({
   const [capacity, setCapacity] = useState(v?.capacity ?? 100);
   const [isPrivate, setPrivate] = useState(v?.private ?? true);
   const [whitelist, setWhitelist] = useState((initial?.whitelist ?? []).join("\n"));
+  const [staff, setStaff] = useState((initial?.staff ?? []).join("\n"));
+  const [mentors, setMentors] = useState((initial?.mentors ?? []).join("\n"));
   const draftsFrom = (ev: CompanyEvent): RoomDraft[] =>
     ev.venue.rooms.map((r) => ({
       id: r.id,
@@ -146,6 +148,8 @@ function EventEditor({
       capacity: theme === "hackathon" ? capacity : undefined,
       private: isPrivate,
       whitelist: whitelist.split(/[\s,;]+/).filter(Boolean),
+      staff: staff.split(/[\s,;]+/).filter(Boolean),
+      mentors: mentors.split(/[\s,;]+/).filter(Boolean),
       rooms,
     };
     try {
@@ -243,6 +247,22 @@ function EventEditor({
               <textarea value={whitelist} onChange={(e) => setWhitelist(e.target.value)} rows={4} placeholder={"ana@empresa.com\nluis@empresa.com"} />
             </label>
           )}
+        </fieldset>
+
+        <fieldset className="team">
+          <legend>Equipo del evento</legend>
+          <p className="muted small">
+            Entran aunque el evento sea privado. Los organizadores llevan ⭐ y pueden usar la sala de organizadores; los mentores llevan 🧭 y la gente los
+            encuentra en la sala de mentores. Tú ya eres organizador.
+          </p>
+          <label>
+            Organizadores <span className="muted small">(correos)</span>
+            <textarea value={staff} onChange={(e) => setStaff(e.target.value)} rows={2} placeholder="equipo@empresa.com" />
+          </label>
+          <label>
+            Mentores <span className="muted small">(correos)</span>
+            <textarea value={mentors} onChange={(e) => setMentors(e.target.value)} rows={2} placeholder="mentora@empresa.com" />
+          </label>
         </fieldset>
 
         <fieldset className="rooms-editor">

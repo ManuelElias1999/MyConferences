@@ -676,42 +676,37 @@ const STEP: Record<StyleId, { tread: string; rail: string }> = {
   hackathon: { tread: "#d9dee8", rail: "#22d3ee" },
 };
 
-/** Ascensor en la pared: puertas de acero, un visor con la flecha y el botón de llamada. */
+/** Ascensor: marco amarillo, letrero luminoso «ASCENSOR», puertas de acero y el visor con la flecha. Nada que ver con una puerta de sala. */
 function elevator(ctx: CanvasRenderingContext2D, s: Stairs) {
   const x = s.x * T + 2;
   const w = s.w * T - 4;
-  const top = T + 2;
+  const top = T - 6;
   const bottom = 3 * T;
-  frame(ctx, x - 3, top - 2, w + 6, bottom - top + 2, "#8b93a3");
-  ctx.fillStyle = "#c9d0da";
-  ctx.fillRect(x, top + 12, w / 2 - 1, bottom - top - 12);
-  ctx.fillRect(x + w / 2 + 1, top + 12, w / 2 - 1, bottom - top - 12);
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillRect(x + 4, top + 16, 2, bottom - top - 20);
-  ctx.fillRect(x + w / 2 + 5, top + 16, 2, bottom - top - 20);
-  ctx.fillStyle = "#5b6475";
-  ctx.fillRect(x + w / 2 - 1, top + 12, 2, bottom - top - 12);
-  // Visor con la flecha.
+  // Marco amarillo con franjas, bien distinto de las puertas de las salas.
+  ctx.fillStyle = "#fbbf24";
+  ctx.fillRect(x - 6, top, w + 12, bottom - top);
   ctx.fillStyle = "#16161d";
-  ctx.fillRect(x + w / 2 - 12, top + 1, 24, 10);
-  ctx.fillStyle = "#ffb703";
-  ctx.beginPath();
-  if (s.dir === "up") {
-    ctx.moveTo(x + w / 2, top + 3);
-    ctx.lineTo(x + w / 2 + 5, top + 9);
-    ctx.lineTo(x + w / 2 - 5, top + 9);
-  } else {
-    ctx.moveTo(x + w / 2, top + 9);
-    ctx.lineTo(x + w / 2 + 5, top + 3);
-    ctx.lineTo(x + w / 2 - 5, top + 3);
+  for (let yy = top + 4; yy < bottom; yy += 10) {
+    ctx.fillRect(x - 6, yy, 3, 5);
+    ctx.fillRect(x + w + 3, yy, 3, 5);
   }
-  ctx.closePath();
-  ctx.fill();
-  // Botonera.
-  frame(ctx, x + w + 4, top + 22, 6, 12, "#3a3f4d");
-  ctx.fillStyle = "#ffb703";
-  ctx.fillRect(x + w + 6, top + 25, 2, 2);
-  ctx.fillRect(x + w + 6, top + 29, 2, 2);
+  // Letrero luminoso.
+  ctx.fillStyle = "#16161d";
+  ctx.fillRect(x - 2, top + 3, w + 4, 13);
+  ctx.font = `700 8px ${FONT}`;
+  ctx.fillStyle = "#fbbf24";
+  ctx.textAlign = "center";
+  ctx.fillText(`${s.dir === "up" ? "▲" : "▼"} ASCENSOR`, x + w / 2, top + 12.5, w);
+  ctx.textAlign = "left";
+  // Puertas de acero.
+  ctx.fillStyle = "#c9d0da";
+  ctx.fillRect(x, top + 19, w / 2 - 1, bottom - top - 19);
+  ctx.fillRect(x + w / 2 + 1, top + 19, w / 2 - 1, bottom - top - 19);
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillRect(x + 4, top + 22, 2, bottom - top - 26);
+  ctx.fillRect(x + w / 2 + 5, top + 22, 2, bottom - top - 26);
+  ctx.fillStyle = "#5b6475";
+  ctx.fillRect(x + w / 2 - 1, top + 19, 2, bottom - top - 19);
 }
 
 /** Escalera angosta dentro de un arco: se ven los peldaños que suben (o bajan) por dentro del muro. */
@@ -1900,9 +1895,12 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         break;
       case "booth": {
         // Stand de un patrocinador: panel en la pared, dos roll-ups y el mostrador con su logo.
+        // Sin patrocinador: un puesto vacío, gris, que dice «espacio disponible».
+        const empty = f.n === undefined;
         const n = f.n ?? 0;
-        const color = BOOTH_COLORS[n % BOOTH_COLORS.length]!;
+        const color = empty ? "#9aa5b1" : BOOTH_COLORS[n % BOOTH_COLORS.length]!;
         const sponsor = () => {
+          if (empty) return { id: "libre", name: "Espacio disponible", logoUrl: "", url: null, pitch: "" };
           const m = media?.();
           return (m?.stands ?? m?.sponsors)?.[n] ?? null;
         };
@@ -2147,12 +2145,23 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
     ctx.fillStyle = "#ffffff";
     ctx.fillText(text, x + 6, y + 10);
   }
+  // Cartel amarillo y grande sobre cada ascensor o escalera, para que se vea desde lejos.
+  for (const st of map.stairs) {
+    const label = `${st.dir === "up" ? "▲" : "▼"} ${st.label}`;
+    ctx.font = `700 11px ${FONT}`;
+    const width = ctx.measureText(label).width + 18;
+    const cx = (st.x + st.w / 2) * T;
+    const y = (st.y - 2) * T - 22;
+    ctx.fillStyle = "#16161d";
+    ctx.fillRect(cx - width / 2 - 2, y - 2, width + 4, 22);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillRect(cx - width / 2, y, width, 18);
+    ctx.fillStyle = "#16161d";
+    ctx.textAlign = "center";
+    ctx.fillText(label, cx, y + 13);
+    ctx.textAlign = "left";
+  }
   const exits: { cx: number; y: number; label: string }[] = [
-    ...map.stairs.map((st) => ({
-      cx: (st.x + st.w / 2) * T,
-      y: (st.y - 2) * T - 15,
-      label: `${st.dir === "up" ? "▲" : "▼"} ${st.label}`,
-    })),
     ...[...(map.exit ? [{ ...map.exit, label: "Salida a recepción" }] : []), ...map.doors.filter((d) => d.id === "salida").map((d) => ({ ...d, label: "Salida" }))].map((e) => {
       const tiles = spanTiles(e);
       return { cx: ((tiles[0]!.x + tiles[tiles.length - 1]!.x + 1) / 2) * T, y: e.y * T - 14, label: e.label };

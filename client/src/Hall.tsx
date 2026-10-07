@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from "react";
-import { stairsEntry, venueFloors, type Door, type Tile } from "../../shared/maps.ts";
+import { forVisitor, stairsEntry, venueFloors, type Door, type Tile } from "../../shared/maps.ts";
+
+const everyoneMentors = (users: Map<string, User>) => [...users.values()].filter((u) => u.role === "mentor");
 import { THEMES } from "../../shared/themes.ts";
 import type { Sponsor, Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
@@ -54,7 +56,9 @@ export default function Hall({
   const standSponsor = stand !== null ? stands[stand] : undefined;
   const isOrganizer = standSponsor?.id === "organizador";
   const floor = Math.min(me.floor, floors.length - 1);
-  const map = floors[floor]!;
+  // Quien no es del equipo organizador no puede entrar a su sala.
+  const map = useMemo(() => forVisitor(floors[floor]!, me.role === "staff"), [floors, floor, me.role]);
+  const mentorsHere = everyoneMentors(users);
   const scene = useRef<SceneHandle>(null);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [guiding, setGuiding] = useState<string | null>(null);
@@ -233,6 +237,12 @@ export default function Hall({
         )}
 
         <section>
+          {mentorsHere.length > 0 && (
+            <>
+              <h3 className="side-title">🧭 Mentores conectados ({mentorsHere.length})</h3>
+              <p className="muted small">Encuéntralos en la sala de mentores o escríbeles con 🎙.</p>
+            </>
+          )}
           <h3 className="side-title">En el evento ({everyone.length})</h3>
           <ul className="people-list">
             {everyone.map((u) => (
@@ -241,6 +251,8 @@ export default function Hall({
                 <div>
                   <p>
                     {u.name}
+                    {u.role === "staff" && " ⭐"}
+                    {u.role === "mentor" && " 🧭"}
                     {u.id === me.id && <span className="muted"> (tú)</span>}
                   </p>
                   <p className="muted small">
