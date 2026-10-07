@@ -54,6 +54,9 @@ const CHATTER = [
   "Ya casi empieza la keynote",
 ];
 
+/** Lo que dicen los representantes de los stands para que la gente se acerque. */
+const PITCH_LINES = ["¡Acércate a conocer {}!", "¿Quieres ver una demo de {}?", "Tenemos regalos en el stand de {}", "Te cuento qué hace {} en 1 minuto"];
+
 const dirFrom = (dx: number, dy: number, fallback: Dir): Dir =>
   Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3 ? fallback : Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
 
@@ -82,6 +85,8 @@ export interface SceneProps {
   onStairs?: (floor: number) => void;
   onNpc?: (npc: Npc) => void;
   onDirectory?: () => void;
+  /** Clic sobre otra persona (para invitarla a una charla privada). */
+  onUser?: (userId: string) => void;
   handle?: Ref<SceneHandle>;
   label: string;
 }
@@ -146,7 +151,7 @@ export default function Scene(props: SceneProps) {
   const nearbyNpc = () => {
     if (my.current.seg) return null;
     const h = here();
-    return map.npcs.find((n) => map.desk.some((t) => sameTile(h, t)) || Math.abs(n.x - h.x) + Math.abs(n.y - h.y) === 1) ?? null;
+    return map.npcs.find((n) => n.talkFrom?.some((t) => sameTile(h, t)) || Math.abs(n.x - h.x) + Math.abs(n.y - h.y) === 1) ?? null;
   };
   const nearbyDirectory = () => (my.current.seg ? null : (map.directories.find((d) => near(d, here())) ?? null));
 
@@ -413,16 +418,23 @@ export default function Scene(props: SceneProps) {
       for (const id of others.current.keys()) if (!visible.some((u) => u.id === id)) others.current.delete(id);
 
       // La gente del pasillo comenta algo de vez en cuando, si está cerca de ti.
-      if (map.crowd.length && t > nextChatter) {
+      if ((map.crowd.length || map.npcs.length) && t > nextChatter) {
         const nearby = map.crowd.filter((c) => Math.hypot(c.x - my.current.x, c.y - my.current.y) < 12);
         const who = nearby[Math.floor(Math.random() * nearby.length)];
         if (who) bubbles.current.set(who.id, { text: CHATTER[Math.floor(Math.random() * CHATTER.length)]!, at: t - (BUBBLE_MS - CHATTER_MS) });
+        // Los de los stands invitan a acercarse.
+        const rep = map.npcs.filter((n) => n.sponsor !== undefined && Math.hypot(n.x - my.current.x, n.y - my.current.y) < 9);
+        const pitcher = rep[Math.floor(Math.random() * rep.length)];
+        if (pitcher && Math.random() < 0.5) {
+          const line = PITCH_LINES[Math.floor(Math.random() * PITCH_LINES.length)]!.replace("{}", pitcher.name);
+          bubbles.current.set(pitcher.id, { text: line, at: t - (BUBBLE_MS - CHATTER_MS) });
+        }
         nextChatter = t + 3500 + Math.random() * 3500;
       }
 
       const npc = p.onNpc ? nearbyNpc() : null;
       const directory = p.onDirectory ? nearbyDirectory() : null;
-      const nextPrompt = npc ? `hablar con la ${npc.name.toLowerCase()}` : directory ? "ver cómo llegar a cada sala" : null;
+      const nextPrompt = npc ? (npc.sponsor !== undefined ? `hablar con el stand de ${npc.name}` : `hablar con la ${npc.name.toLowerCase()}`) : directory ? "ver cómo llegar a cada sala" : null;
       if (nextPrompt !== lastPrompt) {
         lastPrompt = nextPrompt;
         setPrompt(nextPrompt);
@@ -487,8 +499,9 @@ export default function Scene(props: SceneProps) {
       };
       for (const n of map.npcs) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
       for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir);
-      for (const u of visible) addAvatar(u.id, u.name, u.look, others.current.get(u.id)!, false, true);
-      addAvatar(p.me.id, p.me.name, p.me.look, my.current, true, true);
+      // 🎧: está en una charla privada.
+      for (const u of visible) addAvatar(u.id, u.inCall ? `${u.name} 🎧` : u.name, u.look, others.current.get(u.id)!, false, true);
+      addAvatar(p.me.id, p.me.inCall ? `${p.me.name} 🎧` : p.me.name, p.me.look, my.current, true, true);
       items.sort((a, b) => a.key - b.key);
       for (const it of items) it.draw(ctx, wall);
 
@@ -622,7 +635,7 @@ export default function Scene(props: SceneProps) {
     for (const [id, o] of others.current) if (hitAvatar(w.x, w.y, o.x, o.y)) h.user = id;
     const hd = hitDoor(w.x, w.y);
     h.door = hd?.id ?? null;
-    e.currentTarget.style.cursor = h.npc || hd || hitStairs(w.x, w.y) || hitDirectory(w.x, w.y) ? "pointer" : "default";
+    e.currentTarget.style.cursor = h.npc || (h.user && live.current.onUser) || hd || hitStairs(w.x, w.y) || hitDirectory(w.x, w.y) ? "pointer" : "default";
   };
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -634,11 +647,15 @@ export default function Scene(props: SceneProps) {
     if (npc) {
       const talk = () => p.onNpc?.(npc);
       if (nearbyNpc()?.id === npc.id) return talk();
-      const spots = map.desk
+      const spots = (npc.talkFrom ?? [])
         .filter((t) => isWalkable(map, t.x, t.y))
         .sort((a, b) => Math.hypot(a.x - my.current.x, a.y - my.current.y) - Math.hypot(b.x - my.current.x, b.y - my.current.y));
       for (const spot of spots) if (walkTo(spot, talk)) return;
       return;
+    }
+    if (p.onUser) {
+      const hit = [...others.current].find(([, o]) => hitAvatar(w.x, w.y, o.x, o.y));
+      if (hit) return p.onUser(hit[0]);
     }
     const directory = hitDirectory(w.x, w.y);
     if (directory) {

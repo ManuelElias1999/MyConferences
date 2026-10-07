@@ -22,6 +22,7 @@ export default function Hall({
   onExit,
   onStairs,
   onOpenAgenda,
+  onUser,
 }: {
   me: User;
   venue: Venue;
@@ -32,8 +33,11 @@ export default function Hall({
   onExit: () => void;
   onStairs: (floor: number) => void;
   onOpenAgenda: () => void;
+  onUser: (userId: string) => void;
 }) {
-  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms), [venue]);
+  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, venue.sponsors), [venue]);
+  const [stand, setStand] = useState<number | null>(null);
+  const standSponsor = stand !== null ? venue.sponsors[stand] : undefined;
   const floor = Math.min(me.floor, floors.length - 1);
   const map = floors[floor]!;
   const scene = useRef<SceneHandle>(null);
@@ -100,6 +104,8 @@ export default function Hall({
           onExit={onExit}
           onStairs={onStairs}
           onDirectory={() => setDirectoryOpen(true)}
+          onNpc={(npc) => npc.sponsor !== undefined && setStand(npc.sponsor)}
+          onUser={onUser}
           media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl }}
           handle={scene}
           label={`${venue.name}, ${map.floorName}`}
@@ -222,13 +228,47 @@ export default function Hall({
                     {u.name}
                     {u.id === me.id && <span className="muted"> (tú)</span>}
                   </p>
-                  <p className="muted small">{u.roomId ? roomById.get(u.roomId)?.name : floors[u.floor]?.floorName}</p>
+                  <p className="muted small">
+                    {u.roomId ? roomById.get(u.roomId)?.name : floors[u.floor]?.floorName}
+                    {u.inCall && " · 🎧 en charla"}
+                  </p>
                 </div>
+                {u.id !== me.id && (
+                  <button className="btn ghost sm people-call" onClick={() => onUser(u.id)} aria-label={`Charlar en privado con ${u.name}`} title="Charla privada">
+                    🎙
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         </section>
       </aside>
+
+      {standSponsor && (
+        <Modal title={`Stand de ${standSponsor.name}`} onClose={() => setStand(null)}>
+          <div className="stand-card">
+            <div className="stand-logo">
+              <img src={standSponsor.logoUrl} alt={standSponsor.name} />
+            </div>
+            <div className="stand-rep">
+              {map.npcs.find((n) => n.sponsor === stand) && <AvatarCanvas look={map.npcs.find((n) => n.sponsor === stand)!.look} size={72} />}
+              <p className="stand-quote">
+                {standSponsor.pitch?.trim() || `¡Hola! Somos ${standSponsor.name} y patrocinamos ${venue.name}. Pregúntanos lo que quieras sobre lo que hacemos.`}
+              </p>
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button className="btn ghost" onClick={() => setStand(null)}>
+              Seguir recorriendo
+            </button>
+            {standSponsor.url && (
+              <a className="btn primary" href={standSponsor.url} target="_blank" rel="noreferrer noopener">
+                Visitar su sitio
+              </a>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {directoryOpen && (
         <Modal title="Directorio de salas" onClose={() => setDirectoryOpen(false)}>

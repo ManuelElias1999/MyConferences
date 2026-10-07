@@ -337,6 +337,7 @@ function EventLogo({ event, onChange }: { event: CompanyEvent; onChange: (ev: Co
 function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: CompanyEvent) => void }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [pitch, setPitch] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -352,11 +353,12 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
       const ev = await companyApi<CompanyEvent>(`/events/${id}/sponsors`, {
         method: "POST",
         file,
-        headers: { "X-Sponsor-Name": encodeURIComponent(name), "X-Sponsor-Url": encodeURIComponent(url) },
+        headers: { "X-Sponsor-Name": encodeURIComponent(name), "X-Sponsor-Url": encodeURIComponent(url), "X-Sponsor-Pitch": encodeURIComponent(pitch) },
       });
       onChange(ev);
       setName("");
       setUrl("");
+      setPitch("");
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
     } catch (err) {
@@ -377,7 +379,9 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
   return (
     <section className="sponsors-editor">
       <h3>Patrocinadores</h3>
-      <p className="muted small">Sus logos rotan en la pantalla grande del lugar, en los tótems y en las pantallas de cada sala.</p>
+      <p className="muted small">
+        Sus logos rotan en las pantallas del lugar y de cada sala. Además, cada patrocinador tiene un <b>stand</b> en el recinto con alguien que cuenta lo que hacen.
+      </p>
       {event.venue.sponsors.length > 0 && (
         <ul className="sponsor-grid editable">
           {event.venue.sponsors.map((s) => (
@@ -394,6 +398,14 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
       <form className="sponsor-form" onSubmit={add}>
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Nombre (ej. Stellar)" aria-label="Nombre del patrocinador" />
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Sitio web (opcional)" aria-label="Sitio web del patrocinador" />
+        <textarea
+          value={pitch}
+          onChange={(e) => setPitch(e.target.value)}
+          maxLength={280}
+          rows={2}
+          placeholder="Qué cuenta su representante en el stand (opcional)"
+          aria-label="Qué cuenta el representante del stand"
+        />
         <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} aria-label="Logo" required />
         <button className="btn" disabled={busy || !file || !name.trim()}>
           {busy ? "Subiendo…" : "Agregar logo"}

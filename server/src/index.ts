@@ -22,6 +22,7 @@ import {
 } from "../../shared/maps.ts";
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
+  CallInfo,
   Account,
   ChatMessage,
   ClientToServerEvents,
@@ -319,6 +320,7 @@ function evictVenue(venueId: string, reason: string) {
     const u = conn.user;
     const sock = io.sockets.sockets.get(u.id);
     if (u.venueId !== venueId || !sock) continue;
+    leaveCall(u.id);
     for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
     Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
@@ -433,7 +435,13 @@ app.post("/api/company/events/:id/sponsors", express.raw({ type: Object.keys(IMA
   await writeFile(path.join(logosDir, fileName), body);
   entry.venue = {
     ...entry.venue,
-    sponsors: [...entry.venue.sponsors, { id: randomUUID(), name, logoUrl: `/uploads/logos/${fileName}`, url: safeUrl(decodeURIComponent(String(req.header("x-sponsor-url") ?? ""))) }],
+    sponsors: [...entry.venue.sponsors, {
+        id: randomUUID(),
+        name,
+        logoUrl: `/uploads/logos/${fileName}`,
+        url: safeUrl(decodeURIComponent(String(req.header("x-sponsor-url") ?? ""))),
+        pitch: clean(decodeURIComponent(String(req.header("x-sponsor-pitch") ?? "")), 280),
+      }],
   };
   await companyEvents.save(entry);
   applyVenue(entry.venue, venues.get(entry.venue.id)!.whitelist, entry.speakerCodes, entry.ownerId);
@@ -507,6 +515,61 @@ function sceneMapFor(u: User): SceneMap {
 
 const guestName = () => `Invitado ${Math.floor(1000 + Math.random() * 9000)}`;
 
+// ---------- Charlas privadas ----------
+
+/** Charla privada por micrófono: el servidor solo sabe quién está y pasa las señales de WebRTC. */
+interface PrivateCall {
+  id: string;
+  venueId: string;
+  members: Set<string>;
+  invited: Set<string>;
+}
+const calls = new Map<string, PrivateCall>();
+const callOfUser = new Map<string, string>();
+const MAX_CALL = 8;
+
+const callInfo = (call: PrivateCall): CallInfo => ({
+  id: call.id,
+  members: [...call.members].flatMap((id) => {
+    const user = connections.get(id)?.user;
+    return user ? [user] : [];
+  }),
+});
+
+function setInCall(userId: string, inCall: boolean) {
+  const c = connections.get(userId);
+  if (!c || c.user.inCall === inCall) return;
+  c.user.inCall = inCall;
+  io.to(presenceChannel(c.user)).emit("userUpdated", c.user);
+}
+
+function emitCall(call: PrivateCall) {
+  const info = callInfo(call);
+  for (const id of call.members) io.to(id).emit("callUpdated", info);
+}
+
+function endCall(call: PrivateCall) {
+  calls.delete(call.id);
+  for (const id of call.members) {
+    callOfUser.delete(id);
+    setInCall(id, false);
+    io.to(id).emit("callUpdated", null);
+  }
+  for (const id of call.invited) io.to(id).emit("callCancelled", call.id);
+}
+
+/** Saca a alguien de su charla; si queda una sola persona y nadie por contestar, la charla termina. */
+function leaveCall(userId: string) {
+  const call = calls.get(callOfUser.get(userId) ?? "");
+  if (!call) return;
+  call.members.delete(userId);
+  callOfUser.delete(userId);
+  setInCall(userId, false);
+  io.to(userId).emit("callUpdated", null);
+  if (call.members.size < 2 && call.invited.size === 0) endCall(call);
+  else emitCall(call);
+}
+
 io.on("connection", (socket) => {
   let conn: Connection | null = null;
   let lastSaid = 0;
@@ -550,6 +613,7 @@ io.on("connection", (socket) => {
       venueId: null,
       roomId: null,
       speakerFor: null,
+      inCall: false,
       x: spot.x,
       y: spot.y,
     };
@@ -649,6 +713,7 @@ io.on("connection", (socket) => {
     if (!conn?.user.venueId) return ack({ ok: false, error: "No estás en un salón" });
     const u = conn.user;
     const venueId = u.venueId!;
+    leaveCall(u.id);
     leaveCurrentRoom();
     socket.leave(venueChannel(venueId));
     socket.leave(hallChannel(venueId, u.floor));
@@ -837,9 +902,65 @@ io.on("connection", (socket) => {
     io.to(target.user.id).emit("rtc", me.id, signal);
   });
 
+  // ----- Charlas privadas -----
+
+  socket.on("callInvite", (userId, ack) => {
+    const me = conn?.user;
+    const target = connections.get(String(userId))?.user;
+    if (!me?.venueId) return ack({ ok: false, error: "Entra a un evento para charlar" });
+    if (!target || target.venueId !== me.venueId || target.id === me.id) return ack({ ok: false, error: "Esa persona ya no está en el evento" });
+    let call = calls.get(callOfUser.get(me.id) ?? "");
+    if (call?.members.has(target.id)) return ack({ ok: false, error: `${target.name} ya está en tu charla` });
+    if (call && call.members.size + call.invited.size >= MAX_CALL) return ack({ ok: false, error: `Una charla privada es de hasta ${MAX_CALL} personas` });
+    if (!call) {
+      call = { id: randomUUID(), venueId: me.venueId, members: new Set([me.id]), invited: new Set() };
+      calls.set(call.id, call);
+      callOfUser.set(me.id, call.id);
+      setInCall(me.id, true);
+      emitCall(call);
+    }
+    call.invited.add(target.id);
+    const members = [...call.members].map((id) => connections.get(id)?.user.name ?? "").filter(Boolean);
+    io.to(target.id).emit("callInvited", { callId: call.id, from: me, members });
+    ack({ ok: true, data: null });
+  });
+
+  socket.on("callRespond", (callId, accept, ack) => {
+    const me = conn?.user;
+    const call = calls.get(String(callId));
+    if (!me || !call || !call.invited.has(me.id)) return ack({ ok: false, error: "Esa charla ya terminó" });
+    call.invited.delete(me.id);
+    if (!accept || me.venueId !== call.venueId) {
+      for (const id of call.members) io.to(id).emit("callDeclined", { name: me.name });
+      if (call.members.size < 2 && call.invited.size === 0) endCall(call);
+      return ack({ ok: true, data: null });
+    }
+    if (callOfUser.has(me.id)) leaveCall(me.id);
+    if (!calls.has(call.id)) return ack({ ok: false, error: "Esa charla ya terminó" });
+    call.members.add(me.id);
+    callOfUser.set(me.id, call.id);
+    setInCall(me.id, true);
+    emitCall(call);
+    ack({ ok: true, data: callInfo(call) });
+  });
+
+  socket.on("callLeave", () => {
+    if (conn) leaveCall(conn.user.id);
+  });
+
+  socket.on("callSignal", (to, signal) => {
+    const me = conn?.user;
+    const callId = me && callOfUser.get(me.id);
+    if (!callId || callOfUser.get(String(to)) !== callId || !signal || typeof signal !== "object") return;
+    if (!["offer", "answer", "ice"].includes(signal.kind)) return;
+    io.to(String(to)).emit("callSignal", me.id, signal);
+  });
+
   socket.on("disconnect", () => {
     if (!conn) return;
     const u = conn.user;
+    leaveCall(u.id);
+    for (const call of calls.values()) if (call.invited.delete(u.id) && call.members.size < 2 && call.invited.size === 0) endCall(call);
     leaveCurrentRoom();
     connections.delete(socket.id);
     io.to(presenceChannel(u)).emit("userLeft", u.id);

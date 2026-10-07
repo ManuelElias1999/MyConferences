@@ -5,6 +5,8 @@ import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
 import AuthDialog from "./AuthDialog.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
+import { usePrivateCall } from "./call.ts";
+import CallPanel, { UserCard } from "./CallPanel.tsx";
 import Hall from "./Hall.tsx";
 import { loadToken, saveToken, socket } from "./lib.ts";
 import Reception from "./Reception.tsx";
@@ -33,6 +35,9 @@ export default function App() {
   /** Al registrarse desde «Crear evento», se abre el panel apenas termina. */
   const openPanelAfterAuth = useRef(false);
   const [notice, setNotice] = useState("");
+  const call = usePrivateCall(me?.id ?? null);
+  /** Persona a la que le hiciste clic (para invitarla a charlar). */
+  const [cardUser, setCardUser] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   // Las posiciones cambian muchas veces por segundo: viven en un ref que los mapas
@@ -55,6 +60,13 @@ export default function App() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!call.notice) return;
+    setNotice(call.notice);
+    call.clearNotice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call.notice]);
 
   useEffect(() => {
     if (!notice) return;
@@ -280,6 +292,8 @@ export default function App() {
   }
 
   const venue = place.kind === "reception" ? null : place.venue;
+  const people = [...usersRef.current.values()].filter((u) => venue && u.venueId === venue.id);
+  const card = cardUser ? usersRef.current.get(cardUser) : undefined;
   const room = place.kind === "room" ? place.venue.rooms.find((r) => r.id === place.roomId) ?? null : null;
 
   return (
@@ -373,6 +387,7 @@ export default function App() {
           onExit={leaveVenue}
           onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
+          onUser={setCardUser}
         />
       )}
       {place.kind === "room" && room && (
@@ -388,6 +403,7 @@ export default function App() {
           speakerCode={speakerCode.current?.code ?? null}
           onLeave={leaveRoom}
           onClaim={claimSpeaker}
+          onUser={setCardUser}
         />
       )}
 
@@ -417,6 +433,8 @@ export default function App() {
           }}
         />
       )}
+      {venue && <CallPanel me={me} call={call} people={people} />}
+      {card && venue && card.venueId === venue.id && <UserCard user={card} call={call} onClose={() => setCardUser(null)} />}
       {notice && (
         <div className="toast" role="status">
           {notice}

@@ -39,6 +39,8 @@ export interface Sponsor {
   name: string;
   logoUrl: string;
   url: string | null;
+  /** Lo que cuenta su representante en el stand. */
+  pitch: string;
 }
 
 export interface Talk {
@@ -114,6 +116,8 @@ export interface User {
   floor: number;
   /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
+  /** Está en una charla privada por micrófono (los demás no la escuchan). */
+  inCall: boolean;
   /** Posición en baldosas del mapa en el que está. */
   x: number;
   y: number;
@@ -176,6 +180,21 @@ export type RtcSignal =
   | { kind: "answer"; session: number; sdp: string }
   | { kind: "ice"; session: number; candidate: RTCIceCandidateInit };
 
+/** Charla privada por micrófono entre algunas personas del evento. */
+export interface CallInfo {
+  id: string;
+  members: User[];
+}
+
+export interface CallInvite {
+  callId: string;
+  from: User;
+  /** Nombres de quienes ya están en la charla. */
+  members: string[];
+}
+
+export type CallSignal = { kind: "offer" | "answer"; sdp: string } | { kind: "ice"; candidate: RTCIceCandidateInit };
+
 export type Ack<T> = (res: { ok: true; data: T } | { ok: false; error: string }) => void;
 
 export interface Welcome {
@@ -211,6 +230,11 @@ export interface ClientToServerEvents {
   setMode: (mode: StageMode) => void;
   setLive: (live: { video: LiveInfo["video"]; audio: boolean } | null) => void;
   rtc: (to: string, signal: RtcSignal) => void;
+  /** Invitar a alguien a tu charla privada (si no tienes una, se crea). */
+  callInvite: (userId: string, ack: Ack<null>) => void;
+  callRespond: (callId: string, accept: boolean, ack: Ack<CallInfo | null>) => void;
+  callLeave: () => void;
+  callSignal: (to: string, signal: CallSignal) => void;
 }
 
 export interface ServerToClientEvents {
@@ -228,4 +252,11 @@ export interface ServerToClientEvents {
   questions: (questions: Question[]) => void;
   stage: (stage: Stage) => void;
   rtc: (from: string, signal: RtcSignal) => void;
+  callInvited: (invite: CallInvite) => void;
+  /** Quiénes están en tu charla; null si ya no estás en ninguna. */
+  callUpdated: (call: CallInfo | null) => void;
+  callDeclined: (data: { name: string }) => void;
+  /** La invitación ya no vale (la charla terminó). */
+  callCancelled: (callId: string) => void;
+  callSignal: (from: string, signal: CallSignal) => void;
 }

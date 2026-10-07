@@ -1682,6 +1682,50 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.fillRect(sx, sy + ih - 3, iw, 3);
         });
         break;
+      case "booth": {
+        // Stand de un patrocinador: panel en la pared, dos roll-ups y el mostrador con su logo.
+        const n = f.n ?? 0;
+        const color = BOOTH_COLORS[n % BOOTH_COLORS.length]!;
+        const sponsor = () => media?.().sponsors[n] ?? null;
+        const sw = 3 * T;
+        add(y - 0.5, (ctx) => {
+          const sp = sponsor();
+          frame(ctx, px + 2, py - 2 * T + 6, sw - 4, 2 * T - 2, "#ffffff");
+          ctx.fillStyle = color;
+          ctx.fillRect(px + 2, py - 2 * T + 6, sw - 4, 8);
+          ctx.fillRect(px + 2, py - 6, sw - 4, 4);
+          // Logo y nombre arriba, por encima de la cabeza de quien atiende.
+          if (sp) logoIn(ctx, sp, px + 10, py - 2 * T + 16, sw - 20, 16);
+          ctx.fillStyle = "#16161d";
+          ctx.font = `700 8px ${FONT}`;
+          ctx.textAlign = "center";
+          ctx.fillText((sp?.name ?? "").toUpperCase(), px + sw / 2, py - 2 * T + 41, sw - 12);
+          ctx.textAlign = "left";
+        });
+        for (const rx of [px + 4, px + sw - 24]) {
+          add(y + 0.9, (ctx) => {
+            const sp = sponsor();
+            const b = py + T - 2;
+            shadowUnder(ctx, rx + 10, b, 12);
+            ctx.fillStyle = "#3a3f4d";
+            ctx.fillRect(rx - 1, b - 4, 22, 4);
+            frame(ctx, rx, b - 62, 20, 58, "#ffffff");
+            ctx.fillStyle = color;
+            ctx.fillRect(rx, b - 62, 20, 6);
+            ctx.fillRect(rx, b - 18, 20, 14);
+            if (sp) logoIn(ctx, sp, rx + 2, b - 50, 16, 26);
+          });
+        }
+        add(y + 1.9, (ctx) => {
+          const sp = sponsor();
+          const top = py + T + 4;
+          shadowUnder(ctx, cx, top + 26, sw / 2 - 4);
+          box(ctx, px + 4, top, sw - 8, 8, 18, color, "#f4f1ea");
+          frame(ctx, cx - 20, top + 10, 40, 14, "#ffffff");
+          if (sp) logoIn(ctx, sp, cx - 18, top + 11, 36, 12);
+        });
+        break;
+      }
       case "crenel":
         // Almena de piedra en el borde de la azotea.
         add(y + 1, (ctx) => {
@@ -1899,6 +1943,26 @@ export interface Media {
   title: string;
   /** Logo del evento para la pantalla grande del lobby. */
   logoUrl?: string | null;
+}
+
+/** Colores de los stands, para que cada patrocinador se distinga. */
+const BOOTH_COLORS = ["#2f6bff", "#ff5c39", "#10b981", "#a78bfa", "#f59e0b", "#ef476f"];
+
+/** Logo de un patrocinador ajustado a un rectángulo (o su nombre mientras carga). */
+function logoIn(ctx: CanvasRenderingContext2D, sponsor: Sponsor, x: number, y: number, w: number, h: number) {
+  const img = logoImage(sponsor.logoUrl);
+  if (img) {
+    const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, x + (w - img.naturalWidth * scale) / 2, y + (h - img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale);
+    ctx.imageSmoothingEnabled = false;
+    return;
+  }
+  ctx.fillStyle = "#16161d";
+  ctx.font = `700 ${Math.min(10, h - 2)}px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.fillText(sponsor.name, x + w / 2, y + h / 2 + 3, w);
+  ctx.textAlign = "left";
 }
 
 const SLIDE_MS = 5000;

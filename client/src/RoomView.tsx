@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { interiorFor } from "../../shared/maps.ts";
+import { useDeafened } from "./call.ts";
 import type { ChatMessage, Question, Room, RoomSnapshot, Stage, StageMode, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { useBroadcaster, useLiveViewer } from "./live.ts";
@@ -24,6 +25,7 @@ export default function RoomView({
   speakerCode,
   onLeave,
   onClaim,
+  onUser,
 }: {
   me: User;
   venue: Venue;
@@ -35,7 +37,9 @@ export default function RoomView({
   speakerCode: string | null;
   onLeave: () => void;
   onClaim: (code: string) => Promise<void>;
+  onUser: (userId: string) => void;
 }) {
+  const deafened = useDeafened();
   const map = useMemo(() => interiorFor(venue.theme, venue.rooms, room.id), [venue.theme, venue.rooms, room.id]);
   const scene = useRef<SceneHandle>(null);
   const [phase, setPhase] = useState<"entering" | "seated">("entering");
@@ -139,6 +143,7 @@ export default function RoomView({
           <span className="muted small stage-status">
             {presenter ? `Presenta: ${presenter.name}` : "El ponente aún no está en la sala"}
             {stage.live?.audio && " · 🎙 hablando"}
+            {deafened && " · 🎧 estás en una charla privada: la sala está en silencio"}
             {stage.mode === "slides" && stage.slidesUrl && pageCount > 0 && ` · Diapositiva ${stage.slide} de ${pageCount}`}
           </span>
           {isPresenter ? (
@@ -160,6 +165,7 @@ export default function RoomView({
             media={{ sponsors: venue.sponsors, title: venue.organizer }}
             locked={phase === "entering"}
             onDoor={onLeave}
+            onUser={onUser}
             handle={scene}
             label={`Público de ${room.name}`}
           />
@@ -204,6 +210,9 @@ export default function RoomView({
 
 function MediaPlayer({ stream, kind, muted = false }: { stream: MediaStream; kind: "video" | "audio"; muted?: boolean }) {
   const ref = useRef<HTMLMediaElement>(null);
+  // En una charla privada solo se escucha a la gente de la charla.
+  const deafened = useDeafened();
+  const silent = muted || deafened;
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
@@ -218,9 +227,9 @@ function MediaPlayer({ stream, kind, muted = false }: { stream: MediaStream; kin
   return (
     <>
       {kind === "video" ? (
-        <video ref={ref as React.RefObject<HTMLVideoElement>} className="live-video" playsInline autoPlay muted={muted} />
+        <video ref={ref as React.RefObject<HTMLVideoElement>} className="live-video" playsInline autoPlay muted={silent} />
       ) : (
-        <audio ref={ref as React.RefObject<HTMLAudioElement>} autoPlay />
+        <audio ref={ref as React.RefObject<HTMLAudioElement>} autoPlay muted={silent} />
       )}
       {blocked && (
         <button className="btn primary unmute" onClick={() => ref.current?.play().then(() => setBlocked(false))}>

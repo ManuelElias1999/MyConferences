@@ -19,7 +19,15 @@ interface VenueSeed {
   program: Program;
 }
 
-const logo = (id: string, name: string, url: string | null = null): Sponsor => ({ id, name, logoUrl: `/assets/logos/${id}.svg`, url });
+/** Lo que cuenta el representante de cada patrocinador de ejemplo en su stand. */
+const PITCH: Record<string, string> = {
+  novapay: "Cobros en línea en 5 minutos, con tarjetas, transferencias y billeteras. Hoy te damos 3 meses sin comisión.",
+  "orbit-cloud": "Servidores y bases de datos que escalan solos. Si te registras en el evento, tienes USD 300 de crédito.",
+  devforge: "Integración continua y despliegues sin configurar nada. Pasa a ver la demo de pipelines en 30 segundos.",
+  "pixel-bank": "La cuenta para startups: tarjetas virtuales, pagos internacionales y reportes automáticos para tu contador.",
+};
+
+const logo = (id: string, name: string, url: string | null = null): Sponsor => ({ id, name, logoUrl: `/assets/logos/${id}.svg`, url, pitch: PITCH[id] ?? "" });
 
 const seeds: VenueSeed[] = [
   {

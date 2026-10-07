@@ -15,7 +15,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **acceso**: privado (solo los correos de la lista) o abierto;
   - **salas y agenda**: el **auditorio principal** y entre **8 y 16 salas** (las primeras ocho van en la planta baja y las demás en el piso de arriba), cada una con su color, su **código de ponente** y sus charlas (título, ponente, hora de inicio y duración). Cada sala tiene una distribución distinta: aula, taller con mesas, anfiteatro en U o sala ancha;
   - **logo del evento**: aparece en la pantalla gigante del lobby (si no hay logo, se muestra el nombre);
-  - **patrocinadores**: logos en PNG, JPG o WebP con su sitio web opcional. Rotan en las pantallas gigantes de la fachada del auditorio, en los tótems de la plaza y en las pantallas de cada sala.
+  - **patrocinadores**: logos en PNG, JPG o WebP con su sitio web opcional y un texto corto sobre lo que ofrecen. Rotan en las pantallas del recinto y de cada sala, y cada uno tiene su **stand**.
 - Cada evento recibe un **número** para compartir con los invitados. La empresa siempre puede entrar a su propio evento con «Visitar mi evento», y también puede cerrarlo: quien esté dentro vuelve a recepción.
 
 ### Para los asistentes
@@ -29,9 +29,12 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
   - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.
+  - Ninguna sala queda escondida: todas dan al lobby, al bulevar o al pasillo del auditorio, y se ven apenas llegas. Cafetería, juegos y patios quedan a un costado, detrás de portales.
   - Entre una zona y otra hay **portales con el nombre de la zona** o carteles con flecha («← CAFETERÍA», «JUEGOS →»).
   - Las paredes tienen un color bien distinto al piso, y el piso es liso, sin dibujos.
   - Las **escaleras** son anchas, con barandas y una flecha: la que sube se mete en el muro y la que baja es un hueco con baranda. Basta pisarlas para cambiar de piso.
+- **Stands de patrocinadores**: pegados a las paredes para no estorbar, con panel, roll-ups, mostrador con el logo y alguien que atiende e invita a acercarse. Al hablarle (X o clic) cuenta lo que hace la marca y ofrece ir a su sitio.
+- **Charla privada por micrófono**: haz clic en una persona (o en 🎙 en la lista «En el evento») e invítala. Si acepta, solo ustedes se escuchan y el resto del evento queda en silencio, incluido el ponente si estás en una sala. Con «＋ Añadir» se suman más personas (hasta 8). Quien está en una charla lleva 🎧 sobre su nombre.
 - **Sin choques**: solo las paredes cortan el paso. Muebles y personas se pueden atravesar, aunque los caminos automáticos rodean los muebles.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.
 - **Puertas**: cada una muestra el nombre de la sala, la charla en curso o la próxima, y su horario (por ejemplo «10:00–10:45»).
