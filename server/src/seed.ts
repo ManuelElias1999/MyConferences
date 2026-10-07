@@ -40,6 +40,8 @@ const seeds: VenueSeed[] = [
       { id: "devops", name: "Sala DevOps", topic: "Cloud, contenedores y CI/CD", color: "#14b8a6", main: false },
       { id: "seguridad", name: "Sala Seguridad", topic: "Ciberseguridad para equipos de producto", color: "#8b5cf6", main: false },
       { id: "datos", name: "Sala Datos", topic: "Datos, analítica y visualización", color: "#f97316", main: false },
+      { id: "mobile", name: "Sala Mobile", topic: "Apps móviles y multiplataforma", color: "#ec4899", main: false },
+      { id: "gaming", name: "Sala Gaming", topic: "Videojuegos y gráficos en tiempo real", color: "#6366f1", main: false },
     ],
     program: {
       auditorio: [
@@ -256,6 +258,7 @@ export function createVenues(dataDir: string, now = Date.now()) {
       private: seed.private,
       theme: seed.theme,
       organizer: seed.organizer,
+      logoUrl: seed.id === "101" ? "/assets/logos/myconferences.svg" : null,
       rooms: seed.rooms,
       talks: buildTalks(seed, now),
       sponsors: seed.sponsors,

@@ -470,7 +470,8 @@ kbd {
 .floor-badge {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 6px 12px;
   border-radius: 3px;
   background: var(--navy);
@@ -1614,6 +1615,27 @@ textarea {
   gap: 10px;
   padding-top: 18px;
   border-top: 1px solid var(--border);
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.event-logo {
+  width: 200px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 3px;
+  background: #16161d;
+}
+
+.event-logo.empty {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
 }
 
 .sponsor-form {

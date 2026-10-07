@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { venueMap, type Door } from "../../shared/maps.ts";
+import { venueFloors, type Door, type Tile } from "../../shared/maps.ts";
 import { THEMES } from "../../shared/themes.ts";
 import type { Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
@@ -20,6 +20,7 @@ export default function Hall({
   now,
   onEnterRoom,
   onExit,
+  onStairs,
   onOpenAgenda,
 }: {
   me: User;
@@ -29,20 +30,25 @@ export default function Hall({
   now: number;
   onEnterRoom: (roomId: string) => void;
   onExit: () => void;
+  onStairs: (floor: number) => void;
   onOpenAgenda: () => void;
 }) {
-  const map = useMemo(() => venueMap(venue.theme, venue.rooms), [venue]);
+  const floors = useMemo(() => venueFloors(venue.theme, venue.rooms), [venue]);
+  const floor = Math.min(me.floor, floors.length - 1);
+  const map = floors[floor]!;
   const scene = useRef<SceneHandle>(null);
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [guiding, setGuiding] = useState<string | null>(null);
 
   void usersVersion;
   const everyone = [...users.values()];
-  const doorById = new Map(map.doors.map((d) => [d.id, d]));
+  const doorInfo = new Map<string, { door: Door; floor: number }>();
+  floors.forEach((m, f) => m.doors.forEach((door) => doorInfo.set(door.id, { door, floor: f })));
   const info = venue.rooms.map((room) => {
     const { current, next } = roomSchedule(venue, room.id, now);
     const talk = current ?? next;
-    return { room, current, next, door: doorById.get(room.id), count: everyone.filter((u) => u.roomId === room.id).length, talk };
+    const where = doorInfo.get(room.id);
+    return { room, current, next, where, count: everyone.filter((u) => u.roomId === room.id).length, talk };
   });
   const doorStatus = new Map<string, DoorStatus>(
     info.map(({ room, current, talk, count }) => [room.id, { live: Boolean(current), count, title: talk?.title ?? "", time: talk ? span(talk) : "" }]),
@@ -52,40 +58,56 @@ export default function Hall({
     .sort((a, b) => a.start - b.start)
     .slice(0, 4);
   const roomById = new Map(venue.rooms.map((r) => [r.id, r]));
+  const placeOf = (roomId: string) => {
+    const w = doorInfo.get(roomId);
+    return w ? `${floors[w.floor]!.floorName} · ${w.door.zone}` : "";
+  };
 
-  const guide = (door: Door) => {
-    scene.current?.guide({ x: door.x, y: door.y });
-    setGuiding(door.label);
+  /** Si la sala está en otro piso, el camino lleva primero a la escalera. */
+  const targetFor = (where: { door: Door; floor: number }): Tile => {
+    if (where.floor === floor) return { x: where.door.x, y: where.door.y };
+    const st = map.stairs.find((s) => s.to === where.floor) ?? map.stairs[0];
+    return st ? { x: st.x, y: st.y } : map.spawn;
+  };
+  const guide = (roomId: string) => {
+    const where = doorInfo.get(roomId);
+    if (!where) return;
+    scene.current?.guide(targetFor(where));
+    setGuiding(where.floor === floor ? where.door.label : `${where.door.label} (sube por la escalera)`);
     setDirectoryOpen(false);
   };
-  const go = (door: Door | undefined, roomId: string) => {
+  const go = (roomId: string) => {
     setDirectoryOpen(false);
     setGuiding(null);
     scene.current?.guide(null);
-    if (!door || !scene.current?.walkTo({ x: door.x, y: door.y })) onEnterRoom(roomId);
+    const where = doorInfo.get(roomId);
+    if (!where || where.floor !== floor || !scene.current?.walkTo({ x: where.door.x, y: where.door.y })) onEnterRoom(roomId);
   };
 
   return (
     <main className="hall">
       <div className="world">
         <Scene
+          key={`${venue.id}:${floor}`}
           map={map}
           me={me}
           users={users}
-          inScene={(u) => u.venueId === venue.id && !u.roomId}
+          inScene={(u) => u.venueId === venue.id && !u.roomId && u.floor === floor}
           camera="follow"
           names="all"
           doorStatus={doorStatus}
           onDoor={(door) => onEnterRoom(door.id)}
           onExit={onExit}
+          onStairs={onStairs}
           onDirectory={() => setDirectoryOpen(true)}
-          media={{ sponsors: venue.sponsors, title: venue.name }}
+          media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl }}
           handle={scene}
-          label={`Recinto de ${venue.name}`}
+          label={`${venue.name}, ${map.floorName}`}
         />
         <p className="scene-hint">
-          Recorre el evento: camina por sus pasillos hasta la sala que quieras. Usa los tótems <b>?</b> o el minimapa para saber cómo llegar.
+          Recorre el evento: hay cafetería, zonas para charlar, juegos y un patio. Usa los tótems <b>?</b> o el minimapa para llegar a cada sala.
         </p>
+        <span className="floor-badge">{map.floorName}</span>
         {guiding && (
           <p className="guide-chip">
             Siguiendo el camino a <b>{guiding}</b>
@@ -135,29 +157,37 @@ export default function Hall({
           </section>
         )}
 
-        <section>
-          <h3 className="side-title">Salas</h3>
-          <ul className="room-list">
-            {info.map(({ room, current, talk, door, count }) => (
-              <li key={room.id} style={{ "--room": room.color } as React.CSSProperties}>
-                <span className="room-dot" />
-                <div>
-                  <p className="room-name">
-                    {room.name} {current && <span className="status live">En vivo</span>}
-                  </p>
-                  <p className="muted small">
-                    {talk ? `${span(talk)} · ${talk.title}` : room.topic}
-                    {count > 0 && ` · ${count} dentro`}
-                  </p>
-                  {door && <p className="muted small">{door.zone}</p>}
-                </div>
-                <button className="btn sm" onClick={() => go(door, room.id)}>
-                  Ir
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {floors.map((m, f) => (
+          <section key={f}>
+            <h3 className="side-title">
+              {m.floorName}
+              {f === floor && <span className="here">Estás aquí</span>}
+            </h3>
+            <ul className="room-list">
+              {info
+                .filter((i) => i.where?.floor === f)
+                .map(({ room, current, talk, where, count }) => (
+                  <li key={room.id} style={{ "--room": room.color } as React.CSSProperties}>
+                    <span className="room-dot" />
+                    <div>
+                      <p className="room-name">
+                        {room.name} {current && <span className="status live">En vivo</span>}
+                      </p>
+                      <p className="muted small">
+                        {talk ? `${span(talk)} · ${talk.title}` : room.topic}
+                        {count > 0 && ` · ${count} dentro`}
+                      </p>
+                      {where && <p className="muted small">{where.door.zone}</p>}
+                    </div>
+                    <button className="btn sm" onClick={() => go(room.id)}>
+                      Ir
+                    </button>
+                  </li>
+                ))}
+              {!info.some((i) => i.where?.floor === f) && <li className="muted small">Espacios para charlar y descansar.</li>}
+            </ul>
+          </section>
+        ))}
 
         {upcoming.length > 0 && (
           <section>
@@ -192,7 +222,7 @@ export default function Hall({
                     {u.name}
                     {u.id === me.id && <span className="muted"> (tú)</span>}
                   </p>
-                  <p className="muted small">{u.roomId ? roomById.get(u.roomId)?.name : "Recorriendo el evento"}</p>
+                  <p className="muted small">{u.roomId ? roomById.get(u.roomId)?.name : floors[u.floor]?.floorName}</p>
                 </div>
               </li>
             ))}
@@ -204,14 +234,14 @@ export default function Hall({
         <Modal title="Directorio de salas" onClose={() => setDirectoryOpen(false)}>
           <p className="muted small directory-lead">Elige una sala: te marcamos el camino en el suelo o te llevamos caminando.</p>
           <ul className="directory">
-            {info.map(({ room, current, next, door, count }) => (
+            {info.map(({ room, current, next, count }) => (
               <li key={room.id} className={room.main ? "main" : ""} style={{ "--room": room.color } as React.CSSProperties}>
                 <div className="directory-room">
                   <p className="room-name">
                     {room.name} {current && <span className="status live">En vivo</span>}
                   </p>
                   <p className="muted small">
-                    {door?.zone ?? ""}
+                    {placeOf(room.id)}
                     {count > 0 && ` · ${count} dentro`}
                   </p>
                 </div>
@@ -230,12 +260,10 @@ export default function Hall({
                   {!current && !next && <p className="muted">{room.topic}</p>}
                 </div>
                 <div className="directory-actions">
-                  {door && (
-                    <button className="btn sm" onClick={() => guide(door)}>
-                      Mostrar camino
-                    </button>
-                  )}
-                  <button className="btn primary sm" onClick={() => go(door, room.id)}>
+                  <button className="btn sm" onClick={() => guide(room.id)}>
+                    Mostrar camino
+                  </button>
+                  <button className="btn primary sm" onClick={() => go(room.id)}>
                     Llevarme
                   </button>
                 </div>

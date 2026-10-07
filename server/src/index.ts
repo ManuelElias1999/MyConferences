@@ -7,7 +7,19 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "socket.io";
 import { DEFAULT_LOOK } from "../../shared/look.ts";
-import { inFront, interiorFor, isWalkable, MAX_ROOMS, receptionMap, venueMap, type SceneMap, type Tile } from "../../shared/maps.ts";
+import {
+  floorOfRoom,
+  inFront,
+  interiorFor,
+  isWalkable,
+  MAX_ROOMS,
+  MIN_ROOMS,
+  receptionMap,
+  stairsArrival,
+  venueFloors,
+  type SceneMap,
+  type Tile,
+} from "../../shared/maps.ts";
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   Account,
@@ -54,7 +66,8 @@ interface VenueState {
   venue: Venue;
   whitelist: Set<string> | null;
   /** Mapa del recinto del evento. */
-  map: SceneMap;
+  /** Un mapa por piso del recinto. */
+  floors: SceneMap[];
   rooms: Map<string, RoomState>;
   /** Cuenta de la empresa dueña del evento (null en los de ejemplo). */
   ownerId: string | null;
@@ -79,7 +92,7 @@ function applyVenue(venue: Venue, whitelist: Set<string> | null, codes: Record<s
   const rooms = venues.get(venue.id)?.rooms ?? new Map<string, RoomState>();
   for (const r of venue.rooms) if (!rooms.has(r.id)) rooms.set(r.id, newRoomState());
   for (const id of rooms.keys()) if (!venue.rooms.some((r) => r.id === id)) rooms.delete(id);
-  venues.set(venue.id, { venue, whitelist, map: venueMap(venue.theme, venue.rooms), rooms, ownerId });
+  venues.set(venue.id, { venue, whitelist, floors: venueFloors(venue.theme, venue.rooms), rooms, ownerId });
   for (const r of venue.rooms) {
     const key = `${venue.id}/${r.id}`;
     const code = codes[r.id] ?? speakerCodes.get(key) ?? randomBytes(3).toString("hex").toUpperCase();
@@ -250,7 +263,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
   if (!name) return { error: "Ponle un nombre al evento" };
   if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
   const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
-  if (!rawRooms.length) return { error: "El evento necesita su auditorio principal" };
+  if (rawRooms.length < MIN_ROOMS) return { error: `El evento necesita el auditorio principal y al menos ${MIN_ROOMS - 1} salas` };
   const whitelist = [
     ...new Set(
       (Array.isArray(body.whitelist) ? body.whitelist : [])
@@ -308,7 +321,7 @@ function evictVenue(venueId: string, reason: string) {
     if (u.venueId !== venueId || !sock) continue;
     for (const room of [...sock.rooms]) if (room !== sock.id) sock.leave(room);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
     sock.join("reception");
     sock.to("reception").emit("userJoined", u);
     moved.push(u);
@@ -350,6 +363,7 @@ app.post("/api/company/events", json, async (req, res) => {
     private: input.private,
     theme: input.theme,
     organizer: account.company!.name,
+    logoUrl: null,
     rooms: input.rooms,
     talks: input.talks,
     sponsors: [],
@@ -427,6 +441,25 @@ app.post("/api/company/events/:id/sponsors", express.raw({ type: Object.keys(IMA
   res.json(toCompanyEvent(entry));
 });
 
+/** Logo del evento para la pantalla grande del lobby. */
+app.post("/api/company/events/:id/logo", express.raw({ type: Object.keys(IMAGE_TYPES), limit: "2mb" }), async (req, res) => {
+  const owned = ownedEvent(req, res);
+  if (!owned) return;
+  const { entry } = owned;
+  const type = IMAGE_TYPES[String(req.header("content-type")).split(";")[0]!];
+  const body = req.body;
+  if (!type || !Buffer.isBuffer(body) || !type.magic(body)) return res.status(400).json({ error: "El logo debe ser una imagen PNG, JPG o WebP" });
+  const fileName = `${entry.venue.id}-logo-${randomUUID()}.${type.ext}`;
+  await writeFile(path.join(logosDir, fileName), body);
+  const previous = entry.venue.logoUrl;
+  if (previous?.startsWith("/uploads/")) unlink(path.join(uploadsDir, previous.slice(9))).catch(() => {});
+  entry.venue = { ...entry.venue, logoUrl: `/uploads/logos/${fileName}` };
+  await companyEvents.save(entry);
+  applyVenue(entry.venue, venues.get(entry.venue.id)!.whitelist, entry.speakerCodes, entry.ownerId);
+  io.to(venueChannel(entry.venue.id)).emit("venueUpdated", entry.venue);
+  res.json(toCompanyEvent(entry));
+});
+
 app.delete("/api/company/events/:id/sponsors/:sponsorId", async (req, res) => {
   const owned = ownedEvent(req, res);
   if (!owned) return;
@@ -454,11 +487,11 @@ if (existsSync(clientDist)) {
 //   hall:<salón>:<piso> quienes caminan por ese piso del edificio
 //   room:<salón>:<sala> quienes están en una sala
 const venueChannel = (venueId: string) => `v:${venueId}`;
-const hallChannel = (venueId: string) => `hall:${venueId}`;
+const hallChannel = (venueId: string, floor: number) => `hall:${venueId}:${floor}`;
 const roomChannel = (venueId: string, roomId: string) => `room:${venueId}:${roomId}`;
 
 const sceneChannel = (u: User) =>
-  !u.venueId ? "reception" : u.roomId ? roomChannel(u.venueId, u.roomId) : hallChannel(u.venueId);
+  !u.venueId ? "reception" : u.roomId ? roomChannel(u.venueId, u.roomId) : hallChannel(u.venueId, u.floor);
 const presenceChannel = (u: User) => (u.venueId ? venueChannel(u.venueId) : "reception");
 
 const usersIn = (venueId: string | null) =>
@@ -469,7 +502,7 @@ function sceneMapFor(u: User): SceneMap {
   const state = venues.get(u.venueId);
   if (!state) return RECEPTION;
   if (u.roomId) return interiorOf(state.venue, u.roomId);
-  return state.map;
+  return state.floors[u.floor] ?? state.floors[0]!;
 }
 
 const guestName = () => `Invitado ${Math.floor(1000 + Math.random() * 9000)}`;
@@ -513,6 +546,7 @@ io.on("connection", (socket) => {
       name: account?.name ?? guestName(),
       look: account?.look ?? DEFAULT_LOOK,
       registered: Boolean(account),
+      floor: 0,
       venueId: null,
       roomId: null,
       speakerFor: null,
@@ -590,9 +624,10 @@ io.on("connection", (socket) => {
 
     socket.leave("reception");
     socket.to("reception").emit("userLeft", u.id);
-    const spot = spawnNear(state.map, state.map.spawn);
-    Object.assign(u, { venueId: id, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
-    socket.join([venueChannel(id), hallChannel(id)]);
+    const ground = state.floors[0]!;
+    const spot = spawnNear(ground, ground.spawn);
+    Object.assign(u, { venueId: id, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
+    socket.join([venueChannel(id), hallChannel(id, 0)]);
     socket.to(venueChannel(id)).emit("userJoined", u);
     ack({ ok: true, data: { venue: state.venue, user: u, users: usersIn(id) } });
   });
@@ -616,10 +651,10 @@ io.on("connection", (socket) => {
     const venueId = u.venueId!;
     leaveCurrentRoom();
     socket.leave(venueChannel(venueId));
-    socket.leave(hallChannel(venueId));
+    socket.leave(hallChannel(venueId, u.floor));
     socket.to(venueChannel(venueId)).emit("userLeft", u.id);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
-    Object.assign(u, { venueId: null, roomId: null, speakerFor: null, x: spot.x, y: spot.y });
+    Object.assign(u, { venueId: null, roomId: null, floor: 0, speakerFor: null, x: spot.x, y: spot.y });
     socket.join("reception");
     socket.to("reception").emit("userJoined", u);
     ack({ ok: true, data: { user: u, users: usersIn(null) } });
@@ -634,7 +669,7 @@ io.on("connection", (socket) => {
     if (!state) return ack({ ok: false, error: "Sala no encontrada" });
     if (u.roomId !== roomId) {
       leaveCurrentRoom();
-      socket.leave(hallChannel(u.venueId));
+      socket.leave(hallChannel(u.venueId, u.floor));
       socket.join(roomChannel(u.venueId, roomId));
       u.roomId = roomId;
       const interior = interiorOf(venues.get(u.venueId)!.venue, roomId);
@@ -659,13 +694,15 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", (ack) => {
     const u = conn?.user;
     if (!u?.venueId || !u.roomId) return ack({ ok: false, error: "No estás en una sala" });
-    const map = venues.get(u.venueId)!.map;
+    const floors = venues.get(u.venueId)!.floors;
+    const floor = floorOfRoom(floors, u.roomId);
+    const map = floors[floor]!;
     const door = map.doors.find((d) => d.id === u.roomId);
     leaveCurrentRoom();
     // Aparece justo afuera de la puerta de la sala que dejó.
     const spot = door ? inFront(door) : map.spawn;
-    Object.assign(u, { x: spot.x, y: spot.y });
-    socket.join(hallChannel(u.venueId));
+    Object.assign(u, { floor, x: spot.x, y: spot.y });
+    socket.join(hallChannel(u.venueId, floor));
     io.to(venueChannel(u.venueId)).emit("userUpdated", u);
     ack({ ok: true, data: { user: u } });
   });
@@ -677,6 +714,20 @@ io.on("connection", (socket) => {
     if (now - lastSaid < 400) return;
     lastSaid = now;
     io.to(sceneChannel(conn.user)).emit("emote", { userId: conn.user.id, emoji });
+  });
+
+  socket.on("changeFloor", (floor, ack) => {
+    const u = conn?.user;
+    if (!u?.venueId || u.roomId) return ack({ ok: false, error: "Solo se cambia de piso desde los pasillos" });
+    const floors = venues.get(u.venueId)!.floors;
+    const target = Math.floor(Number(floor));
+    if (!floors[target] || !floors[u.floor]?.stairs.some((s) => s.to === target)) return ack({ ok: false, error: "Esa escalera no lleva ahí" });
+    socket.leave(hallChannel(u.venueId, u.floor));
+    const spot = stairsArrival(floors, target, u.floor);
+    Object.assign(u, { floor: target, x: spot.x, y: spot.y });
+    socket.join(hallChannel(u.venueId, target));
+    io.to(venueChannel(u.venueId)).emit("userUpdated", u);
+    ack({ ok: true, data: { user: u } });
   });
 
   socket.on("claimSpeaker", (code, ack) => {

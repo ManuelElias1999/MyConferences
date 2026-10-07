@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MAX_ROOMS, ROOMS_PER_EVENT, venueMap } from "../../shared/maps.ts";
+import { MAX_ROOMS, MIN_ROOMS, ROOMS_PER_FLOOR, venueFloors } from "../../shared/maps.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import type { Account, CompanyEvent, EventInput, TalkInput } from "../../shared/types.ts";
 import { companyApi, loadToken } from "./lib.ts";
@@ -16,7 +16,7 @@ function ThemePreview({ theme }: { theme: ThemeId }) {
       color,
       main: i === 0,
     }));
-    const map = venueMap(theme, sample);
+    const map = venueFloors(theme, sample)[0]!;
     const canvas = ref.current!;
     const dpr = window.devicePixelRatio || 1;
     const width = 180;
@@ -124,7 +124,7 @@ function EventEditor({
       ? draftsFrom(initial)
       : [
           { ...blankRoom(0), name: "Auditorio principal", topic: "Charlas principales" },
-          ...Array.from({ length: ROOMS_PER_EVENT }, (_, i) => ({ ...blankRoom(i + 1), name: `Sala ${i + 1}` })),
+          ...Array.from({ length: ROOMS_PER_FLOOR }, (_, i) => ({ ...blankRoom(i + 1), name: `Sala ${i + 1}` })),
         ],
   );
   const [openAgenda, setOpenAgenda] = useState<number | null>(0);
@@ -228,8 +228,8 @@ function EventEditor({
         <fieldset className="rooms-editor">
           <legend>Salas y agenda</legend>
           <p className="muted small">
-            El auditorio principal está al fondo de la plaza; las ocho salas, en edificios a los lados. Cada sala tiene una forma distinta: aula, taller con
-            mesas, anfiteatro en U o sala ancha.
+            Mínimo {MIN_ROOMS - 1} salas más el auditorio principal, y hasta {MAX_ROOMS - 1}. Las primeras {ROOMS_PER_FLOOR} van en la planta baja; las
+            siguientes, en el piso de arriba. Cada sala tiene una forma distinta: aula, taller con mesas, anfiteatro en U o sala ancha.
           </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
@@ -253,7 +253,7 @@ function EventEditor({
                 <button type="button" className="btn ghost sm" onClick={() => setOpenAgenda(openAgenda === i ? null : i)} aria-expanded={openAgenda === i}>
                   Agenda ({r.talks.length})
                 </button>
-                {i > 0 && (
+                {i > 0 && rooms.length > MIN_ROOMS && (
                   <button type="button" className="btn ghost sm" onClick={() => setRooms((rs) => rs.filter((_, j) => j !== i))} aria-label="Quitar sala">
                     ✕
                   </button>
@@ -284,8 +284,53 @@ function EventEditor({
         </div>
       </form>
 
-      {v ? <Sponsors event={initial!} onChange={onSaved} /> : <p className="muted small">Después de crear el evento podrás subir los logos de tus patrocinadores.</p>}
+      {v ? (
+        <>
+          <EventLogo event={initial!} onChange={onSaved} />
+          <Sponsors event={initial!} onChange={onSaved} />
+        </>
+      ) : (
+        <p className="muted small">Después de crear el evento podrás subir su logo y los de tus patrocinadores.</p>
+      )}
     </div>
+  );
+}
+
+/** Logo del evento: se muestra en la pantalla gigante del lobby. */
+function EventLogo({ event, onChange }: { event: CompanyEvent; onChange: (ev: CompanyEvent) => void }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="sponsors-editor">
+      <h3>Logo del evento</h3>
+      <p className="muted small">Aparece en la pantalla gigante del lobby. Si no subes uno, se muestra el nombre del evento.</p>
+      <div className="logo-row">
+        {event.venue.logoUrl ? <img className="event-logo" src={event.venue.logoUrl} alt="Logo del evento" /> : <span className="event-logo empty">{event.venue.name}</span>}
+        <label className="btn sm">
+          {busy ? "Subiendo…" : event.venue.logoUrl ? "Cambiar logo" : "Subir logo"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              setBusy(true);
+              setError("");
+              try {
+                onChange(await companyApi<CompanyEvent>(`/events/${event.venue.id}/logo`, { method: "POST", file }));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "No se pudo subir el logo");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </label>
+      </div>
+      {error && <p className="error">{error}</p>}
+    </section>
   );
 }
 

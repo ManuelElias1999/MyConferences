@@ -66,6 +66,8 @@ export interface Venue extends VenueSummary {
   theme: ThemeId;
   /** Empresa que organiza el evento. */
   organizer: string;
+  /** Logo del evento para la pantalla grande del lobby (o null para mostrar el nombre). */
+  logoUrl: string | null;
   rooms: Room[];
   talks: Talk[];
   sponsors: Sponsor[];
@@ -108,6 +110,8 @@ export interface User {
   venueId: string | null;
   /** Sala del salón en la que está, o null si está caminando por el salón. */
   roomId: string | null;
+  /** Piso del recinto en el que camina (0 es la planta baja). */
+  floor: number;
   /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
   /** Posición en baldosas del mapa en el que está. */
@@ -193,6 +197,8 @@ export interface ClientToServerEvents {
   leaveVenue: (ack: Ack<{ user: User; users: User[] }>) => void;
   enterRoom: (roomId: string, ack: Ack<RoomSnapshot & { user: User }>) => void;
   leaveRoom: (ack: Ack<{ user: User }>) => void;
+  /** Subir o bajar por la escalera. */
+  changeFloor: (floor: number, ack: Ack<{ user: User }>) => void;
   /** Reacción rápida (👋 👏 ❤️ 😂 🎉) sobre el personaje. */
   emote: (emoji: string) => void;
   claimSpeaker: (code: string, ack: Ack<{ user: User }>) => void;

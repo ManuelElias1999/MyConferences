@@ -79,6 +79,7 @@ export interface SceneProps {
   locked?: boolean;
   onDoor?: (door: Door) => void;
   onExit?: () => void;
+  onStairs?: (floor: number) => void;
   onNpc?: (npc: Npc) => void;
   onDirectory?: () => void;
   handle?: Ref<SceneHandle>;
@@ -279,13 +280,16 @@ export default function Scene(props: SceneProps) {
       const intended = !s.path.length || keys.current.length > 0;
       const door = intended && p.onDoor && map.doors.find((d) => onSpan(to, d));
       const exit = intended && p.onExit && map.exit && onSpan(to, map.exit);
-      if (door || exit) {
+      const stairs = intended && p.onStairs && map.stairs.find((st) => onSpan(to, st));
+      if (door || exit || stairs) {
         s.path = [];
         s.then = null;
         keys.current = [];
         s.moving = false;
-        guideTo.current = null;
-        if (door) p.onDoor!(door);
+        if (door) {
+          guideTo.current = null;
+          p.onDoor!(door);
+        } else if (stairs) p.onStairs!(stairs.to);
         else p.onExit!();
         return;
       }
@@ -600,7 +604,7 @@ export default function Scene(props: SceneProps) {
     if (wx < x0 || wx >= x1) return false;
     return s.side === "top" ? wy >= (s.y - 1) * T && wy < (s.y + 1) * T : wy >= (s.y - 0.5) * T && wy < (s.y + 1) * T;
   };
-  const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy));
+  const hitDoor = (wx: number, wy: number) => map.doors.find((d) => spanHit(d, wx, wy)) ?? map.stairs.find((st) => spanHit(st, wx, wy));
   const hitDirectory = (wx: number, wy: number) =>
     map.directories.find((d) => wx >= d.x * T && wx < (d.x + 1) * T && wy >= (d.y - 1.2) * T && wy < (d.y + 1) * T);
 
@@ -611,8 +615,9 @@ export default function Scene(props: SceneProps) {
     h.npc = map.npcs.find((n) => hitAvatar(w.x, w.y, n.x, n.y))?.id ?? null;
     h.user = null;
     for (const [id, o] of others.current) if (hitAvatar(w.x, w.y, o.x, o.y)) h.user = id;
-    h.door = hitDoor(w.x, w.y)?.id ?? null;
-    e.currentTarget.style.cursor = h.npc || h.door || hitDirectory(w.x, w.y) ? "pointer" : "default";
+    const hd = hitDoor(w.x, w.y);
+    h.door = hd && "id" in hd ? hd.id : null;
+    e.currentTarget.style.cursor = h.npc || hd || hitDirectory(w.x, w.y) ? "pointer" : "default";
   };
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {

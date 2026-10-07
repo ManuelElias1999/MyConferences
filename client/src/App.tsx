@@ -219,6 +219,12 @@ export default function App() {
   };
 
 
+  const changeFloor = (floor: number) => {
+    socket.emit("changeFloor", floor, (res) => {
+      if (res.ok) transition(() => setMe(res.data.user));
+    });
+  };
+
   const claimSpeaker = (code: string) =>
     new Promise<void>((resolve, reject) => {
       socket.emit("claimSpeaker", code, (res) => {
@@ -365,6 +371,7 @@ export default function App() {
           now={now}
           onEnterRoom={(roomId) => enterRoom(roomId, place.venue)}
           onExit={leaveVenue}
+          onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
         />
       )}
