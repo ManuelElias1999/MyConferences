@@ -14,7 +14,8 @@ import RoomView from "./RoomView.tsx";
 
 type Place =
   | { kind: "reception" }
-  | { kind: "hall"; venue: Venue }
+  /** `visit` cambia cada vez que se entra al salón: así el plano toma la posición que da el servidor. */
+  | { kind: "hall"; venue: Venue; visit: number }
   | { kind: "room"; venue: Venue; roomId: string; snapshot: RoomSnapshot; visit: number };
 
 const FADE_MS = 350;
@@ -85,7 +86,7 @@ export default function App() {
   const goToHall = (venue: Venue, user: User, users: User[]) => {
     setMe(user);
     replaceUsers(users);
-    setPlace({ kind: "hall", venue });
+    setPlace({ kind: "hall", venue, visit: Date.now() });
   };
 
   const enterRoom = useCallback(
@@ -213,7 +214,7 @@ export default function App() {
       if (!res.ok || p.kind !== "room") return;
       transition(() => {
         setMe(res.data.user);
-        setPlace({ kind: "hall", venue: p.venue });
+        setPlace({ kind: "hall", venue: p.venue, visit: Date.now() });
       });
     });
   };
@@ -377,7 +378,7 @@ export default function App() {
       )}
       {place.kind === "hall" && (
         <Hall
-          key={place.venue.id}
+          key={`${place.venue.id}:${place.visit}`}
           me={me}
           venue={place.venue}
           users={usersRef.current}

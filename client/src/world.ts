@@ -1162,7 +1162,9 @@ function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, top
 
 function shadowUnder(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number) {
   ctx.fillStyle = "rgba(30,28,45,0.16)";
-  ctx.fillRect(Math.round(cx - rx), Math.round(cy - rx * 0.3), Math.round(rx * 2), Math.max(3, Math.round(rx * 0.6)));
+  // Sombra baja y pareja: en muebles anchos no debe volverse un bloque gris.
+  const h = Math.max(3, Math.min(8, Math.round(rx * 0.6)));
+  ctx.fillRect(Math.round(cx - rx), Math.round(cy - h / 2), Math.round(rx * 2), h);
 }
 
 /** Follaje de bloques: varios cuadrados superpuestos con luz arriba a la izquierda. */
@@ -1802,25 +1804,61 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         break;
       }
       case "frontdesk":
-        // Mostrador de recepción: cubierta blanca, frente grafito con una línea de luz y el nombre.
+        // Mostrador de recepción: cubierta blanca, frente grafito con línea de luz, el logo y monitores.
         add(y + 1, (ctx) => {
           const dw = w * T;
-          shadowUnder(ctx, px + dw / 2, py + T + 2, dw / 2);
-          box(ctx, px, py - 2, dw, 12, 24, "#2b2f3a", "#f4f4f5");
+          shadowUnder(ctx, px + dw / 2, py + T + 4, dw / 2);
+          box(ctx, px, py - 4, dw, 12, 30, "#262a34", "#f8f8f6");
+          ctx.fillStyle = "#c8a46a";
+          ctx.fillRect(px, py + 8, dw, 2);
           ctx.fillStyle = "#22d3ee";
-          ctx.fillRect(px + 4, py + 30, dw - 8, 2);
-          ctx.fillStyle = "rgba(34,211,238,0.25)";
-          ctx.fillRect(px + 4, py + 26, dw - 8, 4);
-          ctx.font = `700 11px ${FONT}`;
+          ctx.fillRect(px + 6, py + 34, dw - 12, 2);
+          ctx.fillStyle = "rgba(34,211,238,0.22)";
+          ctx.fillRect(px + 6, py + 29, dw - 12, 5);
+          // Logo: cuatro cuadrados y el nombre.
+          const lx = px + dw / 2 - 62;
+          const ly = py + 14;
+          for (const [dx, dy, c] of [
+            [0, 0, "#ff5c39"],
+            [7, 0, "#fbbf24"],
+            [0, 7, "#2f6bff"],
+            [7, 7, "#ffffff"],
+          ] as const) {
+            ctx.fillStyle = c;
+            ctx.fillRect(lx + dx, ly + dy, 6, 6);
+          }
+          ctx.font = `700 12px ${FONT}`;
           ctx.fillStyle = "#ffffff";
-          ctx.textAlign = "center";
-          ctx.fillText("MyConferences · Recepción", px + dw / 2, py + 21);
-          ctx.textAlign = "left";
+          ctx.fillText("MyConferences", lx + 19, ly + 11);
           // Monitores sobre la cubierta.
-          for (const mx of [px + dw * 0.3, px + dw * 0.7]) {
-            frame(ctx, mx - 9, py - 14, 18, 11, "#1f2433");
+          for (const k of [0.15, 0.38, 0.62, 0.85]) {
+            const mx = px + dw * k;
+            frame(ctx, mx - 10, py - 18, 20, 12, "#1f2433");
             ctx.fillStyle = "#7dd3fc";
-            ctx.fillRect(mx - 7, py - 12, 14, 7);
+            ctx.fillRect(mx - 8, py - 16, 16, 8);
+            ctx.fillStyle = "#3a3f4d";
+            ctx.fillRect(mx - 2, py - 6, 4, 3);
+          }
+        });
+        break;
+      case "stanchion":
+        // Dos postes cromados unidos por un cordón rojo, para ordenar la fila.
+        add(y + d, (ctx) => {
+          const top = py + 12;
+          const bottom = (y + d) * T - 4;
+          ctx.strokeStyle = "#b91c1c";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx, top - 16);
+          ctx.quadraticCurveTo(cx + 4, (top + bottom) / 2 - 12, cx, bottom - 16);
+          ctx.stroke();
+          for (const yy of [top, bottom]) {
+            ctx.fillStyle = "#64748b";
+            ctx.fillRect(cx - 5, yy, 10, 3);
+            ctx.fillStyle = "#cbd5e1";
+            ctx.fillRect(cx - 1.5, yy - 20, 3, 20);
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(cx - 3, yy - 22, 6, 3);
           }
         });
         break;

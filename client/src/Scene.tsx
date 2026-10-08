@@ -119,7 +119,14 @@ export default function Scene(props: SceneProps) {
   const [prompt, setPrompt] = useState<string | null>(null);
   const showMinimap = map.w > 30;
 
-  const my = useRef<MyState>({ x: me.x, y: me.y, dir: "down", walk: 0, moving: false, seg: null, path: [], then: null });
+  // Si la posición no se puede pisar en este plano (el plano cambió o es un lugar reservado), se arranca en la entrada.
+  const start = isWalkable(map, Math.round(me.x), Math.round(me.y)) ? { x: me.x, y: me.y } : map.spawn;
+  const my = useRef<MyState>({ x: start.x, y: start.y, dir: "down", walk: 0, moving: false, seg: null, path: [], then: null });
+  useEffect(() => {
+    if (start.x !== me.x || start.y !== me.y) socket.emit("move", start);
+    // Solo al montar el plano.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const others = useRef(new Map<string, Walker>());
   const bubbles = useRef(new Map<string, { text: string; at: number }>());
   const emotes = useRef(new Map<string, { emoji: string; at: number }>());

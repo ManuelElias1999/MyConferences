@@ -20,7 +20,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 ### Para los asistentes
 
-- **Recepción**: un cowork moderno y amplio. Al fondo está el gran mostrador con **dos recepcionistas** bajo el letrero «RECEPCIÓN» y kioscos de check-in a los lados; alrededor, escritorios con gente trabajando, una sala de reuniones vidriada, una sala de estar y el café. Te acercas, pulsas X (o le haces clic) y le das el número del evento. Los eventos privados piden iniciar sesión y revisan que tu correo esté en la lista de invitados.
+- **Recepción**: el lobby de un cowork moderno. Al fondo, un gran mostrador con **dos recepcionistas**, el logo flotando detrás, el letrero «RECEPCIÓN» entre dos pantallas de bienvenida, kioscos de check-in y dos filas ordenadas con postes. Alrededor, con aire: escritorios, sala de reuniones vidriada, sala de estar y café.
 - **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
   - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
   - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
@@ -29,11 +29,10 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
   - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Cada cosa tiene su lugar:
-    - **Lobby de entrada sin stands**: desde ahí vas directo a las salas de equipos (a los costados), a la avenida de charlas (arriba) o a las salas de reunión (abajo). Postes con flechas indican cada camino.
+    - **Lobby de entrada sin stands**: desde ahí vas directo a las salas de equipos (a los costados) o a la avenida de charlas (arriba). Postes con flechas indican cada camino. No hay salas en la parte de abajo.
     - **Avenida de charlas**: el auditorio al fondo y las salas de charla de a dos, con bancos para esperar. A un lado sale la **expo de patrocinadores** y al otro el **patio** (pasto, sombrillas, ping-pong, futbolito y food truck).
     - **Salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro.
-    - **Sala de mentores** y **sala de organizadores**: salas de reunión con una mesa, cafetera, agua, pizarra y un sillón. Quien entra se suma a la charla; a la de organizadores solo entra su equipo.
-    - Arriba (por el **ascensor** amarillo): otra avenida de charlas, las salas de equipos 3, 4 y 5 y una terraza.
+    - Arriba (por el **ascensor** amarillo): otra avenida de charlas, las salas de equipos 3, 4 y 5 y un ala de reuniones con la **sala de mentores** y la **sala de organizadores**: salas de reunión con una mesa, cafetera, agua, pizarra y un sillón. Quien entra se suma a la charla; a la de organizadores solo entra su equipo.
     - Al crear el hackathon se elige el cupo (100 a 500): se habilita una sala de equipos por cada 100 personas y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).

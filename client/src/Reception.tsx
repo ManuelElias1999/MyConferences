@@ -10,6 +10,9 @@ const MAP = receptionMap();
 
 type Dialog = { step: "ask" } | { step: "checking" } | { step: "error"; text: string; needsLogin: boolean } | { step: "ok"; text: string };
 
+/** Lo que muestran las pantallas junto al mostrador. */
+const RECEPTION_SCREENS = { sponsors: [], title: "Bienvenidos a MyConferences" };
+
 export default function Reception({
   me,
   users,
@@ -50,6 +53,7 @@ export default function Reception({
         camera="follow"
         names="all"
         onNpc={() => setDialog({ step: "ask" })}
+        media={RECEPTION_SCREENS}
         label="Recepción"
       />
 
