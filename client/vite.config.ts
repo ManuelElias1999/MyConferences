@@ -10,6 +10,8 @@ export default defineConfig({
     proxy: {
       "/api": server,
       "/uploads": server,
+      // Logos de ejemplo de los patrocinadores y del evento.
+      "/assets/logos": server,
       "/socket.io": { target: server, ws: true },
     },
   },

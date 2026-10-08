@@ -807,6 +807,30 @@ function portal(ctx: CanvasRenderingContext2D, style: StyleId, d: Decor) {
   ctx.textAlign = "left";
 }
 
+/** Puerta de un cuarto: marco de color, dos hojas de vidrio corridas a los lados y el umbral. */
+function roomDoor(ctx: CanvasRenderingContext2D, d: Decor) {
+  const x0 = d.x * T;
+  const x1 = (d.x + (d.w ?? 2)) * T;
+  const color = d.color ?? "#2f6bff";
+  // Marco.
+  ctx.fillStyle = shade(color, -0.35);
+  ctx.fillRect(x0 - 8, T - 2, 8, 2 * T + 2);
+  ctx.fillRect(x1, T - 2, 8, 2 * T + 2);
+  ctx.fillRect(x0 - 8, T - 6, x1 - x0 + 16, 8);
+  ctx.fillStyle = color;
+  ctx.fillRect(x0 - 6, T - 4, x1 - x0 + 12, 3);
+  // Hojas de vidrio abiertas contra el marco.
+  for (const hx of [x0 - 6, x1 - 2]) {
+    ctx.fillStyle = "rgba(186,230,253,0.85)";
+    ctx.fillRect(hx, T + 6, 8, 2 * T - 8);
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillRect(hx + 2, T + 9, 2, 2 * T - 16);
+  }
+  // Umbral.
+  ctx.fillStyle = shade(color, -0.2);
+  ctx.fillRect(x0, 3 * T - 3, x1 - x0, 3);
+}
+
 /** Cartel con flecha en la pared, para indicar hacia dónde sigue una zona. */
 function sign(ctx: CanvasRenderingContext2D, d: Decor) {
   const x = d.x * T + 2;
@@ -1037,6 +1061,9 @@ export function renderStatic(map: SceneMap, scale: number) {
           break;
         case "sign":
           sign(ctx, d);
+          break;
+        case "roomdoor":
+          roomDoor(ctx, d);
           break;
         case "torch": {
           const cx = d.x * T + T / 2;
@@ -2202,6 +2229,23 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.fillText(`🔒 ${c.label}`, cx, cy + 5);
+    ctx.textAlign = "left";
+  }
+  // Nombre de cada cuarto sobre su puerta, como una placa.
+  for (const d of map.decor) {
+    if (d.kind !== "roomdoor") continue;
+    ctx.font = `700 12px ${FONT}`;
+    const text = d.text ?? "";
+    const width = ctx.measureText(text).width + 22;
+    const cx = (d.x + (d.w ?? 2) / 2) * T;
+    const y = (d.y - 2) * T - 18;
+    ctx.fillStyle = "#16161d";
+    ctx.fillRect(cx - width / 2 - 2, y - 2, width + 4, 26);
+    ctx.fillStyle = d.color ?? "#2f6bff";
+    ctx.fillRect(cx - width / 2, y, 5, 22);
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText(text, cx + 2, y + 15);
     ctx.textAlign = "left";
   }
   // Cartel de cada mesa de equipo, en su esquina.

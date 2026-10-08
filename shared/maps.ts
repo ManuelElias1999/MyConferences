@@ -116,7 +116,9 @@ export type DecorKind =
   /** Vano entre dos zonas: marco con el nombre de la zona a la que lleva. */
   | "portal"
   /** Cartel con flecha que indica hacia dónde queda una zona. */
-  | "sign";
+  | "sign"
+  /** Puerta de un cuarto (mentores, staff): marco con puertas de vidrio abiertas y el nombre arriba. */
+  | "roomdoor";
 
 export interface Decor {
   kind: DecorKind;
@@ -1343,24 +1345,33 @@ function teamHalls(spots: HallSpot[], capacity: number) {
   return { floors, zones, furni, decor, closed, name };
 }
 
+/** El gran salón del hackathon: todo se abre a él. */
+const HACK_HALL: Rect = { x: 36, y: 22, w: 58, h: 28 };
+
 /**
- * Las salas de charla del hackathon, repartidas por el mapa: dos en el ala
- * oeste, dos a cada lado del auditorio en la avenida y dos en el ala este.
+ * Salas de charla: dos a cada lado del auditorio en la pared de arriba y dos
+ * en cada pared lateral, con aire entre los grupos.
  */
-const hackRoomSlots = (prefix: string, west: string, east: string) => [
-  ...pairV(29, 7, "right", `${prefix}${west}`),
-  ...pairH(37, 17, `${prefix}avenida (oeste)`),
-  ...pairH(66, 17, `${prefix}avenida (este)`),
-  ...pairV(82, 8, "left", `${prefix}${east}`),
+const hackRoomSlots = (prefix: string) => [
+  ...pairH(51, 21, `${prefix}salón (arriba, oeste)`),
+  ...pairV(35, 23, "left", `${prefix}salón (oeste)`),
+  ...pairH(71, 21, `${prefix}salón (arriba, este)`),
+  ...pairV(94, 23, "right", `${prefix}salón (este)`),
 ];
 
-/** Esqueleto común de los dos pisos: lobby, avenida de salas y las salas de equipos a los costados. */
-const HACK_LOBBY: Rect = { x: 41, y: 38, w: 30, h: 18 };
-const HACK_AVENUE: Rect = { x: 36, y: 18, w: 40, h: 14 };
+/** Salas de equipos a los costados del salón, con entrada directa por su pared. */
 const hackSides = (west: number, east: number): HallSpot[] => [
-  { hall: west, x: 6, y: 36, entrance: { x: 37, y: 44, w: 4, h: 6 } },
-  { hall: east, x: 75, y: 36, entrance: { x: 71, y: 44, w: 4, h: 6 } },
+  { hall: west, x: 2, y: 34, entrance: { x: 33, y: 40, w: 3, h: 6 } },
+  { hall: east, x: 97, y: 34, entrance: { x: 94, y: 40, w: 3, h: 6 } },
 ];
+
+/** Cuarto con puerta al salón (arriba): su piso, el paso y la puerta con su nombre. */
+function sideRoom(x: number, label: string, color: string) {
+  const room: Rect = { x, y: 8, w: 12, h: 10 };
+  const passage: Rect = { x: x + 5, y: 18, w: 2, h: 4 };
+  const door: Decor = { kind: "roomdoor", x: x + 5, y: 21, w: 2, text: label, color };
+  return { room, passage, door };
+}
 
 /** Sala de reunión: una mesa con sillas, cafetera, agua, pizarra y un sillón. Quien entra se suma a la charla. */
 function meetingRoom(r: Rect, color: string, extra: Furni[]): Furni[] {
@@ -1374,192 +1385,137 @@ function meetingRoom(r: Rect, color: string, extra: Furni[]): Furni[] {
     ]).flat(),
     { kind: "coffeebar", x: r.x + r.w - 4, y: r.y, w: 3 },
     { kind: "cooler", x: r.x + r.w - 1, y: r.y },
-    { kind: "sofa", x: r.x + 1, y: r.y + r.h - 2, w: 3, color, dir: "down" },
-    { kind: "coffeetable", x: r.x + 5, y: r.y + r.h - 2, w: 2 },
+    { kind: "sofa", x: r.x + 1, y: r.y + r.h - 3, w: 3, color, dir: "down" },
+    { kind: "coffeetable", x: r.x + 1, y: r.y + r.h - 1, w: 2 },
     { kind: "bigplant", x: r.x, y: r.y },
     { kind: "bigplant", x: r.x + r.w - 1, y: r.y + r.h - 1 },
     ...extra,
   ];
 }
 
-/** Lobby: sin stands, para ir directo a donde haga falta. Pantalla, bancos, plantas y carteles. */
-const hackLobbyFurni = (sign: string, west: string, east: string): Furni[] => [
-  { kind: "countdown", x: 52, y: 40, w: 8 },
-  { kind: "signpost", x: 59, y: 50, label: sign },
-  { kind: "signpost", x: 42, y: 43, label: `← ${west}` },
-  { kind: "signpost", x: 69, y: 43, label: `${east} →` },
-  { kind: "bench", x: 48, y: 54, w: 3 },
-  { kind: "bench", x: 60, y: 54, w: 3 },
-  { kind: "bigplant", x: 41, y: 38 },
-  { kind: "bigplant", x: 70, y: 38 },
-  { kind: "bigplant", x: 41, y: 55 },
-  { kind: "bigplant", x: 70, y: 55 },
-  { kind: "ledpillar", x: 47, y: 38 },
-  { kind: "ledpillar", x: 64, y: 38 },
-  { kind: "robot", x: 48, y: 47 },
-  { kind: "hologram", x: 62, y: 46, w: 2, d: 2 },
-];
+/** Stands sueltos en la mitad de arriba del salón: dos filas a cada lado, con el centro libre hacia el auditorio. */
+const HACK_STANDS = [27, 34].flatMap((y) => [40, 48, 56, 72, 80, 88].map((x) => ({ x, y, free: true })));
 
-/** Avenida: luces y bancos para esperar la próxima charla. */
-const hackAvenueFurni = (): Furni[] => [
-  { kind: "bench", x: 40, y: 25, w: 3 },
-  { kind: "bench", x: 69, y: 25, w: 3 },
-  { kind: "ledpillar", x: 36, y: 18 },
-  { kind: "ledpillar", x: 75, y: 18 },
-  { kind: "bigplant", x: 45, y: 19 },
-  { kind: "bigplant", x: 64, y: 18 },
+/** Lo de la mitad de abajo del salón: pantalla, carteles, juegos, snacks y bancos. */
+const hackHallFurni = (sign: string, west: string, east: string): Furni[] => [
+  { kind: "countdown", x: 61, y: 40, w: 8 },
+  { kind: "signpost", x: 69, y: 46, label: sign },
+  { kind: "signpost", x: 38, y: 40, label: `← ${west}` },
+  { kind: "signpost", x: 91, y: 40, label: `${east} →` },
+  { kind: "directory", x: 57, y: 46 },
+  { kind: "arcade", x: 37, y: 49 },
+  { kind: "arcade", x: 38, y: 49 },
+  { kind: "foosball", x: 41, y: 48, w: 2 },
+  { kind: "pingpong", x: 45, y: 47, w: 3 },
+  { kind: "coffeebar", x: 86, y: 49, w: 3 },
+  { kind: "vending", x: 90, y: 49 },
+  { kind: "cooler", x: 91, y: 49 },
+  { kind: "cafetable", x: 82, y: 47, w: 2 },
+  { kind: "bench", x: 52, y: 44, w: 3 },
+  { kind: "bench", x: 75, y: 44, w: 3 },
+  { kind: "bigplant", x: 36, y: 22 },
+  { kind: "bigplant", x: 93, y: 22 },
+  { kind: "ledpillar", x: 50, y: 22 },
+  { kind: "ledpillar", x: 80, y: 22 },
+  { kind: "hologram", x: 64, y: 30, w: 2, d: 2 },
 ];
 
 function hackathonGround(capacity: number): Level {
   const halls = teamHalls(hackSides(1, 2), capacity);
-  // Ala oeste: un pasillo con la sala de mentores y la de organizadores (salas de reunión).
-  const corridor: Rect = { x: 23, y: 6, w: 6, h: 26 };
-  const mentors: Rect = { x: 3, y: 6, w: 17, h: 11 };
-  const staff: Rect = { x: 3, y: 21, w: 17, h: 11 };
-  const staffDoor: Rect = { x: 20, y: 25, w: 3, h: 3 };
-  // Ala este: la expo de patrocinadores.
-  const expo: Rect = { x: 83, y: 6, w: 25, h: 26 };
+  const mentors = sideRoom(36, "🧭 MENTORES", "#f59e0b");
+  const staff = sideRoom(82, "🔒 STAFF", "#ef4444");
   return {
     name: "Planta baja",
-    w: 112,
-    h: 71,
-    floors: [
-      HACK_LOBBY,
-      { x: 48, y: 32, w: 16, h: 6 },
-      HACK_AVENUE,
-      ...halls.floors,
-      corridor,
-      { x: 29, y: 29, w: 7, h: 3 },
-      { x: 20, y: 10, w: 3, h: 3 },
-      mentors,
-      staffDoor,
-      staff,
-      expo,
-      { x: 76, y: 29, w: 7, h: 3 },
-    ],
-    areas: [{ ...mentors, floor: "wood" }],
-    exit: { x: 55, y: 56 },
-    spawn: { x: 55, y: 54 },
-    main: { x: 54, y: 17, roof: { x: 50, y: 10, w: 12, h: 6 } },
-    slots: hackRoomSlots("", "ala oeste", "expo"),
+    w: 130,
+    h: 67,
+    floors: [HACK_HALL, ...halls.floors, mentors.room, mentors.passage, staff.room, staff.passage],
+    areas: [{ ...mentors.room, floor: "wood" }],
+    exit: { x: 64, y: 50 },
+    spawn: { x: 64, y: 48 },
+    main: { x: 63, y: 21, roof: { x: 61, y: 12, w: 8, h: 8 } },
+    slots: hackRoomSlots(""),
     zones: [
       ...halls.zones,
-      { id: "mentores", label: "Sala de mentores", ...mentors, color: "#f59e0b", seats: 30, room: true },
-      { id: "organizadores", label: "Sala de organizadores", ...staff, color: "#ef4444", seats: 30, staff: true, room: true },
+      { id: "mentores", label: "Sala de mentores", ...mentors.room, color: "#f59e0b", seats: 30, room: true },
+      { id: "organizadores", label: "Sala de organizadores", ...staff.room, color: "#ef4444", seats: 30, staff: true, room: true },
     ],
     closed: halls.closed,
     restricted: [
-      { ...staff, staff: true },
-      { ...staffDoor, staff: true },
+      { ...staff.room, staff: true },
+      { ...staff.passage, staff: true },
     ],
-    // Stands: cuatro en las esquinas del salón (lejos de las entradas a las salas de equipos) y el resto en la expo.
-    stands: [
-      { x: 42, y: 38 },
-      { x: 67, y: 38 },
-      { x: 42, y: 51, free: true },
-      { x: 67, y: 51, free: true },
-      ...[86, 93, 100].map((x) => ({ x, y: 6 })),
-      ...[87, 95, 103].map((x) => ({ x, y: 15, free: true })),
-      ...[87, 95, 103].map((x) => ({ x, y: 23, free: true })),
-    ],
+    stands: HACK_STANDS,
     expo: true,
-    stairs: [{ x: 47, y: 17, w: 2, dir: "up", to: 1, label: "ASCENSOR · salas de equipos 3 a 5 y terraza" }],
-    decor: [
-      ...halls.decor,
-      { kind: "portal", x: 48, y: 37, w: 16, text: "AUDITORIO Y SALAS DE CHARLA" },
-      { kind: "sign", x: 29, y: 28, w: 6, text: "← MENTORES · STAFF" },
-      { kind: "sign", x: 77, y: 28, w: 5, text: "EXPO →" },
-      { kind: "neon", x: 104, y: 5, w: 3, text: "EXPO", color: "#22d3ee" },
-      { kind: "neon", x: 5, y: 5, w: 5, text: "MENTORES", color: "#fbbf24" },
-      { kind: "whiteboard", x: 11, y: 5, w: 3 },
-      { kind: "neon", x: 5, y: 20, w: 4, text: "STAFF", color: "#ef4444" },
-      { kind: "whiteboard", x: 11, y: 20, w: 3 },
-    ],
+    stairs: [{ x: 46, y: 21, w: 2, dir: "up", to: 1, label: "ASCENSOR · equipos 3 a 5" }],
+    decor: [...halls.decor, mentors.door, staff.door],
     furni: [
       ...halls.furni,
-      ...hackLobbyFurni("↑ Auditorio y salas de charla|← Equipos 1 · Equipos 2 →|↖ Mentores · Organizadores|↗ Expo de patrocinadores", halls.name(1), halls.name(2)),
-      ...hackAvenueFurni(),
-      // Mentores y organizadores: una mesa para charlar con un café, nada más.
-      ...meetingRoom(mentors, "#b45309", [{ kind: "bookshelf", x: 3, y: 10 }]),
-      ...meetingRoom(staff, "#ef4444", [{ kind: "rack", x: 3, y: 25 }]),
-      { kind: "signpost", x: 25, y: 18, label: "← Sala de mentores|← Organizadores (solo staff)" },
-      { kind: "bigplant", x: 28, y: 6 },
-      // Snacks en la expo.
-      { kind: "coffeebar", x: 104, y: 29, w: 3 },
-      { kind: "vending", x: 107, y: 29 },
-      { kind: "cafetable", x: 92, y: 30, w: 2 },
-      { kind: "cafetable", x: 98, y: 30, w: 2 },
+      ...hackHallFurni("↑ Auditorio y salas de charla|← Equipos 1 · Equipos 2 →|↖ Mentores · Staff ↗|↖ Ascensor: equipos 3 a 5", halls.name(1), halls.name(2)),
+      ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 36, y: 12 }]),
+      ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 82, y: 12 }]),
     ],
     crowd: [
-      [9, 38, "down", true],
-      [11, 38, "down", true],
-      [10, 40, "up", true],
-      [82, 44, "down", true],
-      [83, 46, "up", true],
-      [7, 9, "down", true],
-      [9, 9, "down", true],
-      [8, 11, "up", true],
-      [10, 11, "up", true],
-      ...chat(55, 47),
-      ...chat(56, 24),
-      ...chat(91, 19),
-      ...chat(25, 24),
+      [6, 36, "down", true],
+      [8, 36, "down", true],
+      [7, 38, "up", true],
+      [104, 42, "down", true],
+      [105, 44, "up", true],
+      [40, 11, "down", true],
+      [42, 11, "down", true],
+      [41, 13, "up", true],
+      [43, 13, "up", true],
+      ...chat(62, 36),
+      ...chat(45, 42),
+      ...chat(84, 42),
+      ...chat(52, 31),
     ],
-    directories: [
-      { x: 50, y: 52 },
-      { x: 61, y: 52 },
-    ],
+    directories: [{ x: 71, y: 46 }],
   };
 }
 
-/** Piso alto: otra avenida de charlas, salas de equipos 3, 4 y 5 y una terraza para descansar. */
+/** Piso alto: el mismo salón con stands y salas de charla, las salas de equipos 3 y 4 a los costados y la 5 abajo, una terraza y una sala de descanso. */
 function hackathonUpper(capacity: number): Level {
   const halls = teamHalls(
-    [...hackSides(3, 4), { hall: 5, x: 83, y: 2, entrance: { x: 76, y: 29, w: 7, h: 3 } }],
+    [...hackSides(3, 4), { hall: 5, x: 50, y: 54, entrance: { x: 62, y: 50, w: 5, h: 4 }, portal: { x: 62, y: 53 } }],
     capacity,
   );
-  const terrace: Rect = { x: 3, y: 6, w: 26, h: 26 };
+  const terrace = sideRoom(36, "🌿 TERRAZA", "#10b981");
+  const lounge = sideRoom(82, "☕ SALA DE DESCANSO", "#a78bfa");
   return {
     name: "Piso 1",
-    w: 116,
-    h: 71,
-    floors: [HACK_LOBBY, { x: 48, y: 32, w: 16, h: 6 }, HACK_AVENUE, ...halls.floors, terrace, { x: 29, y: 29, w: 7, h: 3 }],
-    areas: [{ ...terrace, floor: "deck" }],
-    spawn: { x: 47, y: 18 },
-    slots: [...pairH(37, 17, "Piso 1 · avenida (oeste)"), ...pairV(35, 18, "left", "Piso 1 · avenida (fondo oeste)"), ...pairH(66, 17, "Piso 1 · avenida (este)"), ...pairV(76, 18, "right", "Piso 1 · avenida (fondo este)")],
+    w: 130,
+    h: 87,
+    floors: [HACK_HALL, ...halls.floors, terrace.room, terrace.passage, lounge.room, lounge.passage],
+    areas: [
+      { ...terrace.room, floor: "deck" },
+      { ...lounge.room, floor: "wood" },
+    ],
+    spawn: { x: 46, y: 23 },
+    slots: hackRoomSlots("Piso 1 · "),
     zones: halls.zones,
     closed: halls.closed,
-    stands: [
-      { x: 42, y: 38 },
-      { x: 67, y: 38 },
-    ],
-    stairs: [{ x: 47, y: 17, w: 2, dir: "down", to: 0, label: "ASCENSOR · lobby, expo, mentores y organizadores" }],
-    decor: [
-      ...halls.decor,
-      { kind: "portal", x: 48, y: 37, w: 16, text: "SALAS DE CHARLA" },
-      { kind: "sign", x: 29, y: 28, w: 6, text: "← TERRAZA" },
-      ...(capacity >= 500 ? [{ kind: "sign" as const, x: 77, y: 28, w: 5, text: "EQUIPOS 5 →" }] : []),
-      { kind: "neon", x: 6, y: 5, w: 5, text: "TERRAZA", color: "#fbbf24" },
-    ],
+    stands: HACK_STANDS,
+    expo: true,
+    stairs: [{ x: 46, y: 21, w: 2, dir: "down", to: 0, label: "ASCENSOR · salón, mentores y staff" }],
+    decor: [...halls.decor, terrace.door, lounge.door, { kind: "neon", x: 63, y: 21, w: 4, text: "BUILD", color: "#f472b6" }],
     furni: [
       ...halls.furni,
-      ...hackLobbyFurni(`↑ Salas de charla|← ${halls.name(3)} · ${halls.name(4)} →|↖ Terraza · ↗ ${halls.name(5)}`, halls.name(3), halls.name(4)),
-      ...hackAvenueFurni(),
-      { kind: "parasol", x: 8, y: 10, w: 2 },
-      { kind: "parasol", x: 18, y: 10, w: 2 },
-      { kind: "beanbag", x: 7, y: 18, color: "#fbbf24" },
-      { kind: "beanbag", x: 10, y: 18, color: "#22d3ee" },
-      { kind: "beanbag", x: 20, y: 18, color: "#f472b6" },
-      { kind: "pingpong", x: 12, y: 24, w: 3 },
-      { kind: "coffeebar", x: 3, y: 29, w: 3 },
-      { kind: "tree", x: 3, y: 6 },
-      { kind: "tree", x: 28, y: 18 },
+      ...hackHallFurni(`↑ Salas de charla|← ${halls.name(3)} · ${halls.name(4)} →|↓ ${halls.name(5)}|↖ Terraza · Descanso ↗`, halls.name(3), halls.name(4)),
+      { kind: "parasol", x: 38, y: 10, w: 2 },
+      { kind: "parasol", x: 44, y: 10, w: 2 },
+      { kind: "beanbag", x: 38, y: 14, color: "#fbbf24" },
+      { kind: "beanbag", x: 45, y: 14, color: "#22d3ee" },
+      { kind: "tree", x: 36, y: 8 },
+      { kind: "tree", x: 47, y: 8 },
+      { kind: "sofa", x: 83, y: 10, w: 3, color: "#a78bfa", dir: "down" },
+      { kind: "sofa", x: 88, y: 10, w: 3, color: "#a78bfa", dir: "down" },
+      { kind: "beanbag", x: 84, y: 14, color: "#f472b6" },
+      { kind: "beanbag", x: 90, y: 14, color: "#22d3ee" },
+      { kind: "coffeebar", x: 82, y: 8, w: 3 },
+      { kind: "bookshelf", x: 93, y: 8 },
     ],
-    crowd: [...chat(52, 47), ...chat(56, 24), ...chat(12, 14), ...chat(17, 21)],
-    directories: [
-      { x: 50, y: 52 },
-      { x: 61, y: 52 },
-    ],
+    crowd: [...chat(62, 36), ...chat(45, 42), ...chat(84, 42), ...chat(40, 12), ...chat(86, 13)],
+    directories: [{ x: 71, y: 46 }],
   };
 }
 
@@ -1746,7 +1702,7 @@ export function checkVenue(map: SceneMap) {
   for (const d of map.decor) {
     if (d.kind === "entrance") continue;
     const x1 = d.x + (d.w ?? 1);
-    if (d.kind === "portal") {
+    if (d.kind === "portal" || d.kind === "roomdoor") {
       for (let x = d.x; x < x1; x++) if (tile(x, d.y) !== "." || tile(x, d.y + 1) !== ".") problems.push(`portal ${d.text} sin paso en ${x},${d.y}`);
       if (!onFace(d.x - 1, d.y) || !onFace(x1, d.y)) problems.push(`portal ${d.text} sin muro a los lados`);
       continue;
