@@ -298,7 +298,7 @@ const seeds: VenueSeed[] = [
       { id: "web3", name: "Sala Web3", topic: "Contratos y pagos", color: "#6366f1", main: false, theme: "stellar" },
       { id: "diseno", name: "Diseño y producto", topic: "Del problema al prototipo", color: "#ec4899", main: false },
       { id: "pitch", name: "Práctica de pitch", topic: "Cómo presentar en 3 minutos", color: "#f59e0b", main: false },
-      { id: "mentorias", name: "Mentorías", topic: "Pregúntale a un mentor", color: "#14b8a6", main: false },
+      { id: "apis", name: "Workshop de APIs", topic: "Integrar APIs de los patrocinadores", color: "#14b8a6", main: false },
       { id: "relampago", name: "Charlas relámpago", topic: "5 minutos por charla", color: "#8b5cf6", main: false },
     ],
     program: {

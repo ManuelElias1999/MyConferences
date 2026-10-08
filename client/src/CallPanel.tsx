@@ -204,9 +204,12 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
             <button className={`btn sm ${call.camera ? "primary" : ""}`} onClick={() => void call.toggleCamera()}>
               {call.camera ? "📷 Apagar cámara" : "📷 Cámara"}
             </button>
-            <button className={`btn sm ${call.screen ? "primary" : ""}`} onClick={() => void call.toggleScreen()}>
-              {call.screen ? "🖥 Dejar de compartir" : "🖥 Compartir"}
-            </button>
+            {/* En una sala de reunión se charla: no hay nada que presentar. */}
+            {!current.meeting && (
+              <button className={`btn sm ${call.screen ? "primary" : ""}`} onClick={() => void call.toggleScreen()}>
+                {call.screen ? "🖥 Dejar de compartir" : "🖥 Compartir"}
+              </button>
+            )}
             {!zone && (
               <button className="btn sm" onClick={() => setAdding((a) => !a)}>
                 ＋ Añadir

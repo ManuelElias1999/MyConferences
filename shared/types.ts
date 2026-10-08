@@ -207,6 +207,8 @@ export interface CallInfo {
   members: User[];
   /** Nombre de la mesa de equipo si es la conversación de una mesa (hackathon). */
   zone: string | null;
+  /** Es una sala de reunión (mentores, organizadores): se charla, no se presenta. */
+  meeting: boolean;
   /** Quién tiene la cámara o la pantalla compartida. */
   media: Record<string, CallMedia>;
 }

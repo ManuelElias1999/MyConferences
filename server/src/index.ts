@@ -570,7 +570,7 @@ interface PrivateCall {
   members: Set<string>;
   invited: Set<string>;
   /** Si es la conversación de una mesa de equipo: su nombre y cuántos caben. */
-  zone?: { label: string; seats: number };
+  zone?: { label: string; seats: number; meeting: boolean };
   media: Map<string, CallMedia>;
 }
 const calls = new Map<string, PrivateCall>();
@@ -580,6 +580,7 @@ const MAX_CALL = 8;
 const callInfo = (call: PrivateCall): CallInfo => ({
   id: call.id,
   zone: call.zone?.label ?? null,
+  meeting: call.zone?.meeting ?? false,
   media: Object.fromEntries(call.media),
   members: [...call.members].flatMap((id) => {
     const user = connections.get(id)?.user;
@@ -654,7 +655,7 @@ function syncZone(u: User) {
   }
   if (callOfUser.has(u.id)) leaveCall(u.id);
   if (!call) {
-    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats }, media: new Map() };
+    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats, meeting: Boolean(zone.room) }, media: new Map() };
     calls.set(key, call);
   }
   call.members.add(u.id);

@@ -20,7 +20,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 ### Para los asistentes
 
-- **Recepción**: el lobby de un cowork moderno. Al fondo, un gran mostrador con **dos recepcionistas**, el logo flotando detrás, el letrero «RECEPCIÓN» entre dos pantallas de bienvenida, kioscos de check-in y dos filas ordenadas con postes. Alrededor, con aire: escritorios, sala de reuniones vidriada, sala de estar y café.
+- **Recepción**: el lobby de un cowork moderno. Al fondo, pegados a la pared, un gran mostrador con **dos recepcionistas**, el letrero «RECEPCIÓN» entre dos pantallas de bienvenida, kioscos de check-in y dos filas ordenadas con postes. Alrededor: escritorios, sala de reuniones vidriada, sala de estar y café.
 - **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
   - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
   - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
@@ -28,11 +28,12 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
-  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Cada cosa tiene su lugar:
-    - **Lobby de entrada sin stands**: desde ahí vas directo a las salas de equipos (a los costados) o a la avenida de charlas (arriba). Postes con flechas indican cada camino. No hay salas en la parte de abajo.
-    - **Avenida de charlas**: el auditorio al fondo y las salas de charla de a dos, con bancos para esperar. A un lado sale la **expo de patrocinadores** y al otro el **patio** (pasto, sombrillas, ping-pong, futbolito y food truck).
-    - **Salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro.
-    - Arriba (por el **ascensor** amarillo): otra avenida de charlas, las salas de equipos 3, 4 y 5 y un ala de reuniones con la **sala de mentores** y la **sala de organizadores**: salas de reunión con una mesa, cafetera, agua, pizarra y un sillón. Quien entra se suma a la charla; a la de organizadores solo entra su equipo.
+  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva.
+    - **Salón de entrada**: stands de patrocinadores en sus esquinas (lejos de los caminos), la cuenta regresiva y postes con flechas. A los costados, directo, las **salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2): al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro.
+    - **Avenida de charlas** (arriba del salón): el auditorio con dos salas de charla a cada lado y el ascensor amarillo.
+    - **Ala oeste**: dos salas de charla y las salas de reunión de **mentores** y **organizadores**: una mesa grande con café, agua, pizarra y un sillón; entras y te sumas a la charla (ahí no se comparte pantalla, se conversa). A la de organizadores solo entra su equipo.
+    - **Ala este**: la **expo de patrocinadores**, con stands contra la pared y sueltos, dos salas de charla y snacks.
+    - Arriba: otra avenida de charlas, las salas de equipos 3, 4 y 5 y una terraza.
     - Al crear el hackathon se elige el cupo (100 a 500): se habilita una sala de equipos por cada 100 personas y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
