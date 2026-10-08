@@ -942,6 +942,7 @@ export function renderStatic(map: SceneMap, scale: number) {
   for (const area of map.areas) AREA_FLOOR[area.floor](ctx, area.x * T, area.y * T, (area.x + area.w) * T, (area.y + area.h) * T);
   // Mesas de equipo: un rectángulo de color suave con borde, para que se vea hasta dónde llega la conversación.
   for (const z of map.zones) {
+    if (z.room) continue;
     if (z.id.startsWith("stand-")) {
       // El cuadrado de un stand: apenas marcado, para saber dónde se escucha.
       ctx.strokeStyle = "rgba(100,116,139,0.45)";
@@ -2167,7 +2168,7 @@ export function drawPlaques(ctx: CanvasRenderingContext2D, map: SceneMap, status
   }
   // Cartel de cada mesa de equipo, en su esquina.
   for (const z of map.zones) {
-    if (z.id.startsWith("stand-")) continue;
+    if (z.id.startsWith("stand-") || z.room) continue;
     ctx.font = `700 9px ${FONT}`;
     const text = `${z.label} · hasta ${z.seats}`;
     const width = ctx.measureText(text).width + 12;

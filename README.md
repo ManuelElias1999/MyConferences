@@ -28,12 +28,12 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
-  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Todo gira alrededor de un **lobby central**, así se camina poco:
-    - en el lobby, **seis stands sueltos y bien separados**, juegos, snacks y postes con flechas hacia cada lugar;
-    - en sus tres paredes, el **auditorio** al fondo y las **salas de charla** de a dos;
-    - a los costados, con entrada directa, las **salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro;
-    - al sur, la **sala de mentores** (un cuarto con la mesa de los mentores: entras y te sumas a la charla) y la **sala de organizadores** (igual, pero solo para su equipo);
-    - arriba (por el **ascensor** amarillo), otro lobby con stands y salas de charla, y las salas de equipos 3, 4 y 5.
+  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Cada cosa tiene su lugar:
+    - **Lobby de entrada sin stands**: desde ahí vas directo a las salas de equipos (a los costados), a la avenida de charlas (arriba) o a las salas de reunión (abajo). Postes con flechas indican cada camino.
+    - **Avenida de charlas**: el auditorio al fondo y las salas de charla de a dos, con bancos para esperar. A un lado sale la **expo de patrocinadores** y al otro el **patio** (pasto, sombrillas, ping-pong, futbolito y food truck).
+    - **Salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro.
+    - **Sala de mentores** y **sala de organizadores**: salas de reunión con una mesa, cafetera, agua, pizarra y un sillón. Quien entra se suma a la charla; a la de organizadores solo entra su equipo.
+    - Arriba (por el **ascensor** amarillo): otra avenida de charlas, las salas de equipos 3, 4 y 5 y una terraza.
     - Al crear el hackathon se elige el cupo (100 a 500): se habilita una sala de equipos por cada 100 personas y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
@@ -43,7 +43,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - Las paredes tienen un color bien distinto al piso, y el piso es liso, sin dibujos.
   - Las **escaleras** están en la pared, como una puerta, y no ocupan lugar en el piso: un ascensor en las temáticas modernas y una escalera bajo un arco en las clásicas. Siempre quedan separadas de salas y stands.
   - Las salas de charla se reconocen enseguida: su puerta y su techo llevan 🎤, y por dentro tienen escenario, pantalla y filas de asientos (aula, teatro en abanico, anfiteatro en U o sala ancha).
-- **Stands**: todos los eventos tienen: uno por patrocinador y uno del organizador (con la agenda). Son sólidos (se los rodea, no se los cruza) y los atienden **dos personas**: dos muñecos por defecto, o quienes el patrocinador anote con su correo, que pueden pararse detrás del mostrador. Alrededor de cada stand hay un cuadrado: estando dentro escuchas lo que hablan ahí. Al hablarle a un muñeco (X o clic) cuenta lo que hace la marca y ofrece ir a su sitio.
+- **Stands**: todos los eventos tienen: uno por patrocinador y uno del organizador (con la agenda). Son sólidos (se los rodea, no se los cruza) y los atienden **dos personas**: dos muñecos por defecto, o quienes el patrocinador anote con su correo, que pueden pararse detrás del mostrador. Justo frente a cada stand hay un pequeño cuadrado: parado ahí escuchas lo que hablan. Al hablarle a un muñeco (X o clic) cuenta lo que hace la marca y ofrece ir a su sitio.
 - **Charla privada por micrófono**: haz clic en una persona (o en 🎙 en la lista «En el evento») e invítala. Si acepta, solo ustedes se escuchan y el resto del evento queda en silencio, incluido el ponente si estás en una sala. Con «＋ Añadir» se suman más personas (hasta 8). En la charla puedes prender la cámara y compartir tu pantalla. Quien está en una charla lleva 🎧 sobre su nombre.
 - **Sin choques**: solo las paredes cortan el paso. Muebles y personas se pueden atravesar, aunque los caminos automáticos rodean los muebles.
 - **Cámara**: tu personaje siempre queda al centro de la pantalla; solo se mueve del centro al llegar a los bordes del recinto.

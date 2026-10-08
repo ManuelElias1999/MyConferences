@@ -174,6 +174,16 @@ export default function Scene(props: SceneProps) {
     bubble: (userId, text) => bubbles.current.set(userId, { text, at: performance.now() }),
   }));
 
+  // Modo de prueba (solo con ?e2e en la dirección): las pruebas automáticas caminan a una baldosa exacta.
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("e2e")) return;
+    const w = window as unknown as { __e2e?: unknown };
+    w.__e2e = { walkTo: (t: Tile) => walkTo(t), here: () => ({ x: Math.round(my.current.x), y: Math.round(my.current.y) }) };
+    return () => {
+      delete w.__e2e;
+    };
+  });
+
   useEffect(() => {
     const onBubble = (b: Bubble) => bubbles.current.set(b.userId, { text: b.text, at: performance.now() });
     const onEmote = (e: { userId: string; emoji: string }) => emotes.current.set(e.userId, { emoji: e.emoji, at: performance.now() });
