@@ -1378,85 +1378,91 @@ const singleV = (wallX: number, y: number, side: "left" | "right", zone: string)
   zone,
 });
 
-/** Cuarto con puerta al pasillo principal (arriba): su piso, el paso y la puerta con su nombre. */
-function sideRoom(x: number, label: string, color: string) {
-  const room: Rect = { x, y: 14, w: 13, h: 12 };
-  const passage: Rect = { x: x + 5, y: 26, w: 2, h: 4 };
-  const door: Decor = { kind: "roomdoor", x: x + 5, y: 29, w: 2, text: label, color };
+/** Cuarto con puerta a la calle de abajo: su piso, el paso hasta la calle y la puerta con su nombre en la cara de muro `faceY`. */
+function doorRoom(room: Rect, faceY: number, label: string, color: string) {
+  const dx = room.x + Math.floor(room.w / 2) - 1;
+  const passage: Rect = { x: dx, y: room.y + room.h, w: 2, h: faceY - (room.y + room.h) + 1 };
+  const door: Decor = { kind: "roomdoor", x: dx, y: faceY, w: 2, text: label, color };
   return { room, passage, door };
 }
 
 /** Sala de reunión: una mesa con sillas, cafetera, agua y un sillón. Quien entra se suma a la charla. */
 function meetingRoom(r: Rect, color: string, extra: Furni[]): Furni[] {
   const tx = r.x + 3;
-  const ty = r.y + 4;
+  const ty = r.y + 3;
   return [
-    { kind: "table", x: tx, y: ty, w: 6 },
-    ...Array.from({ length: 6 }, (_, i) => [
+    { kind: "table", x: tx, y: ty, w: 7 },
+    ...Array.from({ length: 7 }, (_, i) => [
       { kind: "officechair" as const, x: tx + i, y: ty - 1 },
       { kind: "officechair" as const, x: tx + i, y: ty + 1 },
     ]).flat(),
-    { kind: "coffeebar", x: r.x + r.w - 4, y: r.y, w: 3 },
+    { kind: "coffeebar", x: r.x + r.w - 4, y: r.y + r.h - 1, w: 3 },
     { kind: "cooler", x: r.x + r.w - 1, y: r.y },
-    { kind: "sofa", x: r.x + 1, y: r.y + r.h - 3, w: 3, color, dir: "down" },
-    { kind: "coffeetable", x: r.x + 1, y: r.y + r.h - 1, w: 2 },
+    { kind: "sofa", x: r.x + 1, y: r.y + r.h - 2, w: 3, color, dir: "down" },
     { kind: "bigplant", x: r.x, y: r.y },
-    { kind: "bigplant", x: r.x + r.w - 1, y: r.y + r.h - 1 },
     ...extra,
   ];
 }
 
-/** Esqueleto común: el pasillo principal, las cuatro salas de equipos en las esquinas y el espacio central de abajo. */
-const HACK_CONCOURSE: Rect = { x: 6, y: 30, w: 108, h: 12 };
-const HACK_CENTER: Rect = { x: 46, y: 45, w: 28, h: 16 };
-const hackCorners = (first: number): HallSpot[] => [
-  { hall: first, x: 3, y: 3, entrance: { x: 17, y: 27, w: 5, h: 3 }, portal: { x: 17, y: 29 } },
-  { hall: first + 1, x: 84, y: 3, entrance: { x: 98, y: 27, w: 5, h: 3 }, portal: { x: 98, y: 29 } },
-  { hall: first + 2, x: 3, y: 45, entrance: { x: 17, y: 42, w: 5, h: 3 }, portal: { x: 17, y: 44 } },
-  { hall: first + 3, x: 84, y: 45, entrance: { x: 98, y: 42, w: 5, h: 3 }, portal: { x: 98, y: 44 } },
-];
-
-/**
- * Cuatro salas de charla, cada una lejos de la otra: una en cada punta del
- * pasillo principal y una a cada lado del espacio central de abajo.
+/*
+ * Plano del hackathon: una calle principal (norte–sur) cruzada por dos calles
+ * (este–oeste). En cada cruce, una sala de equipos; en cada punta de las calles
+ * cruzadas, una sala de charla; arriba, el auditorio con mentores y staff a los
+ * lados; abajo, la entrada. Los stands van pegados a la pared de arriba de cada
+ * calle cruzada y en la calle principal solo hay carteles y tótems.
  */
-const hackRoomSlots = (prefix: string, center: string): Slot[] => [
-  singleV(5, 31, "left", `${prefix}pasillo (oeste)`),
-  singleV(114, 31, "right", `${prefix}pasillo (este)`),
-  singleV(45, 50, "left", `${prefix}${center}`),
-  singleV(74, 50, "right", `${prefix}${center}`),
+const HACK_MAIN: Rect = { x: 52, y: 16, w: 10, h: 57 };
+const HACK_CROSS_A: Rect = { x: 8, y: 16, w: 98, h: 8 };
+const HACK_CROSS_B: Rect = { x: 8, y: 54, w: 98, h: 8 };
+const hackHalls = (first: number): HallSpot[] => [
+  { hall: first, x: 16, y: 27, entrance: { x: 30, y: 24, w: 5, h: 3 }, portal: { x: 30, y: 26 } },
+  { hall: first + 1, x: 65, y: 27, entrance: { x: 79, y: 24, w: 5, h: 3 }, portal: { x: 79, y: 26 } },
+  { hall: first + 2, x: 16, y: 65, entrance: { x: 30, y: 62, w: 5, h: 3 }, portal: { x: 30, y: 64 } },
+  { hall: first + 3, x: 65, y: 65, entrance: { x: 79, y: 62, w: 5, h: 3 }, portal: { x: 79, y: 64 } },
 ];
 
-/** Stands pegados a la pared de arriba del pasillo principal, separados entre sí y de cada puerta. */
-const HACK_STANDS = [7, 11, 25, 30, 35, 63, 68, 78, 83, 88, 93, 105, 109].map((x) => ({ x, y: 30 }));
+/** Una sala de charla en cada punta de las calles cruzadas. */
+const hackRoomSlots = (prefix: string): Slot[] => [
+  singleV(7, 17, "left", `${prefix}calle norte (oeste)`),
+  singleV(106, 17, "right", `${prefix}calle norte (este)`),
+  singleV(7, 55, "left", `${prefix}calle sur (oeste)`),
+  singleV(106, 55, "right", `${prefix}calle sur (este)`),
+];
 
-/** En el camino solo hay carteles, logos y alguna planta. */
-const hackConcourseFurni = (sign: string): Furni[] => [
-  { kind: "signpost", x: 58, y: 38, label: sign },
-  { kind: "signpost", x: 19, y: 39, label: "↑ Equipos · Equipos ↓" },
-  { kind: "signpost", x: 100, y: 39, label: "↑ Equipos · Equipos ↓" },
-  { kind: "directory", x: 40, y: 39 },
-  { kind: "directory", x: 79, y: 39 },
-  { kind: "ledpillar", x: 6, y: 41 },
-  { kind: "ledpillar", x: 113, y: 41 },
-  { kind: "bigplant", x: 30, y: 41 },
-  { kind: "bigplant", x: 89, y: 41 },
+/** Stands: contra la pared de arriba de las dos calles cruzadas, separados entre sí y de cada puerta. */
+const HACK_STANDS = [
+  ...[10, 15, 37, 42, 64, 69, 90, 95, 100].map((x) => ({ x, y: 16 })),
+  ...[10, 15, 20, 39, 44, 66, 71, 92, 97].map((x) => ({ x, y: 54 })),
+];
+
+/** En las calles solo hay carteles, tótems y alguna planta. */
+const hackStreetFurni = (north: string, south: string): Furni[] => [
+  { kind: "signpost", x: 60, y: 21, label: north },
+  { kind: "signpost", x: 60, y: 59, label: south },
+  { kind: "directory", x: 53, y: 27 },
+  { kind: "directory", x: 60, y: 48 },
+  { kind: "ledpillar", x: 52, y: 40 },
+  { kind: "ledpillar", x: 61, y: 40 },
+  { kind: "bigplant", x: 8, y: 23 },
+  { kind: "bigplant", x: 105, y: 23 },
+  { kind: "bigplant", x: 8, y: 61 },
+  { kind: "bigplant", x: 105, y: 61 },
 ];
 
 function hackathonGround(capacity: number): Level {
-  const halls = teamHalls(hackCorners(1), capacity);
-  const mentors = sideRoom(38, "🧭 MENTORES", "#f59e0b");
-  const staff = sideRoom(69, "🔒 STAFF", "#ef4444");
+  const halls = teamHalls(hackHalls(1), capacity);
+  const mentors = doorRoom({ x: 24, y: 3, w: 13, h: 10 }, 15, "🧭 MENTORES", "#f59e0b");
+  const staff = doorRoom({ x: 77, y: 3, w: 13, h: 10 }, 15, "🔒 STAFF", "#ef4444");
   return {
     name: "Planta baja",
-    w: 120,
-    h: 72,
-    floors: [HACK_CONCOURSE, ...halls.floors, mentors.room, mentors.passage, staff.room, staff.passage, { x: 52, y: 42, w: 16, h: 3 }, HACK_CENTER],
+    w: 113,
+    h: 91,
+    floors: [HACK_MAIN, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, mentors.room, mentors.passage, staff.room, staff.passage],
     areas: [{ ...mentors.room, floor: "wood" }],
-    exit: { x: 59, y: 61 },
-    spawn: { x: 59, y: 58 },
-    main: { x: 58, y: 29, roof: { x: 53, y: 21, w: 14, h: 7 } },
-    slots: hackRoomSlots("", "entrada"),
+    exit: { x: 56, y: 73 },
+    spawn: { x: 56, y: 70 },
+    main: { x: 55, y: 15, roof: { x: 48, y: 7, w: 18, h: 7 } },
+    slots: hackRoomSlots(""),
     zones: [
       ...halls.zones,
       { id: "mentores", label: "Sala de mentores", ...mentors.room, color: "#f59e0b", seats: 30, room: true },
@@ -1469,101 +1475,83 @@ function hackathonGround(capacity: number): Level {
     ],
     stands: HACK_STANDS,
     expo: true,
-    stairs: [{ x: 49, y: 29, w: 2, dir: "up", to: 1, label: "ASCENSOR · equipos 5 a 8" }],
-    decor: [
-      ...halls.decor,
-      mentors.door,
-      staff.door,
-      { kind: "portal", x: 52, y: 44, w: 16, text: "BIENVENIDOS · PASILLO PRINCIPAL" },
-      { kind: "sponsors", x: 48, y: 44, w: 3 },
-      { kind: "sponsors", x: 69, y: 44, w: 3 },
-    ],
+    stairs: [{ x: 50, y: 15, w: 2, dir: "up", to: 1, label: "ASCENSOR · equipos 5 a 8" }],
+    decor: [...halls.decor, mentors.door, staff.door],
     furni: [
       ...halls.furni,
-      ...hackConcourseFurni("↑ Auditorio · Mentores · Staff|← Equipos 1 y 3 · Equipos 2 y 4 →|↖ Ascensor: equipos 5 a 8"),
-      ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 38, y: 18 }]),
-      ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 69, y: 18 }]),
-      // Entrada: la cuenta regresiva y bancos.
-      { kind: "countdown", x: 55, y: 48, w: 10 },
-      { kind: "bench", x: 49, y: 55, w: 3 },
-      { kind: "bench", x: 68, y: 55, w: 3 },
-      { kind: "bigplant", x: 46, y: 60 },
-      { kind: "bigplant", x: 73, y: 60 },
-      { kind: "signpost", x: 62, y: 57, label: "↑ Pasillo principal|↑ Auditorio, mentores y staff" },
+      ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charla · Charla →", "← Equipos 3 · Equipos 4 →|← Charla · Charla →|↑ Auditorio y ascensor"),
+      ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 24, y: 7 }]),
+      ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 77, y: 7 }]),
+      // Entrada: la cuenta regresiva.
+      { kind: "countdown", x: 53, y: 64, w: 8 },
+      { kind: "signpost", x: 59, y: 69, label: "↑ Salas de equipos y charlas|↑↑ Auditorio, mentores y staff" },
     ],
     crowd: [
-      [5, 5, "down", true],
-      [7, 5, "down", true],
-      [6, 7, "up", true],
-      [90, 12, "down", true],
-      [91, 14, "up", true],
-      [42, 17, "down", true],
-      [44, 17, "down", true],
-      [43, 19, "up", true],
-      ...chat(45, 36),
-      ...chat(72, 37),
-      ...chat(56, 52),
+      [18, 29, "down", true],
+      [20, 29, "down", true],
+      [19, 31, "up", true],
+      [71, 36, "down", true],
+      [72, 38, "up", true],
+      [28, 5, "down", true],
+      [30, 5, "down", true],
+      [29, 7, "up", true],
+      ...chat(25, 21),
+      ...chat(84, 21),
+      ...chat(55, 35),
+      ...chat(30, 59),
     ],
     directories: [],
   };
 }
 
-/** Piso alto: el mismo pasillo con stands, las salas de equipos 5 a 8, una terraza, una sala de descanso y una zona de juegos al centro. */
+/** Piso alto: las mismas calles, las salas de equipos 5 a 8, una terraza, una sala de descanso y una zona de juegos. */
 function hackathonUpper(capacity: number): Level {
-  const halls = teamHalls(hackCorners(5), capacity);
-  const terrace = sideRoom(38, "🌿 TERRAZA", "#10b981");
-  const lounge = sideRoom(69, "☕ SALA DE DESCANSO", "#a78bfa");
+  const halls = teamHalls(hackHalls(5), capacity);
+  const terrace = doorRoom({ x: 24, y: 3, w: 13, h: 10 }, 15, "🌿 TERRAZA", "#10b981");
+  const lounge = doorRoom({ x: 77, y: 3, w: 13, h: 10 }, 15, "☕ SALA DE DESCANSO", "#a78bfa");
+  const games = doorRoom({ x: 48, y: 3, w: 18, h: 10 }, 15, "🎮 ZONA DE JUEGOS", "#22d3ee");
   return {
     name: "Piso 1",
-    w: 120,
-    h: 72,
-    floors: [HACK_CONCOURSE, ...halls.floors, terrace.room, terrace.passage, lounge.room, lounge.passage, { x: 52, y: 42, w: 16, h: 3 }, HACK_CENTER],
+    w: 113,
+    h: 91,
+    floors: [{ ...HACK_MAIN, h: 47 }, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, terrace.room, terrace.passage, lounge.room, lounge.passage, games.room, games.passage],
     areas: [
       { ...terrace.room, floor: "deck" },
       { ...lounge.room, floor: "wood" },
     ],
-    spawn: { x: 49, y: 31 },
-    slots: hackRoomSlots("Piso 1 · ", "zona de juegos"),
+    spawn: { x: 50, y: 16 },
+    slots: hackRoomSlots("Piso 1 · "),
     zones: halls.zones,
     closed: halls.closed,
     stands: HACK_STANDS,
     expo: true,
-    stairs: [{ x: 49, y: 29, w: 2, dir: "down", to: 0, label: "ASCENSOR · auditorio, mentores y staff" }],
-    decor: [
-      ...halls.decor,
-      terrace.door,
-      lounge.door,
-      { kind: "neon", x: 56, y: 29, w: 6, text: "BUILD · SHIP", color: "#f472b6" },
-      { kind: "portal", x: 52, y: 44, w: 16, text: "ZONA DE JUEGOS" },
-    ],
+    stairs: [{ x: 50, y: 15, w: 2, dir: "down", to: 0, label: "ASCENSOR · auditorio, mentores y staff" }],
+    decor: [...halls.decor, terrace.door, lounge.door, games.door],
     furni: [
       ...halls.furni,
-      ...hackConcourseFurni("↑ Terraza · Descanso|← Equipos 5 y 7 · Equipos 6 y 8 →|↓ Zona de juegos"),
-      { kind: "parasol", x: 40, y: 17, w: 2 },
-      { kind: "parasol", x: 46, y: 17, w: 2 },
-      { kind: "beanbag", x: 40, y: 22, color: "#fbbf24" },
-      { kind: "beanbag", x: 47, y: 22, color: "#22d3ee" },
-      { kind: "tree", x: 38, y: 14 },
-      { kind: "tree", x: 50, y: 14 },
-      { kind: "sofa", x: 70, y: 16, w: 3, color: "#a78bfa", dir: "down" },
-      { kind: "sofa", x: 75, y: 16, w: 3, color: "#a78bfa", dir: "down" },
-      { kind: "beanbag", x: 71, y: 21, color: "#f472b6" },
-      { kind: "beanbag", x: 77, y: 21, color: "#22d3ee" },
-      { kind: "coffeebar", x: 69, y: 14, w: 3 },
-      // Zona de juegos al centro.
-      { kind: "pingpong", x: 49, y: 48, w: 3 },
-      { kind: "pingpong", x: 68, y: 48, w: 3 },
-      { kind: "foosball", x: 55, y: 52, w: 2 },
-      { kind: "foosball", x: 63, y: 52, w: 2 },
-      { kind: "arcade", x: 57, y: 45 },
-      { kind: "arcade", x: 58, y: 45 },
-      { kind: "arcade", x: 61, y: 45 },
-      { kind: "arcade", x: 62, y: 45 },
-      { kind: "beanbag", x: 50, y: 57, color: "#fbbf24" },
-      { kind: "beanbag", x: 69, y: 57, color: "#22d3ee" },
-      { kind: "vending", x: 73, y: 45 },
+      ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charla · Charla →", "← Equipos 7 · Equipos 8 →|← Charla · Charla →|↑ Ascensor"),
+      { kind: "parasol", x: 26, y: 5, w: 2 },
+      { kind: "parasol", x: 32, y: 5, w: 2 },
+      { kind: "beanbag", x: 26, y: 10, color: "#fbbf24" },
+      { kind: "beanbag", x: 33, y: 10, color: "#22d3ee" },
+      { kind: "tree", x: 24, y: 3 },
+      { kind: "tree", x: 36, y: 3 },
+      { kind: "sofa", x: 78, y: 5, w: 3, color: "#a78bfa", dir: "down" },
+      { kind: "sofa", x: 84, y: 5, w: 3, color: "#a78bfa", dir: "down" },
+      { kind: "beanbag", x: 79, y: 9, color: "#f472b6" },
+      { kind: "beanbag", x: 86, y: 9, color: "#22d3ee" },
+      { kind: "coffeebar", x: 77, y: 3, w: 3 },
+      { kind: "pingpong", x: 49, y: 5, w: 3 },
+      { kind: "pingpong", x: 61, y: 5, w: 3 },
+      { kind: "foosball", x: 55, y: 7, w: 2 },
+      { kind: "arcade", x: 48, y: 3 },
+      { kind: "arcade", x: 49, y: 3 },
+      { kind: "arcade", x: 64, y: 3 },
+      { kind: "arcade", x: 65, y: 3 },
+      { kind: "beanbag", x: 50, y: 10, color: "#fbbf24" },
+      { kind: "beanbag", x: 63, y: 10, color: "#22d3ee" },
     ],
-    crowd: [...chat(45, 36), ...chat(72, 37), ...chat(42, 19), ...chat(73, 19), ...chat(59, 55)],
+    crowd: [...chat(25, 21), ...chat(84, 21), ...chat(55, 35), ...chat(28, 7), ...chat(56, 9)],
     directories: [],
   };
 }
