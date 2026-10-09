@@ -28,13 +28,13 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Minimalista (galería tipo museo)**: lounge, jardín interior, café y estudio de juegos; arriba, terraza y biblioteca.
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
-  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Todo se abre a un **gran salón**:
-    - arriba, con aire entre cada cosa: el cuarto de **mentores** (con su puerta y su nombre), el **ascensor**, dos salas de charla, el **auditorio**, dos salas más y el cuarto de **staff** (solo su equipo); en cada pared lateral, dos salas de charla más;
-    - en la mitad de arriba del salón, **stands** sueltos en dos filas, con el centro libre hacia el auditorio; en la mitad de abajo, juegos, snacks, la cuenta regresiva y postes con flechas;
-    - a los costados, con entrada directa sin pasar por los stands, las **salas de equipos de 100 personas** (28 mesas: 5 de 6, 12 de 4 y 11 de 2). Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro;
-    - mentores y staff son salas de reunión: una mesa con café, agua y un sillón; entras y te sumas a la charla (ahí no se comparte pantalla);
-    - arriba: el mismo salón con stands y salas de charla, las salas de equipos 3, 4 y 5, una terraza y una sala de descanso.
-    - Al crear el hackathon se elige el cupo (100 a 500): se habilita una sala de equipos por cada 100 personas y las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
+  - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Cada piso tiene un **pasillo principal** ancho:
+    - **pegados a su pared**, los **stands** de los patrocinadores; en el camino solo hay carteles, tótems y plantas;
+    - en las cuatro esquinas, **cuatro salas de equipos** de 64 personas (4 mesas de 6, 6 de 4 y 8 de 2), cada una con **su cafetería y su zona de juegos**. Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro;
+    - **cuatro salas de charla**, cada una lejos de las demás: una en cada punta del pasillo y una a cada lado del espacio central;
+    - **planta baja**: arriba del pasillo, el cuarto de **mentores**, el ascensor, el **auditorio principal** y el cuarto de **staff** (solo su equipo); mentores y staff son salas de reunión con una mesa y café, donde se entra a charlar. Abajo al centro, la entrada con la cuenta regresiva;
+    - **piso de arriba**: las salas de equipos 5 a 8, una terraza, una sala de descanso y una zona de juegos al centro.
+    - Al crear el hackathon se elige el cupo (100 a 500) y se abren 2, 4, 5, 7 u 8 salas de equipos; las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso). También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
   - El piso de arriba de todas las temáticas es un gran pasillo con la escalera al medio: las salas dan a ese pasillo y hay cuatro stands.
   - En todos, la entrada del auditorio es monumental (columnas, puertas dobles y marquesina con luces).
   - Las salas van **de a dos** y en distintas zonas (2 · 2 · 2 · 2 + el auditorio). Algunas tienen la puerta de frente y otras en un muro lateral. Cada sala es un edificio con su nombre en el techo.

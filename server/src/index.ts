@@ -10,6 +10,7 @@ import { DEFAULT_LOOK } from "../../shared/look.ts";
 import {
   floorOfRoom,
   inFront,
+  maxRoomsFor,
   offLimits,
   standList,
   inZone,
@@ -294,6 +295,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
   if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
   const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
   if (rawRooms.length < MIN_ROOMS) return { error: `El evento necesita el auditorio principal y al menos ${MIN_ROOMS - 1} salas` };
+  if (rawRooms.length > maxRoomsFor(body.theme)) return { error: "Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso)" };
   const emails = (list: unknown, max: number) =>
     [
       ...new Set(
