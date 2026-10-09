@@ -1573,28 +1573,172 @@ const hackStreetFurni = (north: string, south: string): Furni[] => [
   { kind: "charger", x: 50, y: 79 },
   { kind: "photobooth", x: 51, y: 76, w: 2 },
   { kind: "photobooth", x: 71, y: 62, w: 2 },
-  ...[16, 97].flatMap((x) => [
-    { kind: "ledpillar" as const, x, y: 27 },
-    { kind: "ledpillar" as const, x, y: 69 },
-  ]),
 ];
+
+/*
+ * Áreas recreativas a los costados, con entrada desde la punta de cada calle
+ * cruzada: al oeste, arriba y abajo; al este, lo mismo. Cada piso tiene las
+ * suyas (parque y patio, café y descanso abajo; jardín y food court, zona
+ * tranquila y arcade arriba). Las mesas del patio y del café tienen su propia
+ * conversación, como las mesas de equipo.
+ */
+const LEISURE = {
+  nw: { x: 1, y: 25, w: 12, h: 32 },
+  sw: { x: 1, y: 67, w: 12, h: 30 },
+  ne: { x: 101, y: 25, w: 10, h: 32 },
+  se: { x: 101, y: 67, w: 10, h: 30 },
+} satisfies Record<string, Rect>;
+const LEISURE_PASSAGES: Rect[] = [
+  { x: 13, y: 25, w: 3, h: 3 },
+  { x: 13, y: 67, w: 3, h: 3 },
+  { x: 98, y: 25, w: 3, h: 3 },
+  { x: 98, y: 67, w: 3, h: 3 },
+];
+
+/** Mesa con su conversación: quien se acerca se suma, como en las mesas de equipo. */
+const tableZone = (id: string, label: string, x: number, y: number, color: string, top = 1): Zone => ({ id, label, x: x - 1, y: y - top, w: 4, h: 3 + top, color, seats: 4 });
+
+function hackLeisure(upper: boolean) {
+  const { nw, sw, ne, se } = LEISURE;
+  const furni: Furni[] = [];
+  const zones: Zone[] = [];
+  const crowd: [number, number, Dir][] = [];
+  // Oeste arriba: un parque (abajo) o un jardín (arriba), con árboles, fuente, bancos y ajedrez.
+  furni.push(
+    ...[26, 33, 41, 49, 55].map((y): Furni => ({ kind: "tree", x: 1, y })),
+    ...[31, 40, 49, 55].map((y): Furni => ({ kind: "tree", x: 11, y })),
+    { kind: "fountain", x: 6, y: 38, w: 2, d: 2 },
+    { kind: "bench", x: 3, y: 35, w: 3 },
+    { kind: "bench", x: 8, y: 35, w: 3 },
+    { kind: "bench", x: 5, y: 42, w: 4 },
+    { kind: "flowerbed", x: 3, y: 29, w: 3 },
+    { kind: "flowerbed", x: 7, y: 29, w: 3 },
+    { kind: "flowerbed", x: 3, y: 53, w: 3 },
+    { kind: "flowerbed", x: 7, y: 53, w: 3 },
+    ...(upper
+      ? [
+          { kind: "telescope" as const, x: 4, y: 47 },
+          { kind: "lamp" as const, x: 8, y: 47 },
+          { kind: "bigplant" as const, x: 6, y: 50 },
+        ]
+      : [
+          { kind: "chess" as const, x: 3, y: 47, w: 2 },
+          { kind: "chess" as const, x: 7, y: 47, w: 2 },
+        ]),
+  );
+  crowd.push(...chat(4, 44), ...chat(8, 27), ...chat(5, 50));
+  // Oeste abajo: patio con sombrillas (abajo) o food court con kioscos (arriba).
+  furni.push(
+    upper ? { kind: "kiosk", x: 3, y: 67 } : { kind: "coffeebar", x: 2, y: 67, w: 4 },
+    upper ? { kind: "kiosk", x: 6, y: 67 } : { kind: "vending", x: 7, y: 67 },
+    { kind: "vending", x: 9, y: 67 },
+    { kind: "bigplant", x: 1, y: 95 },
+    { kind: "bigplant", x: 11, y: 95 },
+    ...[71, 78, 85].flatMap((y): Furni[] => [
+      { kind: "plant", x: 1, y },
+      { kind: "plant", x: 12, y },
+    ]),
+    { kind: "lamp", x: 6, y: 90 },
+    { kind: "beanbag", x: 3, y: 93, color: "#fbbf24" },
+    { kind: "beanbag", x: 6, y: 93, color: "#22d3ee" },
+    { kind: "beanbag", x: 9, y: 93, color: "#f472b6" },
+  );
+  [72, 79, 86].forEach((y, row) =>
+    [3, 8].forEach((x, col) => {
+      const n = row * 2 + col + 1;
+      furni.push(upper ? { kind: "cafetable", x, y, w: 2 } : { kind: "parasol", x, y, w: 2, color: ["#ff5c39", "#22d3ee", "#a78bfa"][row] });
+      zones.push(tableZone(`${upper ? "food" : "patio"}-${n}`, `${upper ? "Food court" : "Patio"} · mesa ${n}`, x, y, "#f59e0b", upper ? 1 : 2));
+    }),
+  );
+  crowd.push(...chat(3, 74), ...chat(8, 81));
+  // Este arriba: café (abajo) o zona tranquila con libros (arriba).
+  furni.push(
+    upper ? { kind: "bookshelf", x: 104, y: 25 } : { kind: "coffeebar", x: 104, y: 25, w: 5 },
+    upper ? { kind: "bookshelf", x: 106, y: 25 } : { kind: "vending", x: 109, y: 25 },
+    upper ? { kind: "bookshelf", x: 108, y: 25 } : { kind: "cooler", x: 110, y: 25 },
+    ...[29, 36, 43].flatMap((y): Furni[] => [
+      { kind: "plant", x: 101, y: y + 3 },
+      { kind: "plant", x: 110, y: y + 3 },
+    ]),
+    { kind: "lamp", x: 105, y: 48 },
+    { kind: "sofa", x: 102, y: 51, w: 3, color: "#a78bfa", dir: "down" },
+    { kind: "sofa", x: 107, y: 51, w: 3, color: "#22d3ee", dir: "down" },
+    { kind: "coffeetable", x: 103, y: 53, w: 2 },
+    { kind: "coffeetable", x: 108, y: 53, w: 2 },
+    { kind: "bigplant", x: 101, y: 56 },
+    { kind: "bigplant", x: 110, y: 56 },
+  );
+  [30, 37, 44].forEach((y, row) =>
+    [102, 107].forEach((x, col) => {
+      const n = row * 2 + col + 1;
+      furni.push({ kind: "cafetable", x, y, w: 2 });
+      zones.push(tableZone(`${upper ? "quiet" : "cafe"}-${n}`, `${upper ? "Zona tranquila" : "Café"} · mesa ${n}`, x, y, "#a16207"));
+    }),
+  );
+  crowd.push(...chat(105, 27), ...chat(103, 48));
+  // Este abajo: sala de descanso con sillones (abajo) o arcade (arriba).
+  furni.push(
+    { kind: "bookshelf", x: 104, y: 67 },
+    { kind: "bookshelf", x: 106, y: 67 },
+    { kind: "plant", x: 108, y: 67 },
+    { kind: "sofa", x: 102, y: 70, w: 3, color: "#a78bfa", dir: "down" },
+    { kind: "sofa", x: 106, y: 70, w: 3, color: "#f472b6", dir: "down" },
+    { kind: "coffeetable", x: 103, y: 72, w: 2 },
+    { kind: "coffeetable", x: 107, y: 72, w: 2 },
+    ...[102, 104, 106, 108].map((x, i): Furni => ({ kind: "beanbag", x, y: 78, color: ["#fbbf24", "#22d3ee", "#f472b6", "#10b981"][i] })),
+    ...(upper
+      ? [102, 103, 104, 107, 108, 109].map((x): Furni => ({ kind: "arcade", x, y: 84 }))
+      : [
+          { kind: "pingpong" as const, x: 102, y: 85, w: 3 },
+          { kind: "foosball" as const, x: 107, y: 85, w: 2 },
+        ]),
+    { kind: "armchair", x: 102, y: 91, color: "#ffb703" },
+    { kind: "armchair", x: 108, y: 91, color: "#ffb703" },
+    { kind: "lamp", x: 105, y: 91 },
+    { kind: "bigplant", x: 101, y: 95 },
+    { kind: "bigplant", x: 110, y: 95 },
+  );
+  crowd.push(...chat(104, 81), ...chat(106, 88));
+  // Carteles en la punta de cada calle cruzada.
+  const names = upper ? ["🌿 JARDÍN", "🍕 FOOD COURT", "📚 ZONA TRANQUILA", "🕹 ARCADE"] : ["🌳 PARQUE", "☕ PATIO", "☕ CAFÉ", "🛋 DESCANSO"];
+  furni.push(
+    { kind: "signpost", x: 16, y: 27, label: `← ${names[0]}` },
+    { kind: "signpost", x: 16, y: 69, label: `← ${names[1]}` },
+    { kind: "signpost", x: 97, y: 27, label: `${names[2]} →` },
+    { kind: "signpost", x: 97, y: 69, label: `${names[3]} →` },
+  );
+  return {
+    floors: [nw, sw, ne, se, ...LEISURE_PASSAGES],
+    areas: [
+      { ...nw, floor: "grass" },
+      { ...sw, floor: "deck" },
+      { ...ne, floor: "wood" },
+      { ...se, floor: upper ? "tiles" : "wood" },
+    ] as Area[],
+    furni,
+    zones,
+    crowd,
+  };
+}
 
 function hackathonGround(capacity: number): Level {
   const halls = teamHalls(hackHalls(1), capacity);
+  const fun = hackLeisure(false);
   const mentors = doorRoom({ x: 24, y: 3, w: 13, h: 10 }, 15, "🧭 MENTORES", "#f59e0b");
   const staff = doorRoom({ x: 77, y: 3, w: 13, h: 10 }, 15, "🔒 STAFF", "#ef4444");
   return {
     name: "Planta baja",
     w: 112,
     h: 99,
-    floors: [HACK_MAIN, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, mentors.room, mentors.passage, staff.room, staff.passage],
-    areas: [{ ...mentors.room, floor: "wood" }],
+    floors: [HACK_MAIN, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, ...fun.floors, mentors.room, mentors.passage, staff.room, staff.passage],
+    areas: [{ ...mentors.room, floor: "wood" }, ...fun.areas],
     exit: { x: 56, y: 83 },
     spawn: { x: 56, y: 80 },
     main: { x: 55, y: 15, roof: { x: 48, y: 7, w: 18, h: 7 }, trail: [{ x: 56, y: 81 }, { x: 56, y: 16 }] },
     slots: hackRoomSlots("", [52, 61, 53, 60], 81, 0),
     zones: [
       ...halls.zones,
+      ...fun.zones,
       { id: "mentores", label: "Sala de mentores", ...mentors.room, color: "#f59e0b", seats: 30, room: true },
       { id: "organizadores", label: "Sala de organizadores", ...staff.room, color: "#ef4444", seats: 30, staff: true, room: true },
     ],
@@ -1609,7 +1753,8 @@ function hackathonGround(capacity: number): Level {
     decor: [...halls.decor, ...hackWallDecor(), mentors.door, staff.door],
     furni: [
       ...halls.furni,
-      ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charlas en las puntas →", "← Equipos 3 · Equipos 4 →|← Charlas en las puntas →|↑ Auditorio y ascensor"),
+      ...fun.furni,
+      ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charlas en las puntas →|← Parque · Café →", "← Equipos 3 · Equipos 4 →|← Charlas en las puntas →|← Patio · Descanso →|↑ Auditorio y ascensor"),
       ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 24, y: 7 }]),
       ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 77, y: 7 }]),
       { kind: "eventscreen", x: 54, y: 74, w: 6, floating: true },
@@ -1630,6 +1775,7 @@ function hackathonGround(capacity: number): Level {
       ...chat(52, 67),
       ...chat(35, 63),
       ...HACK_STREET_CROWD,
+      ...fun.crowd,
     ],
     directories: [],
   };
@@ -1638,6 +1784,7 @@ function hackathonGround(capacity: number): Level {
 /** Piso alto: las mismas calles con vida, las salas de equipos 5 a 8, una terraza, una sala de descanso y una zona de juegos. */
 function hackathonUpper(capacity: number): Level {
   const halls = teamHalls(hackHalls(5), capacity);
+  const fun = hackLeisure(true);
   const terrace = doorRoom({ x: 24, y: 3, w: 13, h: 10 }, 15, "🌿 TERRAZA", "#10b981");
   const lounge = doorRoom({ x: 77, y: 3, w: 13, h: 10 }, 15, "☕ SALA DE DESCANSO", "#a78bfa");
   const games = doorRoom({ x: 48, y: 3, w: 18, h: 10 }, 15, "🎮 ZONA DE JUEGOS", "#22d3ee");
@@ -1645,14 +1792,15 @@ function hackathonUpper(capacity: number): Level {
     name: "Piso 1",
     w: 112,
     h: 99,
-    floors: [HACK_MAIN, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, terrace.room, terrace.passage, lounge.room, lounge.passage, games.room, games.passage],
+    floors: [HACK_MAIN, HACK_CROSS_A, HACK_CROSS_B, ...halls.floors, ...fun.floors, terrace.room, terrace.passage, lounge.room, lounge.passage, games.room, games.passage],
     areas: [
+      ...fun.areas,
       { ...terrace.room, floor: "deck" },
       { ...lounge.room, floor: "wood" },
     ],
     spawn: { x: 50, y: 16 },
     slots: hackRoomSlots("Piso 1 · ", [50, 51, 52, 53], 17, 1),
-    zones: halls.zones,
+    zones: [...halls.zones, ...fun.zones],
     closed: halls.closed,
     stands: HACK_STANDS,
     expo: true,
@@ -1660,7 +1808,8 @@ function hackathonUpper(capacity: number): Level {
     decor: [...halls.decor, ...hackWallDecor(), terrace.door, lounge.door, games.door],
     furni: [
       ...halls.furni,
-      ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charlas en las puntas →", "← Equipos 7 · Equipos 8 →|← Charlas en las puntas →|↑ Ascensor"),
+      ...fun.furni,
+      ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charlas en las puntas →|← Jardín · Zona tranquila →", "← Equipos 7 · Equipos 8 →|← Charlas en las puntas →|← Food court · Arcade →|↑ Ascensor"),
       { kind: "eventscreen", x: 54, y: 74, w: 6, floating: true },
       { kind: "parasol", x: 26, y: 5, w: 2 },
       { kind: "parasol", x: 32, y: 5, w: 2 },
@@ -1683,7 +1832,7 @@ function hackathonUpper(capacity: number): Level {
       { kind: "beanbag", x: 50, y: 10, color: "#fbbf24" },
       { kind: "beanbag", x: 63, y: 10, color: "#22d3ee" },
     ],
-    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 47), ...chat(28, 7), ...chat(56, 9), ...HACK_STREET_CROWD],
+    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 47), ...chat(28, 7), ...chat(56, 9), ...HACK_STREET_CROWD, ...fun.crowd],
     directories: [],
   };
 }

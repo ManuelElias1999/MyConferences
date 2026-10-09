@@ -1841,9 +1841,7 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           box(ctx, cx - 10, py + 12, 20, 10, 4, "#e9e4dc", "#f4f1ea");
           ctx.fillStyle = "#6b7280";
           ctx.fillRect(cx - 1, py - 14, 2, 26);
-        });
-        add(y + 1.2, (ctx) => {
-          const colors = ["#ff5c39", "#ffffff"];
+          const colors = [f.color ?? "#ff5c39", "#ffffff"];
           for (let i = 0; i < 6; i++) {
             ctx.fillStyle = colors[i % 2]!;
             ctx.fillRect(cx - 24 + i * 8, py - 22, 8, 10);
