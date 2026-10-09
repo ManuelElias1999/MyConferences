@@ -1,4 +1,39 @@
 {
   "secret": "c8398e9ff0003d588a7d31b392f57f4618de380910a103580a3f3c0ceb4089bc",
-  "accounts": []
+  "accounts": [
+    {
+      "id": "d5674ebb-8fbf-4cf9-a687-d1a955795ca5",
+      "email": "d1791513377729@demo.dev",
+      "name": "Dueña",
+      "look": {
+        "skin": "#eec1a0",
+        "hair": "short",
+        "hairColor": "#5a3825",
+        "shirt": "#9aa3b5",
+        "pants": "#2b3a67",
+        "shoes": "#1b1b1f"
+      },
+      "company": {
+        "name": "Hack Co"
+      },
+      "passwordHash": "0885c53c022ea3d6c559ab55647701f0:c0d3c063022fc88b1834bc087e293b471cbd7d3ee1c2e3f6219627bef7c7c2bec5f0501681c2fa31adad2060d5c96173971c9b96d5d5ba9153c506ac85689d5c",
+      "createdAt": 1791513377780
+    },
+    {
+      "id": "f36a8da7-6513-4518-8daf-90c708d0d4e0",
+      "email": "rep1791513377729@demo.dev",
+      "name": "Rep",
+      "look": {
+        "skin": "#eec1a0",
+        "hair": "short",
+        "hairColor": "#5a3825",
+        "shirt": "#9aa3b5",
+        "pants": "#2b3a67",
+        "shoes": "#1b1b1f"
+      },
+      "company": null,
+      "passwordHash": "86ca6aa11fc0e958486c9c697d3d4b7e:c04f7d1862b71e0f4bd216b90a5e128b3c5f9a4dc293bd799f88e7d6cf787bfd31fd005d5d3079551f5d29fd786906b9a7e9802203f3b7751f77ab6d0da6cc40",
+      "createdAt": 1791513377806
+    }
+  ]
 }

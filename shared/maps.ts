@@ -83,6 +83,8 @@ export type FurniKind =
   | "photobooth"
   /** Estación para cargar el celular o la laptop. */
   | "charger"
+  /** Cartel publicitario gigante: el logo de `label` o, sin él, los patrocinadores rotando. */
+  | "adboard"
   /** Postes con cordón para ordenar la fila frente a la recepción (se puede pasar por encima). */
   | "stanchion"
   /** Gran mostrador de recepción, con su nombre al frente y una línea de luz. */
@@ -1429,8 +1431,8 @@ function meetingRoom(r: Rect, color: string, extra: Furni[]): Furni[] {
  * el auditorio con mentores y staff a los lados; abajo, la entrada.
  */
 const HACK_MAIN: Rect = { x: 50, y: 16, w: 14, h: 67 };
-const HACK_CROSS_A: Rect = { x: 10, y: 16, w: 94, h: 12 };
-const HACK_CROSS_B: Rect = { x: 10, y: 58, w: 94, h: 12 };
+const HACK_CROSS_A: Rect = { x: 16, y: 16, w: 82, h: 12 };
+const HACK_CROSS_B: Rect = { x: 16, y: 58, w: 82, h: 12 };
 const hackHalls = (first: number): HallSpot[] => {
   const top = (x0: number, y: number) => [
     { rect: { x: x0 + 4, y, w: 4, h: 3 }, portal: { x: x0 + 4, y: y + 2 } },
@@ -1446,31 +1448,29 @@ const hackHalls = (first: number): HallSpot[] => {
 
 /** Una sala de charla en cada punta de las calles cruzadas, a pocos pasos de su sala de equipos. */
 const hackRoomSlots = (prefix: string): Slot[] => [
-  singleV(9, 19, "left", `${prefix}junto a equipos (noroeste)`),
-  singleV(104, 19, "right", `${prefix}junto a equipos (noreste)`),
-  singleV(9, 61, "left", `${prefix}junto a equipos (suroeste)`),
-  singleV(104, 61, "right", `${prefix}junto a equipos (sureste)`),
+  singleV(15, 19, "left", `${prefix}junto a equipos (noroeste)`),
+  singleV(98, 19, "right", `${prefix}junto a equipos (noreste)`),
+  singleV(15, 61, "left", `${prefix}junto a equipos (suroeste)`),
+  singleV(98, 61, "right", `${prefix}junto a equipos (sureste)`),
 ];
 
 /** Stands: contra la pared de arriba de las dos calles cruzadas, separados entre sí y de cada puerta. */
 const HACK_STANDS = [
-  ...[11, 16, 35, 41, 63, 69, 88, 94, 99].map((x) => ({ x, y: 16 })),
+  ...[18, 35, 41, 63, 69, 87, 93].map((x) => ({ x, y: 16 })),
   ...[20, 30, 40, 73, 83, 93].map((x) => ({ x, y: 58 })),
 ];
 
 /** Paredes de las calles: pantallas con código que corre intercaladas con pantallas de patrocinadores. */
 const hackWallDecor = (): Decor[] => [
-  { kind: "codewall", x: 20, y: 15, w: 5 },
+  { kind: "codewall", x: 22, y: 15, w: 5 },
   { kind: "sponsors", x: 45, y: 15, w: 3 },
   { kind: "codewall", x: 73, y: 15, w: 6 },
-  { kind: "codewall", x: 11, y: 57, w: 6 },
   { kind: "sponsors", x: 24, y: 57, w: 5 },
   { kind: "codewall", x: 34, y: 57, w: 5 },
   { kind: "sponsors", x: 44, y: 57, w: 4 },
   { kind: "codewall", x: 67, y: 57, w: 5 },
   { kind: "sponsors", x: 77, y: 57, w: 5 },
   { kind: "codewall", x: 87, y: 57, w: 5 },
-  { kind: "sponsors", x: 97, y: 57, w: 6 },
 ];
 
 /** Gente conversando por las calles. */
@@ -1483,12 +1483,14 @@ const HACK_STREET_CROWD: [number, number, Dir][] = [
   ...chat(80, 65),
   ...chat(56, 77),
   ...chat(53, 55),
+  ...chat(47, 21),
+  ...chat(66, 66),
 ];
 
 /** Vida en las calles: robots, hologramas, pantallas del evento, tótems con los patrocinadores y luces. Nada corta el paso. */
 const hackStreetFurni = (north: string, south: string): Furni[] => [
   // Calle principal.
-  { kind: "eventscreen", x: 53, y: 43, w: 8 },
+  { kind: "countdown", x: 52, y: 43, w: 10 },
   { kind: "hologram", x: 56, y: 33, w: 2, d: 2 },
   { kind: "hologram", x: 56, y: 52, w: 2, d: 2 },
   { kind: "robot", x: 52, y: 37 },
@@ -1503,6 +1505,12 @@ const hackStreetFurni = (north: string, south: string): Furni[] => [
   ]),
   { kind: "signpost", x: 59, y: 29, label: north },
   { kind: "signpost", x: 59, y: 71, label: south },
+  // Cruces: publicidad gigante (Stellar al centro, patrocinadores a los lados) y luces.
+  ...[20, 62].flatMap((y): Furni[] => [
+    { kind: "adboard", x: 54, y, w: 6, label: "/assets/logos/stellar.svg" },
+    { kind: "adboard", x: 50, y: y + 3, w: 3 },
+    { kind: "adboard", x: 61, y: y + 3, w: 3 },
+  ]),
   // Calles cruzadas.
   ...[23, 76].flatMap((x) => [
     { kind: "hologram" as const, x, y: 23, w: 2, d: 2 },
@@ -1519,12 +1527,10 @@ const hackStreetFurni = (north: string, south: string): Furni[] => [
   { kind: "directory", x: 47, y: 26 },
   { kind: "directory", x: 66, y: 66 },
   // Lo divertido: realidad virtual, drones, impresoras 3D, cargadores y un photobooth.
-  { kind: "vrpod", x: 14, y: 22, w: 2 },
-  { kind: "vrpod", x: 98, y: 22, w: 2 },
-  { kind: "vrpod", x: 14, y: 64, w: 2 },
-  { kind: "vrpod", x: 98, y: 64, w: 2 },
-  { kind: "vrpod", x: 51, y: 64, w: 2 },
-  { kind: "vrpod", x: 61, y: 64, w: 2 },
+  { kind: "vrpod", x: 18, y: 22, w: 2 },
+  { kind: "vrpod", x: 94, y: 22, w: 2 },
+  { kind: "vrpod", x: 18, y: 64, w: 2 },
+  { kind: "vrpod", x: 94, y: 64, w: 2 },
   ...[
     [30, 21],
     [68, 21],
@@ -1545,7 +1551,7 @@ const hackStreetFurni = (north: string, south: string): Furni[] => [
   { kind: "charger", x: 50, y: 79 },
   { kind: "photobooth", x: 51, y: 76, w: 2 },
   { kind: "photobooth", x: 71, y: 62, w: 2 },
-  ...[10, 103].flatMap((x) => [
+  ...[16, 97].flatMap((x) => [
     { kind: "ledpillar" as const, x, y: 27 },
     { kind: "ledpillar" as const, x, y: 69 },
   ]),
@@ -1584,7 +1590,7 @@ function hackathonGround(capacity: number): Level {
       ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charlas en las puntas →", "← Equipos 3 · Equipos 4 →|← Charlas en las puntas →|↑ Auditorio y ascensor"),
       ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 24, y: 7 }]),
       ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 77, y: 7 }]),
-      { kind: "countdown", x: 52, y: 74, w: 10 },
+      { kind: "eventscreen", x: 52, y: 74, w: 10 },
       { kind: "signpost", x: 60, y: 79, label: "↑ Salas de equipos y charlas|↑↑ Auditorio, mentores y staff" },
     ],
     crowd: [
@@ -1598,8 +1604,8 @@ function hackathonGround(capacity: number): Level {
       [29, 7, "up", true],
       ...chat(26, 21),
       ...chat(84, 20),
-      ...chat(54, 40),
-      ...chat(58, 64),
+      ...chat(54, 47),
+      ...chat(52, 67),
       ...chat(35, 63),
       ...HACK_STREET_CROWD,
     ],
@@ -1633,7 +1639,7 @@ function hackathonUpper(capacity: number): Level {
     furni: [
       ...halls.furni,
       ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charlas en las puntas →", "← Equipos 7 · Equipos 8 →|← Charlas en las puntas →|↑ Ascensor"),
-      { kind: "countdown", x: 52, y: 74, w: 10 },
+      { kind: "eventscreen", x: 52, y: 74, w: 10 },
       { kind: "parasol", x: 26, y: 5, w: 2 },
       { kind: "parasol", x: 32, y: 5, w: 2 },
       { kind: "beanbag", x: 26, y: 10, color: "#fbbf24" },
@@ -1655,7 +1661,7 @@ function hackathonUpper(capacity: number): Level {
       { kind: "beanbag", x: 50, y: 10, color: "#fbbf24" },
       { kind: "beanbag", x: 63, y: 10, color: "#22d3ee" },
     ],
-    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 40), ...chat(28, 7), ...chat(56, 9), ...HACK_STREET_CROWD],
+    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 47), ...chat(28, 7), ...chat(56, 9), ...HACK_STREET_CROWD],
     directories: [],
   };
 }

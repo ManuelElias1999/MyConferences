@@ -1870,6 +1870,39 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       }
+      case "adboard": {
+        // Cartel publicitario gigante sobre dos patas, con un borde de luz que late.
+        const slot = 20 + x;
+        add(y + 1, (ctx, t) => {
+          const sw = w * T;
+          const big = w >= 5;
+          const h = big ? 70 : 54;
+          shadowUnder(ctx, cx, base - 3, sw / 2 - 6);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(px + 10, base - 22, 5, 19);
+          ctx.fillRect(px + sw - 15, base - 22, 5, 19);
+          const top = base - 22 - h;
+          frame(ctx, px + 2, top, sw - 4, h, "#0b1020");
+          const glow = 0.55 + 0.45 * Math.sin(t / 500 + x);
+          ctx.fillStyle = big ? `rgba(253,218,36,${glow})` : `rgba(244,114,182,${glow})`;
+          ctx.fillRect(px + 2, top, sw - 4, 2);
+          ctx.fillRect(px + 2, top + h - 2, sw - 4, 2);
+          const img = f.label ? logoImage(f.label) : null;
+          if (f.label) {
+            ctx.fillStyle = "#0f0f14";
+            ctx.fillRect(px + 6, top + 4, sw - 12, h - 8);
+            if (img) {
+              const scale = Math.min((sw - 16) / img.naturalWidth, (h - 12) / img.naturalHeight);
+              ctx.imageSmoothingEnabled = true;
+              ctx.drawImage(img, cx - (img.naturalWidth * scale) / 2, top + h / 2 - (img.naturalHeight * scale) / 2, img.naturalWidth * scale, img.naturalHeight * scale);
+              ctx.imageSmoothingEnabled = false;
+            }
+          } else {
+            sponsorSlide(ctx, px + 6, top + 4, sw - 12, h - 8, media?.() ?? { sponsors: [], title: "" }, t, slot);
+          }
+        });
+        break;
+      }
       case "drone":
         // Dron flotando: sube y baja, con hélices y luces que parpadean.
         add(y + 1, (ctx, t) => {

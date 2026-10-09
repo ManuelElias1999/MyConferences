@@ -1,0 +1,117 @@
+[
+  {
+    "ownerId": "d5674ebb-8fbf-4cf9-a687-d1a955795ca5",
+    "venue": {
+      "id": "6281",
+      "name": "Feria",
+      "tagline": "",
+      "private": false,
+      "theme": "hackathon",
+      "capacity": 100,
+      "organizer": "Hack Co",
+      "logoUrl": null,
+      "rooms": [
+        {
+          "id": "auditorio",
+          "name": "Auditorio",
+          "topic": "Charlas principales",
+          "color": "#3b82f6",
+          "main": true,
+          "theme": null
+        },
+        {
+          "id": "sala-1",
+          "name": "Sala 1",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-2",
+          "name": "Sala 2",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-3",
+          "name": "Sala 3",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-4",
+          "name": "Sala 4",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-5",
+          "name": "Sala 5",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-6",
+          "name": "Sala 6",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-7",
+          "name": "Sala 7",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        },
+        {
+          "id": "sala-8",
+          "name": "Sala 8",
+          "topic": "Charla abierta",
+          "color": "#3b82f6",
+          "main": false,
+          "theme": null
+        }
+      ],
+      "talks": [],
+      "sponsors": [
+        {
+          "id": "f7ba4794-2f7e-41f7-a900-817ac5ceaa21",
+          "name": "Acme",
+          "logoUrl": "/uploads/logos/6281-f119e486-6880-4d5e-a1e3-11eefbe8eb95.png",
+          "url": null,
+          "pitch": "",
+          "reps": [
+            "rep1791513377729@demo.dev"
+          ]
+        }
+      ]
+    },
+    "whitelist": [],
+    "speakerCodes": {
+      "auditorio": "BFDCDE",
+      "sala-1": "522F9F",
+      "sala-2": "B25B1B",
+      "sala-3": "F6529F",
+      "sala-4": "60EB4F",
+      "sala-5": "B65D50",
+      "sala-6": "997AFB",
+      "sala-7": "B2E355",
+      "sala-8": "D9B6CD"
+    },
+    "createdAt": 1791513377808,
+    "staff": [],
+    "mentors": []
+  }
+]
