@@ -964,6 +964,23 @@ export function renderStatic(map: SceneMap, scale: number) {
   style.floor(ctx, 0, 0, map.w * T, map.h * T);
   const outside = outsideTiles(map);
   for (const area of map.areas) AREA_FLOOR[area.floor](ctx, area.x * T, area.y * T, (area.x + area.w) * T, (area.y + area.h) * T);
+  // Caminos del color de cada sala: el suelo sigue blanco, apenas teñido, desde la entrada hasta su puerta.
+  for (const trail of map.trails) {
+    const tw = trail.w ?? 1;
+    ctx.fillStyle = hexA(trail.color, 0.16);
+    trail.points.slice(1).forEach((b, i) => {
+      const a = trail.points[i]!;
+      const x0 = Math.min(a.x, b.x);
+      const y0 = Math.min(a.y, b.y);
+      const x1 = Math.max(a.x, b.x) + (a.x === b.x ? tw : 1);
+      const y1 = Math.max(a.y, b.y) + (a.y === b.y ? tw : 1);
+      // Cada tramo empieza donde terminó el anterior: no se pinta dos veces la esquina.
+      ctx.fillRect(x0 * T, y0 * T, (x1 - x0) * T, (y1 - y0) * T);
+    });
+    const end = trail.points[trail.points.length - 1]!;
+    ctx.fillStyle = hexA(trail.color, 0.3);
+    ctx.fillRect(end.x * T, end.y * T, tw * T, T);
+  }
   // Mesas de equipo: un rectángulo de color suave con borde, para que se vea hasta dónde llega la conversación.
   for (const z of map.zones) {
     if (z.room) continue;
@@ -1225,6 +1242,38 @@ function box(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, top
   ctx.fillRect(x, y + top, w, front);
   ctx.fillStyle = "rgba(255,255,255,0.3)";
   ctx.fillRect(x, y, w, 1);
+}
+
+/** Un color #rrggbb con transparencia. */
+function hexA(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+/** Pantalla holográfica que flota: un proyector chico en el suelo, un haz de luz y la pantalla en el aire. Devuelve dónde va el contenido. */
+function floatingScreen(ctx: CanvasRenderingContext2D, px: number, base: number, sw: number, h: number, t: number, seed: number) {
+  const cx = px + sw / 2;
+  const bob = Math.sin(t / 700 + seed) * 2;
+  ctx.fillStyle = "#1f2937";
+  ctx.fillRect(cx - 10, base - 8, 20, 5);
+  ctx.fillStyle = "#22d3ee";
+  ctx.fillRect(cx - 6, base - 9, 12, 2);
+  const top = base - 34 - h + bob;
+  const g = ctx.createLinearGradient(0, top + h, 0, base - 8);
+  g.addColorStop(0, "rgba(34,211,238,0.18)");
+  g.addColorStop(1, "rgba(34,211,238,0.02)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(px + 14, top + h);
+  ctx.lineTo(px + sw - 14, top + h);
+  ctx.lineTo(cx + 6, base - 8);
+  ctx.lineTo(cx - 6, base - 8);
+  ctx.fill();
+  ctx.fillStyle = "rgba(34,211,238,0.35)";
+  ctx.fillRect(px - 2, top - 2, sw + 4, h + 4);
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(px, top, sw, h);
+  return { sx: px + 3, sy: top + 3, iw: sw - 6, ih: h - 6 };
 }
 
 function shadowUnder(ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number) {
@@ -1808,15 +1857,18 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         add(y + 1, (ctx, t) => {
           const m = media?.() ?? { sponsors: [], title: "" };
           const sw = w * T;
-          shadowUnder(ctx, cx, base - 3, sw / 2 - 6);
-          ctx.fillStyle = "#3a3f4d";
-          ctx.fillRect(px + 16, base - 18, 6, 15);
-          ctx.fillRect(px + sw - 22, base - 18, 6, 15);
-          frame(ctx, px, base - 96, sw, 80, "#16161d");
-          const sx = px + 5;
-          const sy = base - 91;
-          const iw = sw - 10;
-          const ih = 70;
+          let sx = px + 5;
+          let sy = base - 91;
+          let iw = sw - 10;
+          let ih = 70;
+          if (f.floating) ({ sx, sy, iw, ih } = floatingScreen(ctx, px, base, sw, 58, t, x));
+          else {
+            shadowUnder(ctx, cx, base - 3, sw / 2 - 6);
+            ctx.fillStyle = "#3a3f4d";
+            ctx.fillRect(px + 16, base - 18, 6, 15);
+            ctx.fillRect(px + sw - 22, base - 18, 6, 15);
+            frame(ctx, px, base - 96, sw, 80, "#16161d");
+          }
           const g = ctx.createLinearGradient(sx, sy, sx + iw, sy + ih);
           g.addColorStop(0, "#1e1b4b");
           g.addColorStop(1, "#0f172a");
@@ -2065,18 +2117,13 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
       case "countdown":
         // Pantalla gigante con la cuenta regresiva del hackathon.
         add(y + 1, (ctx, t) => {
-          const sw = w * T;
-          shadowUnder(ctx, cx, base - 3, sw / 2 - 6);
-          ctx.fillStyle = "#3a3f4d";
-          ctx.fillRect(px + 16, base - 18, 6, 15);
-          ctx.fillRect(px + sw - 22, base - 18, 6, 15);
-          frame(ctx, px, base - 96, sw, 80, "#0b1020");
+          const { sx, sy, iw, ih } = floatingScreen(ctx, px, base, w * T, 52, t, x);
           ctx.fillStyle = "#0f172a";
-          ctx.fillRect(px + 5, base - 91, sw - 10, 70);
+          ctx.fillRect(sx, sy, iw, ih);
           ctx.fillStyle = "#22d3ee";
-          ctx.fillRect(px + 5, base - 91, sw - 10, 2);
+          ctx.fillRect(sx, sy, iw, 2);
           ctx.fillStyle = "#f472b6";
-          ctx.fillRect(px + 5, base - 23, sw - 10, 2);
+          ctx.fillRect(sx, sy + ih - 2, iw, 2);
           const left = Math.max(0, 48 * 3600 - Math.floor(t / 1000) % (48 * 3600));
           const hh = String(Math.floor(left / 3600)).padStart(2, "0");
           const mm = String(Math.floor((left % 3600) / 60)).padStart(2, "0");
@@ -2084,10 +2131,10 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           ctx.textAlign = "center";
           ctx.font = `700 9px ${FONT}`;
           ctx.fillStyle = "#94a3b8";
-          ctx.fillText("TIEMPO RESTANTE", cx, base - 74);
-          ctx.font = `700 26px ${FONT}`;
+          ctx.fillText("TIEMPO RESTANTE", cx, sy + 14);
+          ctx.font = `700 20px ${FONT}`;
           ctx.fillStyle = "#22d3ee";
-          ctx.fillText(`${hh}:${mm}:${ss}`, cx, base - 44);
+          ctx.fillText(`${hh}:${mm}:${ss}`, cx, sy + 36);
           ctx.textAlign = "left";
         });
         break;

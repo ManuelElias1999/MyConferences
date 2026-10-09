@@ -442,6 +442,8 @@ kbd {
 .scene canvas {
   display: block;
   image-rendering: pixelated;
+  /* El mapa se arrastra con el dedo sin mover la página. */
+  touch-action: none;
 }
 
 .scene-hint {

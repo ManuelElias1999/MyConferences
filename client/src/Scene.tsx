@@ -133,6 +133,10 @@ export default function Scene(props: SceneProps) {
   const keys = useRef<Dir[]>([]);
   const guideTo = useRef<Tile | null>(null);
   const view = useRef({ zoom: 1, camX: 0, camY: 0, w: 0, h: 0 });
+  // Arrastrar el mapa corre la cámara sin mover al personaje; al caminar, vuelve a seguirlo.
+  const pan = useRef({ x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
   const hover = useRef<{ tile: Tile | null; user: string | null; npc: string | null; door: string | null }>({
     tile: null,
     user: null,
@@ -390,8 +394,16 @@ export default function Scene(props: SceneProps) {
       const halfW = v.w / 2 / v.zoom;
       const halfH = v.h / 2 / v.zoom;
       const clamp = (c: number, size: number, half: number) => (size <= half * 2 ? size / 2 : Math.max(half, Math.min(size - half, c)));
-      v.camX = clamp(f.x, W, halfW);
-      v.camY = clamp(f.y - 20, H, halfH);
+      const pn = pan.current;
+      if (my.current.moving && !drag.current) {
+        pn.x *= 0.88;
+        pn.y *= 0.88;
+      }
+      v.camX = clamp(f.x + pn.x, W, halfW);
+      v.camY = clamp(f.y - 20 + pn.y, H, halfH);
+      // Lo que el borde del mapa no deja correr no se acumula.
+      pn.x = v.camX - f.x;
+      pn.y = v.camY - (f.y - 20);
     };
 
     let raf = 0;
@@ -646,7 +658,32 @@ export default function Scene(props: SceneProps) {
   const hitDirectory = (wx: number, wy: number) =>
     map.directories.find((d) => wx >= d.x * T && wx < (d.x + 1) * T && wy >= (d.y - 1.2) * T && wy < (d.y + 1) * T);
 
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0 || live.current.camera === "fit") return;
+    drag.current = { x: e.clientX, y: e.clientY, panX: pan.current.x, panY: pan.current.y, moved: false };
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    dragged.current = Boolean(d?.moved);
+    if (d?.moved) e.currentTarget.style.cursor = "default";
+  };
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const d = drag.current;
+    if (d && e.buttons & 1) {
+      const dx = e.clientX - d.x;
+      const dy = e.clientY - d.y;
+      if (!d.moved && Math.hypot(dx, dy) > 6) {
+        d.moved = true;
+        e.currentTarget.setPointerCapture?.((e.nativeEvent as PointerEvent).pointerId);
+      }
+      if (d.moved) {
+        const z = view.current.zoom;
+        pan.current = { x: d.panX - dx / z, y: d.panY - dy / z };
+        e.currentTarget.style.cursor = "grabbing";
+        return;
+      }
+    }
     const w = toWorld(e);
     const h = hover.current;
     h.tile = screenToTile(w.x, w.y);
@@ -660,6 +697,11 @@ export default function Scene(props: SceneProps) {
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const p = live.current;
+    // Si se arrastró el mapa, soltar no es un clic.
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
     if (p.locked) return;
     keys.current = [];
     const w = toWorld(e);
@@ -703,7 +745,10 @@ export default function Scene(props: SceneProps) {
       <canvas
         ref={canvasRef}
         onClick={onClick}
-        onMouseMove={onMove}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => (drag.current = null)}
+        onPointerMove={onMove}
         onMouseLeave={() => (hover.current = { tile: null, user: null, npc: null, door: null })}
         aria-label={props.label}
       />

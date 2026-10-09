@@ -108,6 +108,8 @@ export interface Furni {
   free?: boolean;
   /** Texto de un cartel indicador; cada «|» es una línea. */
   label?: string;
+  /** Pantalla holográfica que flota en el aire, sin patas. */
+  floating?: boolean;
 }
 
 /** Adornos pegados a una cara de muro; `y` es la fila de abajo de esa cara. */
@@ -281,6 +283,8 @@ export interface SceneMap {
   stairs: Stairs[];
   /** Zonas con otro piso (patios, terrazas). */
   areas: Area[];
+  /** Caminos pintados en el suelo, del color de la sala a la que llevan. */
+  trails: Trail[];
   /** Nombre del piso, para mostrarlo en pantalla. */
   floorName: string;
   /** Mesas de equipo con conversación propia. */
@@ -292,6 +296,14 @@ export interface SceneMap {
   blocked: boolean[];
   /** Baldosas con muebles: se pueden atravesar, pero los caminos automáticos los rodean. */
   soft: boolean[];
+}
+
+/** Camino de color en el suelo: baldosas unidas en línea recta entre cada punto. */
+export interface Trail {
+  points: Tile[];
+  color: string;
+  /** Ancho en baldosas (1 si no se indica). */
+  w?: number;
 }
 
 /** Techo de un edificio de sala visto desde arriba. */
@@ -415,6 +427,7 @@ const empty = {
   roofs: [],
   stairs: [],
   areas: [],
+  trails: [],
   zones: [],
   closed: [],
   restricted: [],
@@ -569,6 +582,8 @@ interface Slot {
   door: Tile & { side: Side };
   roof: Rect;
   zone: string;
+  /** Camino pintado desde la entrada del piso hasta la puerta, del color de la sala. */
+  trail?: Tile[];
 }
 
 /** Dos salas lado a lado, con la puerta en la cara de muro `faceY` (la fila justo encima del piso). */
@@ -590,7 +605,7 @@ interface Level {
   exit?: Tile;
   spawn: Tile;
   /** Entrada del auditorio principal (solo en la planta baja) y su edificio. */
-  main?: Tile & { roof: Rect };
+  main?: Tile & { roof: Rect; trail?: Tile[] };
   /** Salas en el orden en que se llenan: siempre de a dos, en distintas zonas. */
   slots: Slot[];
   /** Stands de patrocinadores (esquina superior izquierda, 3×2, pegados a una pared o sueltos con su panel). */
@@ -1352,7 +1367,7 @@ interface HallSpot {
   x: number;
   y: number;
   /** Puertas de entrada: cada una con su paso y, si es de frente, su portal con el nombre. */
-  entrances: { rect: Rect; portal?: Tile }[];
+  entrances: { rect: Rect; portal?: Tile; sign?: Tile & { side: "left" | "right" } }[];
 }
 
 /**
@@ -1379,7 +1394,11 @@ function teamHalls(spots: HallSpot[], capacity: number) {
       zones.push(...t.zones);
       for (const e of s.entrances) {
         floors.push(e.rect);
-        if (e.portal) decor.push({ kind: "portal", x: e.portal.x, y: e.portal.y, w: e.rect.w, text: `EQUIPOS ${s.hall}` });
+        if (e.portal) decor.push({ kind: "portal", x: e.portal.x, y: e.portal.y, w: e.rect.w, text: `SALA DE EQUIPOS ${s.hall}` });
+        if (e.sign) {
+          const name = `SALA DE EQUIPOS ${s.hall}`;
+          furni.push({ kind: "signpost", x: e.sign.x, y: e.sign.y, label: e.sign.side === "left" ? `← ${name}|   Mesas de hackers` : `${name} →|Mesas de hackers   ` });
+        }
       }
     } else {
       closed.push({ ...rect, label: `Sala de equipos ${s.hall} · se habilita con ${need(s.hall)} participantes` });
@@ -1439,20 +1458,23 @@ const hackHalls = (first: number): HallSpot[] => {
     { rect: { x: x0 + 22, y, w: 4, h: 3 }, portal: { x: x0 + 22, y: y + 2 } },
   ];
   return [
-    { hall: first, x: 14, y: 31, entrances: [...top(14, 28), { rect: { x: 47, y: 40, w: 3, h: 5 } }] },
-    { hall: first + 1, x: 67, y: 31, entrances: [...top(67, 28), { rect: { x: 64, y: 40, w: 3, h: 5 } }] },
-    { hall: first + 2, x: 14, y: 73, entrances: [...top(14, 70), { rect: { x: 47, y: 76, w: 3, h: 5 } }] },
-    { hall: first + 3, x: 67, y: 73, entrances: [...top(67, 70), { rect: { x: 64, y: 76, w: 3, h: 5 } }] },
+    { hall: first, x: 14, y: 31, entrances: [...top(14, 28), { rect: { x: 47, y: 40, w: 3, h: 5 }, sign: { x: 50, y: 45, side: "left" } }] },
+    { hall: first + 1, x: 67, y: 31, entrances: [...top(67, 28), { rect: { x: 64, y: 40, w: 3, h: 5 }, sign: { x: 63, y: 45, side: "right" } }] },
+    { hall: first + 2, x: 14, y: 73, entrances: [...top(14, 70), { rect: { x: 47, y: 76, w: 3, h: 5 }, sign: { x: 50, y: 81, side: "left" } }] },
+    { hall: first + 3, x: 67, y: 73, entrances: [...top(67, 70), { rect: { x: 64, y: 76, w: 3, h: 5 }, sign: { x: 63, y: 81, side: "right" } }] },
   ];
 };
 
 /** Una sala de charla en cada punta de las calles cruzadas, a pocos pasos de su sala de equipos. */
-const hackRoomSlots = (prefix: string): Slot[] => [
-  singleV(15, 19, "left", `${prefix}junto a equipos (noroeste)`),
-  singleV(98, 19, "right", `${prefix}junto a equipos (noreste)`),
-  singleV(15, 61, "left", `${prefix}junto a equipos (suroeste)`),
-  singleV(98, 61, "right", `${prefix}junto a equipos (sureste)`),
-];
+const hackRoomSlots = (prefix: string, lanes: number[], from: number, bend: number): Slot[] => {
+  const lane = (i: number, y: number, x: number) => [{ x: lanes[i]!, y: from }, { x: lanes[i]!, y }, { x, y }];
+  return [
+    { ...singleV(15, 19, "left", `${prefix}junto a equipos (noroeste)`), trail: lane(0, 20, 16) },
+    { ...singleV(98, 19, "right", `${prefix}junto a equipos (noreste)`), trail: lane(1, 21, 97) },
+    { ...singleV(15, 61, "left", `${prefix}junto a equipos (suroeste)`), trail: lane(2, 62 + bend, 16) },
+    { ...singleV(98, 61, "right", `${prefix}junto a equipos (sureste)`), trail: lane(3, 63 - bend, 97) },
+  ];
+};
 
 /** Stands: contra la pared de arriba de las dos calles cruzadas, separados entre sí y de cada puerta. */
 const HACK_STANDS = [
@@ -1490,7 +1512,7 @@ const HACK_STREET_CROWD: [number, number, Dir][] = [
 /** Vida en las calles: robots, hologramas, pantallas del evento, tótems con los patrocinadores y luces. Nada corta el paso. */
 const hackStreetFurni = (north: string, south: string): Furni[] => [
   // Calle principal.
-  { kind: "countdown", x: 52, y: 43, w: 10 },
+  { kind: "countdown", x: 54, y: 43, w: 6 },
   { kind: "hologram", x: 56, y: 33, w: 2, d: 2 },
   { kind: "hologram", x: 56, y: 52, w: 2, d: 2 },
   { kind: "robot", x: 52, y: 37 },
@@ -1569,8 +1591,8 @@ function hackathonGround(capacity: number): Level {
     areas: [{ ...mentors.room, floor: "wood" }],
     exit: { x: 56, y: 83 },
     spawn: { x: 56, y: 80 },
-    main: { x: 55, y: 15, roof: { x: 48, y: 7, w: 18, h: 7 } },
-    slots: hackRoomSlots(""),
+    main: { x: 55, y: 15, roof: { x: 48, y: 7, w: 18, h: 7 }, trail: [{ x: 56, y: 81 }, { x: 56, y: 16 }] },
+    slots: hackRoomSlots("", [52, 61, 53, 60], 81, 0),
     zones: [
       ...halls.zones,
       { id: "mentores", label: "Sala de mentores", ...mentors.room, color: "#f59e0b", seats: 30, room: true },
@@ -1590,7 +1612,7 @@ function hackathonGround(capacity: number): Level {
       ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charlas en las puntas →", "← Equipos 3 · Equipos 4 →|← Charlas en las puntas →|↑ Auditorio y ascensor"),
       ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 24, y: 7 }]),
       ...meetingRoom(staff.room, "#ef4444", [{ kind: "rack", x: 77, y: 7 }]),
-      { kind: "eventscreen", x: 52, y: 74, w: 10 },
+      { kind: "eventscreen", x: 54, y: 74, w: 6, floating: true },
       { kind: "signpost", x: 60, y: 79, label: "↑ Salas de equipos y charlas|↑↑ Auditorio, mentores y staff" },
     ],
     crowd: [
@@ -1629,7 +1651,7 @@ function hackathonUpper(capacity: number): Level {
       { ...lounge.room, floor: "wood" },
     ],
     spawn: { x: 50, y: 16 },
-    slots: hackRoomSlots("Piso 1 · "),
+    slots: hackRoomSlots("Piso 1 · ", [50, 51, 52, 53], 17, 1),
     zones: halls.zones,
     closed: halls.closed,
     stands: HACK_STANDS,
@@ -1639,7 +1661,7 @@ function hackathonUpper(capacity: number): Level {
     furni: [
       ...halls.furni,
       ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charlas en las puntas →", "← Equipos 7 · Equipos 8 →|← Charlas en las puntas →|↑ Ascensor"),
-      { kind: "eventscreen", x: 52, y: 74, w: 10 },
+      { kind: "eventscreen", x: 54, y: 74, w: 6, floating: true },
       { kind: "parasol", x: 26, y: 5, w: 2 },
       { kind: "parasol", x: 32, y: 5, w: 2 },
       { kind: "beanbag", x: 26, y: 10, color: "#fbbf24" },
@@ -1694,6 +1716,8 @@ function buildLevel(
 ): SceneMap {
   const doors: Door[] = [];
   const roofs: Roof[] = [];
+  const trails: Trail[] = [];
+  if (main && L.main?.trail) trails.push({ points: L.main.trail, color: main.color, w: 2 });
   if (main && L.main) {
     doors.push({ side: "top", x: L.main.x, y: L.main.y, w: 4, id: main.id, label: main.name, color: main.color, theme: main.theme ?? theme, zone: "Auditorio principal", main: true });
     roofs.push({ ...L.main.roof, label: main.name, color: main.color, open: true });
@@ -1706,6 +1730,7 @@ function buildLevel(
     if (room) doors.push({ ...slot.door, w: 2, id: room.id, label: room.name, color: room.color, theme: room.theme ?? theme, zone: slot.zone, main: false });
     // Los puestos sin sala de los muros de frente muestran un cuadro.
     else if (slot.door.side === "top") decor.push({ kind: "art", x: slot.door.x, y: slot.door.y, w: 2, color: "#9aa5b1" });
+    if (room && slot.trail) trails.push({ points: slot.trail, color: room.color });
   });
   if (L.exit) decor.push({ kind: "entrance", x: L.exit.x, y: L.exit.y, w: 2 });
   // Un stand por patrocinador, mientras haya lugar; cada uno con alguien que cuenta del producto.
@@ -1749,6 +1774,7 @@ function buildLevel(
     closed: L.closed ?? [],
     restricted: [...(L.restricted ?? []), ...standBacks],
     areas: L.areas ?? [],
+    trails,
     crowd: L.crowd.map(([x, y, dir, sit], i) => ({ ...attendee(i, x, y, dir), sit })),
     exit: L.exit ? { side: "bottom", x: L.exit.x, y: L.exit.y, w: 2 } : null,
     directories: L.directories,
