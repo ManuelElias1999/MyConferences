@@ -29,9 +29,10 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
   - **Rústica (pueblo)**: calles con salas, fonda, plaza de juegos y huertos; arriba, un altillo con terraza.
   - **Stellar (hub espacial)**: paredes negras con línea amarilla, techos con estrellas, cohetes y constelaciones. Un hub con las salas alrededor, observatorio, nodo de juegos, Café Ancla y Galaxy Lounge; arriba, la estación orbital.
   - **Hackathon (tecnológico, para 100 a 500 personas)**: paredes azul noche con luces cian y magenta y pantallas con la cuenta regresiva. Está armado como un pequeño barrio: una **calle principal** que va de la entrada (abajo) al auditorio (arriba), cruzada por **dos calles**:
-    - en cada cruce, una **sala de equipos** de 64 personas (4 mesas de 6, 6 de 4 y 8 de 2) con **su cafetería y su zona de juegos**: cuatro por piso. Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro;
-    - en cada punta de las calles cruzadas, una **sala de charla**: cuatro por piso, lejos entre sí;
-    - los **stands** van pegados a la pared de arriba de las calles cruzadas; en la calle principal solo hay carteles y tótems;
+    - las calles son anchas y tienen vida: robots, hologramas, la pantalla del evento, tótems con los logos de los patrocinadores y columnas de luz, sin cortar el paso;
+    - en cada cruce, una **sala de equipos** de 64 personas (4 mesas de 6, 6 de 4 y 8 de 2) con **su cafetería y su zona de juegos** y **tres puertas** (dos desde su calle y una desde la calle principal): cuatro por piso. Al entrar al rectángulo de una mesa te sumas a su conversación (voz, cámara y pantalla compartida) y solo escuchas y ves a quienes están adentro;
+    - al lado de cada sala de equipos, a pocos pasos, una **sala de charla**: cuatro por piso, lejos entre sí;
+    - los **stands** van pegados a la pared de arriba de las calles cruzadas;
     - **planta baja**: el **auditorio principal** al final de la calle, con los cuartos de **mentores** y de **staff** a los lados (con puerta y su nombre; adentro, una mesa con café para charlar) y el ascensor;
     - **piso de arriba**: las salas de equipos 5 a 8, una terraza, una sala de descanso y una zona de juegos.
     - Al crear el hackathon se elige el cupo (100 a 500) y se abren 2, 4, 5, 7 u 8 salas de equipos; las demás quedan cerradas, con un cartel que dice con cuántos participantes se abren. Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso). También se cargan los correos de **organizadores** (⭐) y **mentores** (🧭).
