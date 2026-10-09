@@ -304,6 +304,8 @@ export interface Trail {
   color: string;
   /** Ancho en baldosas (1 si no se indica). */
   w?: number;
+  /** Alfombra frente a la puerta (si no, la última baldosa del camino). */
+  mat?: Rect;
 }
 
 /** Techo de un edificio de sala visto desde arriba. */
@@ -1471,10 +1473,11 @@ const hackHalls = (first: number): HallSpot[] => {
 const hackRoomSlots = (prefix: string, lanes: number[], from: number, bend: number): Slot[] => {
   const lane = (i: number, y: number, x: number) => [{ x: lanes[i]!, y: from }, { x: lanes[i]!, y }, { x, y }];
   return [
-    { ...singleV(15, 19, "left", `${prefix}junto a equipos (noroeste)`), trail: lane(0, 20, 16) },
-    { ...singleV(98, 19, "right", `${prefix}junto a equipos (noreste)`), trail: lane(1, 21, 97) },
-    { ...singleV(15, 61, "left", `${prefix}junto a equipos (suroeste)`), trail: lane(2, 62 + bend, 16) },
-    { ...singleV(98, 61, "right", `${prefix}junto a equipos (sureste)`), trail: lane(3, 63 - bend, 97) },
+    // Edificios grandes, que asoman sobre el patio de afuera: así se ve que ahí hay una sala.
+    { ...singleV(15, 19, "left", `${prefix}junto a equipos (noroeste)`), roof: { x: 6, y: 16, w: 9, h: 7 }, trail: lane(0, 20, 16) },
+    { ...singleV(98, 19, "right", `${prefix}junto a equipos (noreste)`), roof: { x: 99, y: 16, w: 9, h: 7 }, trail: lane(1, 21, 97) },
+    { ...singleV(15, 61, "left", `${prefix}junto a equipos (suroeste)`), roof: { x: 9, y: 58, w: 6, h: 7 }, trail: lane(2, 62 + bend, 16) },
+    { ...singleV(98, 61, "right", `${prefix}junto a equipos (sureste)`), roof: { x: 99, y: 58, w: 6, h: 7 }, trail: lane(3, 63 - bend, 97) },
   ];
 };
 
@@ -1901,7 +1904,12 @@ function buildLevel(
     if (room) doors.push({ ...slot.door, w: 2, id: room.id, label: room.name, color: room.color, theme: room.theme ?? theme, zone: slot.zone, main: false });
     // Los puestos sin sala de los muros de frente muestran un cuadro.
     else if (slot.door.side === "top") decor.push({ kind: "art", x: slot.door.x, y: slot.door.y, w: 2, color: "#9aa5b1" });
-    if (room && slot.trail) trails.push({ points: slot.trail, color: room.color });
+    if (room && slot.trail) {
+      // La alfombra cubre todo el vano de la puerta, del lado del pasillo.
+      const d = slot.door;
+      const mat = d.side === "left" ? { x: d.x + 1, y: d.y, w: 3, h: 2 } : d.side === "right" ? { x: d.x - 3, y: d.y, w: 3, h: 2 } : undefined;
+      trails.push({ points: slot.trail, color: room.color, mat });
+    }
   });
   if (L.exit) decor.push({ kind: "entrance", x: L.exit.x, y: L.exit.y, w: 2 });
   // Un stand por patrocinador, mientras haya lugar; cada uno con alguien que cuenta del producto.

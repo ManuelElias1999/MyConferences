@@ -911,7 +911,19 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
       ctx.fillRect(px + 1, y + 9, 10, 5);
     }
   }
-  if (style === "hackathon") {
+  if (style === "hackathon" && roof.open && roof.color) {
+    // Sala de charla: un edificio del color de la sala, con borde de luz, para que no se confunda con el muro.
+    ctx.fillStyle = shade(roof.color, -0.45);
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = hexA(roof.color, 0.35);
+    for (let lx = x + 12; lx < x + w - 8; lx += 20) ctx.fillRect(lx, y + 8, 3, h - 16);
+    ctx.fillStyle = roof.color;
+    ctx.fillRect(x, y, w, 4);
+    ctx.fillRect(x, y, 4, h);
+    ctx.fillRect(x + w - 4, y, 4, h);
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fillRect(x + 4, y + 4, w - 8, 1);
+  } else if (style === "hackathon") {
     // Techo oscuro con una grilla de luces.
     ctx.fillStyle = "rgba(34,211,238,0.5)";
     for (let lx = x + 12; lx < x + w - 8; lx += 24) ctx.fillRect(lx, y + 6, 2, h - 14);
@@ -939,7 +951,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
   ctx.fillStyle = roof.open ? roof.color : "#b9b4ab";
   ctx.fillRect(x, y + h - 6, w, 6);
   // Nombre pintado sobre un cartel en el techo.
-  ctx.font = `700 ${roof.w > 12 ? 16 : 12}px ${FONT}`;
+  ctx.font = `700 ${roof.w > 12 || (style === "hackathon" && roof.w >= 6) ? 16 : 12}px ${FONT}`;
   const label = roof.open ? `🎤 ${roof.label.toUpperCase()}` : roof.label.toUpperCase();
   const tw = Math.min(w - 16, ctx.measureText(label).width + 18);
   const ty = y + Math.round(h * 0.38);
@@ -978,8 +990,10 @@ export function renderStatic(map: SceneMap, scale: number) {
       ctx.fillRect(x0 * T, y0 * T, (x1 - x0) * T, (y1 - y0) * T);
     });
     const end = trail.points[trail.points.length - 1]!;
-    ctx.fillStyle = hexA(trail.color, 0.3);
-    ctx.fillRect(end.x * T, end.y * T, tw * T, T);
+    // Alfombra frente a la puerta, bien marcada.
+    const mat = trail.mat ?? { x: end.x, y: end.y, w: tw, h: 1 };
+    ctx.fillStyle = hexA(trail.color, 0.45);
+    ctx.fillRect(mat.x * T, mat.y * T, mat.w * T, mat.h * T);
   }
   // Mesas de equipo: un rectángulo de color suave con borde, para que se vea hasta dónde llega la conversación.
   for (const z of map.zones) {
