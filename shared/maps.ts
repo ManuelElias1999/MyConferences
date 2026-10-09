@@ -73,6 +73,16 @@ export type FurniKind =
   | "constellation"
   /** Mampara de vidrio, como la de una sala de reuniones. */
   | "partition"
+  /** Dron flotando con luces (decorativo). */
+  | "drone"
+  /** Estación de realidad virtual: una plataforma con anillo de luz. */
+  | "vrpod"
+  /** Impresora 3D imprimiendo una pieza. */
+  | "printer3d"
+  /** Marco para sacarse fotos con el nombre del evento. */
+  | "photobooth"
+  /** Estación para cargar el celular o la laptop. */
+  | "charger"
   /** Postes con cordón para ordenar la fila frente a la recepción (se puede pasar por encima). */
   | "stanchion"
   /** Gran mostrador de recepción, con su nombre al frente y una línea de luz. */
@@ -118,7 +128,9 @@ export type DecorKind =
   /** Cartel con flecha que indica hacia dónde queda una zona. */
   | "sign"
   /** Puerta de un cuarto (mentores, staff): marco con puertas de vidrio abiertas y el nombre arriba. */
-  | "roomdoor";
+  | "roomdoor"
+  /** Pantalla con código que corre. */
+  | "codewall";
 
 export interface Decor {
   kind: DecorKind;
@@ -1359,6 +1371,8 @@ function teamHalls(spots: HallSpot[], capacity: number) {
     const t = teamHall(s.hall, s.x, s.y);
     floors.push(rect);
     furni.push(...t.furni);
+    // En la pared de arriba: una pantalla con código y una pizarra.
+    decor.push({ kind: "codewall", x: s.x + 10, y: s.y - 1, w: 7 }, { kind: "whiteboard", x: s.x + 17, y: s.y - 1, w: 3 });
     if (open(s.hall)) {
       zones.push(...t.zones);
       for (const e of s.entrances) {
@@ -1444,6 +1458,33 @@ const HACK_STANDS = [
   ...[20, 30, 40, 73, 83, 93].map((x) => ({ x, y: 58 })),
 ];
 
+/** Paredes de las calles: pantallas con código que corre intercaladas con pantallas de patrocinadores. */
+const hackWallDecor = (): Decor[] => [
+  { kind: "codewall", x: 20, y: 15, w: 5 },
+  { kind: "sponsors", x: 45, y: 15, w: 3 },
+  { kind: "codewall", x: 73, y: 15, w: 6 },
+  { kind: "codewall", x: 11, y: 57, w: 6 },
+  { kind: "sponsors", x: 24, y: 57, w: 5 },
+  { kind: "codewall", x: 34, y: 57, w: 5 },
+  { kind: "sponsors", x: 44, y: 57, w: 4 },
+  { kind: "codewall", x: 67, y: 57, w: 5 },
+  { kind: "sponsors", x: 77, y: 57, w: 5 },
+  { kind: "codewall", x: 87, y: 57, w: 5 },
+  { kind: "sponsors", x: 97, y: 57, w: 6 },
+];
+
+/** Gente conversando por las calles. */
+const HACK_STREET_CROWD: [number, number, Dir][] = [
+  ...chat(16, 24),
+  ...chat(46, 23),
+  ...chat(90, 26),
+  ...chat(20, 66),
+  ...chat(60, 61),
+  ...chat(80, 65),
+  ...chat(56, 77),
+  ...chat(53, 55),
+];
+
 /** Vida en las calles: robots, hologramas, pantallas del evento, tótems con los patrocinadores y luces. Nada corta el paso. */
 const hackStreetFurni = (north: string, south: string): Furni[] => [
   // Calle principal.
@@ -1477,6 +1518,33 @@ const hackStreetFurni = (north: string, south: string): Furni[] => [
   { kind: "robot", x: 92, y: 66 },
   { kind: "directory", x: 47, y: 26 },
   { kind: "directory", x: 66, y: 66 },
+  // Lo divertido: realidad virtual, drones, impresoras 3D, cargadores y un photobooth.
+  { kind: "vrpod", x: 14, y: 22, w: 2 },
+  { kind: "vrpod", x: 98, y: 22, w: 2 },
+  { kind: "vrpod", x: 14, y: 64, w: 2 },
+  { kind: "vrpod", x: 98, y: 64, w: 2 },
+  { kind: "vrpod", x: 51, y: 64, w: 2 },
+  { kind: "vrpod", x: 61, y: 64, w: 2 },
+  ...[
+    [30, 21],
+    [68, 21],
+    [92, 21],
+    [59, 35],
+    [54, 49],
+    [38, 62],
+    [86, 62],
+    [57, 66],
+  ].map(([x, y]): Furni => ({ kind: "drone", x: x!, y: y! })),
+  { kind: "printer3d", x: 36, y: 24 },
+  { kind: "printer3d", x: 80, y: 24 },
+  { kind: "printer3d", x: 27, y: 67 },
+  { kind: "printer3d", x: 88, y: 68 },
+  { kind: "charger", x: 19, y: 26 },
+  { kind: "charger", x: 95, y: 26 },
+  { kind: "charger", x: 45, y: 63 },
+  { kind: "charger", x: 50, y: 79 },
+  { kind: "photobooth", x: 51, y: 76, w: 2 },
+  { kind: "photobooth", x: 71, y: 62, w: 2 },
   ...[10, 103].flatMap((x) => [
     { kind: "ledpillar" as const, x, y: 27 },
     { kind: "ledpillar" as const, x, y: 69 },
@@ -1510,7 +1578,7 @@ function hackathonGround(capacity: number): Level {
     stands: HACK_STANDS,
     expo: true,
     stairs: [{ x: 50, y: 15, w: 2, dir: "up", to: 1, label: "ASCENSOR · equipos 5 a 8" }],
-    decor: [...halls.decor, mentors.door, staff.door],
+    decor: [...halls.decor, ...hackWallDecor(), mentors.door, staff.door],
     furni: [
       ...halls.furni,
       ...hackStreetFurni("↑ Auditorio · ← Mentores · Staff →|← Equipos 1 · Equipos 2 →|← Charlas en las puntas →", "← Equipos 3 · Equipos 4 →|← Charlas en las puntas →|↑ Auditorio y ascensor"),
@@ -1533,6 +1601,7 @@ function hackathonGround(capacity: number): Level {
       ...chat(54, 40),
       ...chat(58, 64),
       ...chat(35, 63),
+      ...HACK_STREET_CROWD,
     ],
     directories: [],
   };
@@ -1560,7 +1629,7 @@ function hackathonUpper(capacity: number): Level {
     stands: HACK_STANDS,
     expo: true,
     stairs: [{ x: 50, y: 15, w: 2, dir: "down", to: 0, label: "ASCENSOR · auditorio, mentores y staff" }],
-    decor: [...halls.decor, terrace.door, lounge.door, games.door],
+    decor: [...halls.decor, ...hackWallDecor(), terrace.door, lounge.door, games.door],
     furni: [
       ...halls.furni,
       ...hackStreetFurni("↑ Juegos · ← Terraza · Descanso →|← Equipos 5 · Equipos 6 →|← Charlas en las puntas →", "← Equipos 7 · Equipos 8 →|← Charlas en las puntas →|↑ Ascensor"),
@@ -1586,7 +1655,7 @@ function hackathonUpper(capacity: number): Level {
       { kind: "beanbag", x: 50, y: 10, color: "#fbbf24" },
       { kind: "beanbag", x: 63, y: 10, color: "#22d3ee" },
     ],
-    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 40), ...chat(28, 7), ...chat(56, 9)],
+    crowd: [...chat(26, 21), ...chat(84, 20), ...chat(54, 40), ...chat(28, 7), ...chat(56, 9), ...HACK_STREET_CROWD],
     directories: [],
   };
 }

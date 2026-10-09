@@ -1065,6 +1065,15 @@ export function renderStatic(map: SceneMap, scale: number) {
         case "roomdoor":
           roomDoor(ctx, d);
           break;
+        case "codewall": {
+          // Marco de la pantalla; el código que corre se dibuja animado.
+          const x = d.x * T + 3;
+          const w = (d.w ?? 3) * T - 6;
+          frame(ctx, x - 2, T + 2, w + 4, 2 * T - 10, "#0b1020");
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(x + w / 2 - 6, 3 * T - 8, 12, 4);
+          break;
+        }
         case "torch": {
           const cx = d.x * T + T / 2;
           ctx.fillStyle = "#3a3346";
@@ -1142,6 +1151,37 @@ function glow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, co
 
 /** Llamas de antorchas y chimeneas, y un brillo suave de neones. */
 export function drawAnimatedDecor(ctx: CanvasRenderingContext2D, map: SceneMap, t: number) {
+  // Pantallas de código: líneas de colores que suben sin parar, como un editor en vivo.
+  for (const d of map.decor) {
+    if (d.kind !== "codewall") continue;
+    atRow(ctx, d.y, () => {
+      const x = d.x * T + 3;
+      const w = (d.w ?? 3) * T - 6;
+      const top = T + 4;
+      const h = 2 * T - 14;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, top, w, h);
+      ctx.clip();
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(x, top, w, h);
+      const shift = (t / 90) % 6;
+      for (let i = -1; i < h / 6 + 1; i++) {
+        const line = Math.floor(t / 540) + i + d.x * 7;
+        const y = top + i * 6 - shift + 6;
+        const indent = (hash(line, d.x, 31) * 4) | 0;
+        let cx = x + 4 + indent * 6;
+        for (let k = 0; k < 4; k++) {
+          const len = 6 + ((hash(line, k, 32) * 22) | 0);
+          if (cx + len > x + w - 4) break;
+          ctx.fillStyle = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#94a3b8"][(hash(line, k, 33) * 5) | 0]!;
+          ctx.fillRect(cx, y, len, 2);
+          cx += len + 4;
+        }
+      }
+      ctx.restore();
+    });
+  }
   for (const d of map.decor) {
     if (d.kind !== "torch" && d.kind !== "fireplace" && d.kind !== "neon") continue;
     atRow(ctx, d.y, () => {
@@ -1830,6 +1870,106 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       }
+      case "drone":
+        // Dron flotando: sube y baja, con hélices y luces que parpadean.
+        add(y + 1, (ctx, t) => {
+          const bob = Math.sin(t / 380 + x) * 5;
+          const cy = base - 46 + bob;
+          ctx.fillStyle = "rgba(30,28,45,0.12)";
+          ctx.fillRect(cx - 10, base - 6, 20, 4);
+          ctx.fillStyle = "#334155";
+          ctx.fillRect(cx - 14, cy - 1, 28, 3);
+          frame(ctx, cx - 6, cy - 4, 12, 8, "#1f2937");
+          ctx.fillStyle = "#22d3ee";
+          ctx.fillRect(cx - 2, cy - 1, 4, 3);
+          const spin = Math.floor(t / 60) % 2;
+          ctx.fillStyle = "rgba(226,232,240,0.85)";
+          for (const px of [cx - 16, cx + 10]) ctx.fillRect(px + (spin ? 0 : 2), cy - 4, spin ? 8 : 4, 2);
+          ctx.fillStyle = Math.floor(t / 300) % 2 ? "#ef4444" : "#22c55e";
+          ctx.fillRect(cx - 15, cy + 2, 2, 2);
+          ctx.fillRect(cx + 13, cy + 2, 2, 2);
+        });
+        break;
+      case "vrpod":
+        // Estación de realidad virtual: plataforma con anillo de luz y un visor en su soporte.
+        add(y + 1, (ctx, t) => {
+          const pulse = 0.5 + 0.5 * Math.sin(t / 400 + x);
+          ctx.fillStyle = "#1e293b";
+          ctx.fillRect(px + 2, base - 12, T * w - 4, 10);
+          ctx.fillStyle = `rgba(34,211,238,${0.4 + pulse * 0.5})`;
+          ctx.fillRect(px + 2, base - 13, T * w - 4, 2);
+          ctx.fillRect(px + 2, base - 4, T * w - 4, 2);
+          ctx.fillStyle = "#64748b";
+          ctx.fillRect(cx - 1, base - 40, 2, 28);
+          frame(ctx, cx - 8, base - 46, 16, 8, "#0f172a");
+          ctx.fillStyle = "#a78bfa";
+          ctx.fillRect(cx - 6, base - 44, 5, 4);
+          ctx.fillRect(cx + 1, base - 44, 5, 4);
+          ctx.font = `700 7px ${FONT}`;
+          ctx.fillStyle = "#e2e8f0";
+          ctx.textAlign = "center";
+          ctx.fillText("VR", cx, base - 5);
+          ctx.textAlign = "left";
+        });
+        break;
+      case "printer3d":
+        // Impresora 3D: marco, cabezal que va y viene y una pieza que crece.
+        add(y + 1, (ctx, t) => {
+          shadowUnder(ctx, cx, base - 3, 12);
+          frame(ctx, cx - 12, base - 36, 24, 32, "#334155");
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(cx - 10, base - 34, 20, 26);
+          const head = Math.sin(t / 300 + x) * 6;
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillRect(cx - 3 + head, base - 30, 6, 3);
+          const grow = 4 + ((t / 400) % 10);
+          ctx.fillStyle = "#f472b6";
+          ctx.fillRect(cx - 5, base - 9 - grow, 10, grow);
+          ctx.fillStyle = "#64748b";
+          ctx.fillRect(cx - 10, base - 9, 20, 2);
+        });
+        break;
+      case "photobooth": {
+        // Marco para fotos con el nombre del evento y un aro de luz.
+        const title = () => media?.().title ?? "";
+        add(y + 1, (ctx) => {
+          const bw = w * T;
+          frame(ctx, px + 4, base - 64, bw - 8, 54, "#16161d");
+          ctx.fillStyle = "#ff5c39";
+          ctx.fillRect(px + 8, base - 60, bw - 16, 3);
+          ctx.font = `700 9px ${FONT}`;
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.fillText("📸 SÁCATE UNA FOTO", px + bw / 2, base - 46, bw - 16);
+          ctx.font = `700 10px ${FONT}`;
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillText(`#${title().replace(/\s+/g, "")}`, px + bw / 2, base - 30, bw - 16);
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(px + 10, base - 10, 4, 8);
+          ctx.fillRect(px + bw - 14, base - 10, 4, 8);
+        });
+        break;
+      }
+      case "charger":
+        // Estación de carga: columna con enchufes y un rayo.
+        add(y + 1, (ctx, t) => {
+          shadowUnder(ctx, cx, base - 3, 8);
+          frame(ctx, cx - 7, base - 40, 14, 37, "#1f2937");
+          ctx.fillStyle = Math.floor(t / 500) % 2 ? "#a3e635" : "#65a30d";
+          ctx.beginPath();
+          ctx.moveTo(cx + 1, base - 36);
+          ctx.lineTo(cx - 4, base - 26);
+          ctx.lineTo(cx, base - 26);
+          ctx.lineTo(cx - 2, base - 18);
+          ctx.lineTo(cx + 4, base - 29);
+          ctx.lineTo(cx, base - 29);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#94a3b8";
+          for (let i = 0; i < 3; i++) ctx.fillRect(cx - 4 + i * 3, base - 12, 2, 4);
+        });
+        break;
       case "frontdesk":
         // Mostrador de recepción: cubierta blanca, frente grafito con línea de luz, el logo y monitores.
         add(y + 1, (ctx) => {
