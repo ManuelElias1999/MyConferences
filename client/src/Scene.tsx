@@ -399,11 +399,13 @@ export default function Scene(props: SceneProps) {
         pn.x *= 0.88;
         pn.y *= 0.88;
       }
+      // En la recepción la cámara mira lo más arriba posible sin perderte de vista, así se ve el mostrador al entrar.
+      const follow = map.desk.length ? Math.min(f.y - 20, Math.max(halfH, f.y - halfH + 2.5 * T)) : f.y - 20;
       v.camX = clamp(f.x + pn.x, W, halfW);
-      v.camY = clamp(f.y - 20 + pn.y, H, halfH);
+      v.camY = clamp(follow + pn.y, H, halfH);
       // Lo que el borde del mapa no deja correr no se acumula.
       pn.x = v.camX - f.x;
-      pn.y = v.camY - (f.y - 20);
+      pn.y = v.camY - follow;
     };
 
     let raf = 0;
@@ -525,6 +527,23 @@ export default function Scene(props: SceneProps) {
       const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, tag: boolean, fixedDir?: Dir, sit = false) => {
         const pose = sit ? { dir: fixedDir ?? w.dir, walk: null, sitting: true } : poseFor(w, fixedDir);
         const f = feet(w.x, w.y);
+        // Un anillo de color a tus pies, que late suave, para encontrarte entre la gente.
+        if (mine)
+          items.push({
+            key: w.y + 0.81,
+            draw: (g, now) => {
+              const pulse = 0.5 + 0.5 * Math.sin(now / 350);
+              g.save();
+              g.beginPath();
+              g.ellipse(f.x, f.y - 1, 15 + pulse * 2, 6 + pulse, 0, 0, Math.PI * 2);
+              g.fillStyle = "rgba(255,92,57,0.28)";
+              g.fill();
+              g.lineWidth = 2.5;
+              g.strokeStyle = "#ff5c39";
+              g.stroke();
+              g.restore();
+            },
+          });
         items.push({ key: w.y + 0.82, draw: (g) => drawAvatar(g, look, f.x, f.y, pose) });
         labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag });
       };

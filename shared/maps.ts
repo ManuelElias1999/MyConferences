@@ -467,11 +467,11 @@ export const RECEPTIONIST_ID = "npc-recepcion";
  * sala de reuniones vidriada, sala de estar y café.
  */
 export function receptionMap(): SceneMap {
-  const w = 34;
-  const h = 21;
+  const w = 36;
+  const h = 22;
   const sit = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker", sit: true });
   const stand = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker" });
-  const front = Array.from({ length: 14 }, (_, i) => ({ x: 10 + i, y: 6 }));
+  const front = Array.from({ length: 16 }, (_, i) => ({ x: 10 + i, y: 8 }));
   return finish(
     {
       ...empty,
@@ -479,72 +479,77 @@ export function receptionMap(): SceneMap {
       h,
       tiles: enclosure(w, h),
       style: "cowork",
-      spawn: { x: 16, y: 17 },
+      spawn: { x: 17, y: 17 },
+      // La recepción va sobre una tarima de madera que ocupa todo el fondo, de columna a columna.
+      areas: [{ x: 7, y: 3, w: 22, h: 11, floor: "wood" }],
       furni: [
-        // Recepción pegada a la pared del fondo: los recepcionistas, el gran mostrador y dos filas.
-        { kind: "frontdesk", x: 9, y: 5, w: 16 },
-        { kind: "ledpillar", x: 9, y: 3 },
-        { kind: "ledpillar", x: 24, y: 3 },
-        { kind: "bigplant", x: 16, y: 3 },
-        { kind: "kiosk", x: 7, y: 6 },
-        { kind: "kiosk", x: 26, y: 6 },
-        { kind: "stanchion", x: 11, y: 8, d: 4 },
-        { kind: "stanchion", x: 15, y: 8, d: 4 },
-        { kind: "stanchion", x: 18, y: 8, d: 4 },
-        { kind: "stanchion", x: 22, y: 8, d: 4 },
-        { kind: "bigplant", x: 9, y: 13 },
-        { kind: "bigplant", x: 24, y: 13 },
+        // El gran mostrador, con dos recepcionistas detrás, columnas de luz y plantas a los lados.
+        { kind: "frontdesk", x: 10, y: 6, w: 16 },
+        { kind: "ledpillar", x: 7, y: 3 },
+        { kind: "ledpillar", x: 28, y: 3 },
+        { kind: "bigplant", x: 10, y: 3 },
+        { kind: "bigplant", x: 25, y: 3 },
+        { kind: "bigplant", x: 17, y: 3 },
+        { kind: "kiosk", x: 8, y: 7 },
+        { kind: "kiosk", x: 27, y: 7 },
+        // Fila ordenada frente al mostrador.
+        { kind: "stanchion", x: 12, y: 10, d: 3 },
+        { kind: "stanchion", x: 16, y: 10, d: 3 },
+        { kind: "stanchion", x: 19, y: 10, d: 3 },
+        { kind: "stanchion", x: 23, y: 10, d: 3 },
+        { kind: "ledpillar", x: 7, y: 12 },
+        { kind: "ledpillar", x: 28, y: 12 },
         // Escritorios a la izquierda.
         { kind: "workdesk", x: 1, y: 4, w: 3 },
         { kind: "workdesk", x: 1, y: 8, w: 3 },
         ...[1, 2, 3].flatMap((x) => [5, 9].map((y) => ({ kind: "officechair" as const, x, y }))),
         // Sala de reuniones vidriada a la derecha.
-        { kind: "partition", x: 28, y: 3, d: 6 },
-        { kind: "partition", x: 28, y: 9, w: 2 },
-        { kind: "partition", x: 31, y: 9, w: 2 },
-        { kind: "table", x: 29, y: 5, w: 3 },
-        ...[29, 30, 31].flatMap((x) => [
+        { kind: "partition", x: 30, y: 3, d: 6 },
+        { kind: "partition", x: 30, y: 9, w: 2 },
+        { kind: "partition", x: 33, y: 9, w: 2 },
+        { kind: "table", x: 31, y: 5, w: 3 },
+        ...[31, 32, 33].flatMap((x) => [
           { kind: "officechair" as const, x, y: 4 },
           { kind: "officechair" as const, x, y: 6 },
         ]),
         // Sala de estar abajo a la izquierda y café abajo a la derecha.
-        { kind: "sofa", x: 1, y: 14, w: 3, color: "#2f6bff", dir: "down" },
-        { kind: "armchair", x: 5, y: 14, color: "#ffb703" },
-        { kind: "coffeetable", x: 2, y: 16, w: 2 },
-        { kind: "coffeebar", x: 27, y: 13, w: 4 },
-        { kind: "vending", x: 32, y: 13 },
-        { kind: "cafetable", x: 28, y: 17, w: 2 },
-        { kind: "bigplant", x: 1, y: 18 },
-        { kind: "bigplant", x: 32, y: 18 },
+        { kind: "sofa", x: 1, y: 15, w: 3, color: "#2f6bff", dir: "down" },
+        { kind: "armchair", x: 5, y: 15, color: "#ffb703" },
+        { kind: "coffeetable", x: 2, y: 17, w: 2 },
+        { kind: "coffeebar", x: 29, y: 15, w: 4 },
+        { kind: "vending", x: 34, y: 15 },
+        { kind: "cafetable", x: 30, y: 18, w: 2 },
+        { kind: "bigplant", x: 1, y: 20 },
+        { kind: "bigplant", x: 34, y: 20 },
       ],
       decor: [
         { kind: "window", x: 1, y: 2, w: 3 },
-        { kind: "sponsors", x: 9, y: 2, w: 4 },
-        { kind: "neon", x: 13, y: 2, w: 8, text: "RECEPCIÓN", color: "#22d3ee" },
-        { kind: "sponsors", x: 21, y: 2, w: 4 },
-        { kind: "whiteboard", x: 29, y: 2, w: 3 },
-        { kind: "entrance", x: 16, y: h - 1, w: 2 },
+        { kind: "sponsors", x: 8, y: 2, w: 5 },
+        { kind: "neon", x: 13, y: 2, w: 10, text: "RECEPCIÓN", color: "#22d3ee" },
+        { kind: "sponsors", x: 23, y: 2, w: 5 },
+        { kind: "whiteboard", x: 31, y: 2, w: 3 },
+        { kind: "entrance", x: 17, y: h - 1, w: 2 },
       ],
       crowd: [
         sit(1, 1, 5, "up"),
         sit(2, 3, 5, "up"),
         sit(3, 2, 9, "up"),
-        sit(4, 29, 4, "down"),
-        sit(5, 31, 4, "down"),
-        sit(6, 30, 6, "up"),
-        sit(7, 1, 14, "down"),
-        sit(8, 3, 14, "down"),
-        stand(9, 27, 15, "right"),
-        stand(10, 28, 15, "left"),
+        sit(4, 31, 4, "down"),
+        sit(5, 33, 4, "down"),
+        sit(6, 32, 6, "up"),
+        sit(7, 1, 15, "down"),
+        sit(8, 3, 15, "down"),
+        stand(9, 29, 17, "right"),
+        stand(10, 30, 17, "left"),
       ],
       npcs: [
-        { id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 13, y: 4, dir: "down", talkFrom: front },
+        { id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 14, y: 5, dir: "down", talkFrom: front },
         {
           id: `${RECEPTIONIST_ID}-2`,
           name: "Recepcionista",
           look: { ...RECEPTIONIST_LOOK, hair: "short", hairColor: HAIR_COLORS[3]!, skin: SKINS[4]!, shirt: "#2f6bff" },
-          x: 20,
-          y: 4,
+          x: 21,
+          y: 5,
           dir: "down",
           talkFrom: front,
         },

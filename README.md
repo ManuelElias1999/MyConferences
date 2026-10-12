@@ -20,7 +20,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 ### Para los asistentes
 
-- **Recepción**: el lobby de un cowork moderno. Al fondo, pegados a la pared, un gran mostrador con **dos recepcionistas**, el letrero «RECEPCIÓN» entre dos pantallas de bienvenida, kioscos de check-in y dos filas ordenadas con postes. Alrededor: escritorios, sala de reuniones vidriada, sala de estar y café.
+- **Recepción**: el lobby de un cowork moderno. Todo el fondo es una tarima de madera, de columna a columna de luz, con un **gran mostrador** de 16 baldosas: cubierta de madera con monitores y flores, frente grafito con el logo iluminado («MyConferences · Recepción · Bienvenida») y una línea de luz que late. Detrás, **dos recepcionistas** bajo el letrero «RECEPCIÓN», entre dos pantallas de bienvenida; adelante, kioscos de check-in y filas ordenadas con postes. Al entrar, la cámara muestra el mostrador completo. Alrededor: escritorios, sala de reuniones vidriada, sala de estar y café.
 - **Recinto del evento**: cada temática tiene su propio plano y dos pisos. En la planta baja están el auditorio principal y ocho salas; arriba, hasta ocho salas más y una terraza. En el lobby hay una **pantalla gigante con el logo del evento**, y en todos los planos hay espacios para charlar y descansar:
   - **Tecnológica (campus futurista)**: lobby con dos salas de estar, cafetería, zona de juegos (ping-pong, futbolito, arcades), patio con sombrillas, alas con las salas y, arriba, sky lounge y zona chill.
   - **Medieval (castillo)**: patio de armas con fuentes y jardines, taberna, sala de juegos con mesas de ajedrez, galerías y torres. Arriba, la **azotea** con almenas, catalejos, braseros y su jardín.
@@ -56,7 +56,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 - **Directorio**: los tótems con **?** (y el botón «Cómo llegar a cada sala») muestran dónde está cada sala y qué charla hay ahora y después. Se puede **marcar el camino en el suelo** o pedir **«Llevarme»** para ir caminando solo.
 - **Minimapa** arriba a la derecha, con tu posición y las puertas.
 - **Sala**: al entrar, tu personaje camina hasta un asiento libre y se sienta. Después aparece la pantalla del ponente, y abajo se ve el público con globos de chat y reacciones. El auditorio principal es más grande, con escenario amplio y pantallas de patrocinadores enormes.
-- **Moverse e interactuar**: flechas o WASD, o clic en el piso. Arrastrando el mapa (con el mouse o el dedo) se mira alrededor sin mover al personaje; al volver a caminar, la cámara lo sigue de nuevo. X para hablar o usar un directorio, y teclas 1 a 5 para reaccionar (👋 👏 ❤️ 😂 🎉).
+- **Moverse e interactuar**: flechas o WASD, o clic en el piso. Tu personaje lleva un anillo naranja a los pies, para encontrarlo entre la gente. Arrastrando el mapa (con el mouse o el dedo) se mira alrededor sin mover al personaje; al volver a caminar, la cámara lo sigue de nuevo. X para hablar o usar un directorio, y teclas 1 a 5 para reaccionar (👋 👏 ❤️ 😂 🎉).
 - **Ponente**: dentro de su sala usa «¿Eres el ponente?» con su código y su personaje pasa al atril. Desde ahí puede:
   - transmitir su **voz**, su **pantalla** o su **cámara** en vivo (WebRTC);
   - subir un **PDF** y pasar las diapositivas;

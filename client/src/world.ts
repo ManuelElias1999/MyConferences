@@ -2068,40 +2068,67 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       case "frontdesk":
-        // Mostrador de recepción: cubierta blanca, frente grafito con línea de luz, el logo y monitores.
-        add(y + 1, (ctx) => {
+        // Gran mostrador de recepción: cubierta de madera clara, frente grafito con el logo iluminado,
+        // una línea de luz que late y un resplandor en el piso.
+        add(y + 1, (ctx, t) => {
           const dw = w * T;
-          shadowUnder(ctx, px + dw / 2, py + T + 4, dw / 2);
-          box(ctx, px, py - 4, dw, 12, 30, "#262a34", "#f8f8f6");
+          const top = py - 12;
+          const glow = 0.55 + 0.45 * Math.sin(t / 700);
+          ctx.fillStyle = `rgba(34,211,238,${0.1 + glow * 0.08})`;
+          ctx.fillRect(px - 8, py + 46, dw + 16, 14);
+          shadowUnder(ctx, px + dw / 2, py + 48, dw / 2 + 4);
+          box(ctx, px, top, dw, 16, 46, "#20242e", "#e9d5b5");
           ctx.fillStyle = "#c8a46a";
-          ctx.fillRect(px, py + 8, dw, 2);
+          ctx.fillRect(px, top + 14, dw, 3);
+          // Paneles verticales del frente.
+          ctx.fillStyle = "rgba(255,255,255,0.05)";
+          for (let k = 1; k < w; k += 2) ctx.fillRect(px + k * T, top + 18, T, 40);
+          // Línea de luz.
+          ctx.fillStyle = `rgba(34,211,238,${0.25 + glow * 0.2})`;
+          ctx.fillRect(px + 6, top + 50, dw - 12, 6);
           ctx.fillStyle = "#22d3ee";
-          ctx.fillRect(px + 6, py + 34, dw - 12, 2);
-          ctx.fillStyle = "rgba(34,211,238,0.22)";
-          ctx.fillRect(px + 6, py + 29, dw - 12, 5);
-          // Logo: cuatro cuadrados y el nombre.
-          const lx = px + dw / 2 - 62;
-          const ly = py + 14;
+          ctx.fillRect(px + 6, top + 56, dw - 12, 2);
+          // Logo iluminado: cuatro cuadrados, el nombre y «Recepción».
+          const lx = px + dw / 2 - 86;
+          const ly = top + 22;
           for (const [dx, dy, c] of [
             [0, 0, "#ff5c39"],
-            [7, 0, "#fbbf24"],
-            [0, 7, "#2f6bff"],
-            [7, 7, "#ffffff"],
+            [9, 0, "#fbbf24"],
+            [0, 9, "#2f6bff"],
+            [9, 9, "#ffffff"],
           ] as const) {
             ctx.fillStyle = c;
-            ctx.fillRect(lx + dx, ly + dy, 6, 6);
+            ctx.fillRect(lx + dx, ly + dy, 8, 8);
           }
-          ctx.font = `700 12px ${FONT}`;
+          ctx.font = `700 17px ${FONT}`;
           ctx.fillStyle = "#ffffff";
-          ctx.fillText("MyConferences", lx + 19, ly + 11);
-          // Monitores sobre la cubierta.
-          for (const k of [0.15, 0.38, 0.62, 0.85]) {
+          ctx.fillText("MyConferences", lx + 25, ly + 15);
+          ctx.font = `600 9px ${FONT}`;
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillText("RECEPCIÓN · BIENVENIDA", lx + 26, ly + 28);
+          // Sobre la cubierta: monitores, una campanita y flores.
+          for (const k of [0.12, 0.3, 0.7, 0.88]) {
             const mx = px + dw * k;
-            frame(ctx, mx - 10, py - 18, 20, 12, "#1f2433");
+            frame(ctx, mx - 13, top - 18, 26, 16, "#1f2433");
             ctx.fillStyle = "#7dd3fc";
-            ctx.fillRect(mx - 8, py - 16, 16, 8);
+            ctx.fillRect(mx - 11, top - 16, 22, 12);
             ctx.fillStyle = "#3a3f4d";
-            ctx.fillRect(mx - 2, py - 6, 4, 3);
+            ctx.fillRect(mx - 2, top - 2, 4, 3);
+          }
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillRect(px + dw * 0.5 - 4, top + 2, 8, 5);
+          ctx.fillRect(px + dw * 0.5 - 1, top - 1, 2, 3);
+          for (const [fx, fc] of [
+            [0.42, "#f472b6"],
+            [0.58, "#a78bfa"],
+          ] as const) {
+            const vx = px + dw * fx;
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(vx - 3, top + 1, 6, 8);
+            ctx.fillStyle = "#16a34a";
+            ctx.fillRect(vx - 1, top - 6, 2, 7);
+            ctx.fillStyle = fc;
+            ctx.fillRect(vx - 4, top - 10, 8, 5);
           }
         });
         break;
