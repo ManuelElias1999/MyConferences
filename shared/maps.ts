@@ -1227,84 +1227,189 @@ function villageGround(): Level {
   };
 }
 
-// ----- Stellar: un hub con módulos alrededor, observatorio y lounge -----
+// ----- Stellar: una avenida principal cruzada por dos avenidas, con cuatro zonas y las salas repartidas -----
+
+/*
+ * Como el hackathon, pero con la temática Stellar: una avenida principal
+ * (norte–sur) va de la entrada al auditorio y la cruzan dos avenidas
+ * (este–oeste). Entre ellas, cuatro zonas abiertas con varias entradas cada
+ * una: observatorio, nodo de juegos, Café Ancla y Galaxy Lounge. Las salas van
+ * de a dos en cuatro puntos lejanos: sobre la avenida de arriba (oeste y este)
+ * y en las puntas de la avenida de abajo. Cada sala tiene un camino de su
+ * color desde la entrada.
+ */
+const ST_MAIN: Rect = { x: 42, y: 14, w: 12, h: 52 };
+const ST_CROSS_A: Rect = { x: 8, y: 20, w: 80, h: 10 };
+const ST_CROSS_B: Rect = { x: 8, y: 46, w: 80, h: 10 };
+
+/** Una zona entre avenidas: su piso, sus pasos y el nombre en cada puerta que da a una avenida. */
+function stZone(r: Rect, name: string, side: "west" | "east", doors: { top?: boolean; bottom?: boolean }) {
+  const floors: Rect[] = [r];
+  const decor: Decor[] = [];
+  const mid = side === "west" ? r.x + r.w : ST_MAIN.x + ST_MAIN.w;
+  // Paso lateral desde la avenida principal.
+  floors.push({ x: mid, y: r.y + 3, w: 3, h: 4 });
+  if (doors.top)
+    for (const dx of [6, 22]) {
+      floors.push({ x: r.x + dx, y: r.y - 3, w: 4, h: 3 });
+      decor.push({ kind: "portal", x: r.x + dx, y: r.y - 1, w: 4, text: name });
+    }
+  if (doors.bottom) {
+    floors.push({ x: r.x + 14, y: r.y + r.h, w: 4, h: 3 });
+    decor.push({ kind: "portal", x: r.x + 14, y: r.y + r.h + 2, w: 4, text: name });
+  }
+  return { floors, decor };
+}
+
+/** Camino de color de cada sala: sube por su carril de la avenida principal y dobla hacia su puerta. */
+const stTrail = (lane: number, row: number, doorX: number, doorY?: number): Tile[] => [
+  { x: lane, y: 63 },
+  { x: lane, y: row },
+  { x: doorX, y: row },
+  ...(doorY === undefined ? [] : [{ x: doorX, y: doorY }]),
+];
 
 function stellarGround(): Level {
+  const q1 = { x: 8, y: 33, w: 31, h: 10 };
+  const q2 = { x: 57, y: 33, w: 31, h: 10 };
+  const q3 = { x: 8, y: 59, w: 31, h: 10 };
+  const q4 = { x: 57, y: 59, w: 31, h: 10 };
+  const obs = stZone(q1, "✦ OBSERVATORIO", "west", { top: true, bottom: true });
+  const nodo = stZone(q2, "NODO DE JUEGOS", "east", { top: true, bottom: true });
+  const cafe = stZone(q3, "CAFÉ ANCLA", "west", { top: true });
+  const lng = stZone(q4, "GALAXY LOUNGE", "east", { top: true });
+  // Salas de a dos: arriba al oeste y al este (puerta en la pared norte), abajo en las puntas.
+  const [aw1, aw2] = pairH(12, 19, "Avenida de arriba (oeste)");
+  const [ae1, ae2] = pairH(75, 19, "Avenida de arriba (este)");
+  const [bw1, bw2] = pairV(7, 47, "left", "Punta oeste");
+  const [be1, be2] = pairV(88, 47, "right", "Punta este");
   return {
     name: "Hub",
-    w: 60,
-    h: 50,
-    floors: [
-      { x: 18, y: 24, w: 24, h: 14 }, // hub central
-      { x: 27, y: 10, w: 6, h: 14 }, // pasarela al auditorio
-      { x: 3, y: 8, w: 19, h: 7 }, // observatorio
-      { x: 22, y: 10, w: 5, h: 3 },
-      { x: 38, y: 8, w: 19, h: 7 }, // nodo de juegos
-      { x: 33, y: 10, w: 5, h: 3 },
-      { x: 20, y: 38, w: 4, h: 2 },
-      { x: 8, y: 40, w: 18, h: 8 }, // café
-      { x: 36, y: 38, w: 4, h: 2 },
-      { x: 34, y: 40, w: 18, h: 8 }, // lounge
-    ],
+    w: 96,
+    h: 72,
+    floors: [ST_MAIN, ST_CROSS_A, ST_CROSS_B, ...obs.floors, ...nodo.floors, ...cafe.floors, ...lng.floors],
     areas: [
-      { x: 8, y: 40, w: 18, h: 8, floor: "deck" },
-      { x: 3, y: 8, w: 19, h: 7, floor: "tiles" },
+      { ...q1, floor: "tiles" },
+      { ...q3, floor: "deck" },
     ],
-    exit: { x: 29, y: 38 },
-    spawn: { x: 29, y: 35 },
-    main: { x: 28, y: 9, roof: { x: 22, y: 1, w: 16, h: 7 } },
-    slots: [...pairH(18, 23, "Hub (oeste)"), ...pairV(17, 26, "left", "Módulo Soroban"), ...pairH(33, 23, "Hub (este)"), ...pairV(42, 26, "right", "Módulo Horizon")],
+    exit: { x: 47, y: 66 },
+    spawn: { x: 47, y: 63 },
+    main: { x: 46, y: 13, roof: { x: 40, y: 5, w: 16, h: 7 }, trail: [{ x: 47, y: 63 }, { x: 47, y: 14 }] },
+    slots: [
+      { ...aw1!, trail: stTrail(43, 23, aw1!.door.x, 20) },
+      { ...be1!, trail: stTrail(52, be1!.door.y, 87) },
+      { ...ae1!, trail: stTrail(51, 23, ae1!.door.x, 20) },
+      { ...bw1!, trail: stTrail(44, bw1!.door.y, 8) },
+      { ...aw2!, trail: stTrail(45, 24, aw2!.door.x, 20) },
+      { ...be2!, trail: stTrail(50, be2!.door.y, 87) },
+      { ...ae2!, trail: stTrail(49, 24, ae2!.door.x, 20) },
+      { ...bw2!, trail: stTrail(46, bw2!.door.y, 8) },
+    ],
+    // Stands contra la pared norte de las dos avenidas, lejos de puertas y pasos.
     stands: [
-      { x: 21, y: 24 },
-      { x: 36, y: 24 },
-      { x: 13, y: 40 },
-      { x: 45, y: 40 },
-      { x: 14, y: 8 },
-      { x: 45, y: 8 },
+      { x: 25, y: 20 },
+      { x: 33, y: 20 },
+      { x: 58, y: 20 },
+      { x: 66, y: 20 },
+      { x: 12, y: 46 },
+      { x: 30, y: 46 },
+      { x: 60, y: 46 },
+      { x: 78, y: 46 },
     ],
-    stairs: [{ x: 8, y: 7, w: 2, dir: "up", to: 1, label: "Subir a la estación" }],
+    stairs: [{ x: 42, y: 13, w: 2, dir: "up", to: 1, label: "Subir a la estación" }],
     decor: [
-      { kind: "neon", x: 3, y: 7, w: 3, text: "OBSERVATORIO", color: "#fdda24" },
-      { kind: "window", x: 18, y: 7, w: 3 },
-      { kind: "neon", x: 38, y: 7, w: 3, text: "NODO", color: "#b7ace8" },
-      { kind: "sponsors", x: 50, y: 7, w: 4 },
-      { kind: "sign", x: 23, y: 9, w: 4, text: "← OBSERVATORIO" },
-      { kind: "sign", x: 33, y: 9, w: 4, text: "JUEGOS →" },
-      { kind: "portal", x: 20, y: 39, w: 4, text: "CAFÉ ANCLA" },
-      { kind: "portal", x: 36, y: 39, w: 4, text: "GALAXY LOUNGE" },
-      { kind: "neon", x: 48, y: 39, w: 4, text: "✦ LOUNGE", color: "#fdda24" },
+      ...obs.decor,
+      ...nodo.decor,
+      ...cafe.decor,
+      ...lng.decor,
+      { kind: "neon", x: 50, y: 13, w: 3, text: "✦", color: "#fdda24" },
+      { kind: "sponsors", x: 37, y: 19, w: 4 },
+      { kind: "sponsors", x: 55, y: 19, w: 3 },
+      { kind: "neon", x: 70, y: 19, w: 4, text: "STELLAR", color: "#fdda24" },
+      { kind: "sponsors", x: 17, y: 45, w: 4 },
+      { kind: "neon", x: 36, y: 45, w: 4, text: "SOROBAN", color: "#b7ace8" },
+      { kind: "sponsors", x: 66, y: 45, w: 4 },
+      { kind: "neon", x: 83, y: 45, w: 4, text: "HORIZON", color: "#b7ace8" },
     ],
     furni: [
-      { kind: "eventscreen", x: 27, y: 29, w: 6 },
-      { kind: "rocket", x: 40, y: 31 },
-      { kind: "constellation", x: 19, y: 31 },
-      { kind: "constellation", x: 41, y: 36 },
-      { kind: "bigplant", x: 18, y: 37 },
-      { kind: "telescope", x: 5, y: 12 },
-      { kind: "telescope", x: 20, y: 12 },
-      { kind: "bench", x: 12, y: 13, w: 3 },
-      { kind: "constellation", x: 17, y: 9 },
-      { kind: "arcade", x: 54, y: 8 },
-      { kind: "arcade", x: 55, y: 8 },
-      { kind: "arcade", x: 56, y: 8 },
-      { kind: "pingpong", x: 39, y: 11, w: 3 },
-      { kind: "foosball", x: 49, y: 12, w: 2 },
-      { kind: "beanbag", x: 53, y: 13, color: "#fdda24" },
-      { kind: "beanbag", x: 55, y: 13, color: "#b7ace8" },
-      { kind: "coffeebar", x: 8, y: 40, w: 3 },
-      { kind: "cafetable", x: 9, y: 44, w: 2 },
-      { kind: "cafetable", x: 13, y: 45, w: 2 },
-      { kind: "cafetable", x: 21, y: 44, w: 2 },
-      { kind: "bigplant", x: 25, y: 47 },
-      ...lounge(41, 43, "#fdda24"),
-      { kind: "beanbag", x: 49, y: 45, color: "#b7ace8" },
-      { kind: "beanbag", x: 50, y: 46, color: "#fdda24" },
-      { kind: "rocket", x: 34, y: 46 },
+      // Avenida principal: la entrada con su pantalla, un cohete en cada cruce y constelaciones a los lados.
+      { kind: "eventscreen", x: 45, y: 58, w: 6, floating: true },
+      { kind: "adboard", x: 45, y: 26, w: 6, label: "/assets/logos/stellar.svg" },
+      { kind: "rocket", x: 47, y: 52 },
+      { kind: "hologram", x: 47, y: 37, w: 2, d: 2 },
+      ...[34, 41].flatMap((y): Furni[] => [
+        { kind: "constellation", x: 42, y },
+        { kind: "constellation", x: 53, y },
+      ]),
+      ...[16, 61].flatMap((y): Furni[] => [
+        { kind: "totem", x: 43, y },
+        { kind: "totem", x: 52, y },
+      ]),
+      { kind: "signpost", x: 50, y: 61, label: "↑ Auditorio y salas|← Observatorio · Café|Nodo · Lounge →" },
+      { kind: "signpost", x: 50, y: 31, label: "↑ Auditorio · ascensor|← Salas oeste · Salas este →" },
+      { kind: "bigplant", x: 42, y: 64 },
+      { kind: "bigplant", x: 53, y: 64 },
+      // Avenidas cruzadas: cohetes, constelaciones, robots y tótems con los patrocinadores.
+      ...[16, 80].flatMap((x): Furni[] => [
+        { kind: "constellation", x, y: 27 },
+        { kind: "constellation", x, y: 53 },
+      ]),
+      { kind: "rocket", x: 28, y: 27 },
+      { kind: "rocket", x: 68, y: 53 },
+      { kind: "telescope", x: 22, y: 51 },
+      { kind: "telescope", x: 74, y: 27 },
+      { kind: "robot", x: 37, y: 26 },
+      { kind: "robot", x: 60, y: 52 },
+      ...[20, 35, 61, 77].map((x): Furni => ({ kind: "totem", x, y: 29 })),
+      ...[24, 40, 55, 72].map((x): Furni => ({ kind: "totem", x, y: 55 })),
+      { kind: "drone", x: 30, y: 24 },
+      { kind: "drone", x: 64, y: 50 },
+      // Observatorio: telescopios, bancos y constelaciones.
+      ...[11, 19, 27, 35].map((x): Furni => ({ kind: "telescope", x, y: 35 })),
+      { kind: "bench", x: 12, y: 39, w: 3 },
+      { kind: "bench", x: 28, y: 39, w: 3 },
+      { kind: "constellation", x: 8, y: 33 },
+      { kind: "constellation", x: 38, y: 42 },
+      { kind: "bigplant", x: 20, y: 41 },
+      // Nodo de juegos: arcades, ping-pong, metegol y puffs.
+      ...[78, 79, 80, 84, 85, 86].map((x): Furni => ({ kind: "arcade", x, y: 33 })),
+      { kind: "pingpong", x: 62, y: 37, w: 3 },
+      { kind: "foosball", x: 70, y: 37, w: 2 },
+      { kind: "chess", x: 77, y: 39, w: 2 },
+      ...[80, 82, 84, 86].map((x, i): Furni => ({ kind: "beanbag", x, y: 40, color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      // Café Ancla.
+      { kind: "coffeebar", x: 9, y: 59, w: 4 },
+      { kind: "vending", x: 14, y: 59 },
+      ...[12, 18, 24, 30].flatMap((x): Furni[] => [
+        { kind: "cafetable", x, y: 63, w: 2 },
+        { kind: "cafetable", x: x + 1, y: 66, w: 2 },
+      ]),
+      { kind: "bigplant", x: 8, y: 68 },
+      { kind: "bigplant", x: 38, y: 68 },
+      // Galaxy Lounge.
+      ...lounge(60, 62, "#fdda24"),
+      ...lounge(70, 62, "#b7ace8"),
+      ...lounge(80, 62, "#fdda24"),
+      { kind: "rocket", x: 86, y: 67 },
+      ...[61, 65, 75, 79].map((x, i): Furni => ({ kind: "beanbag", x, y: 67, color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      { kind: "constellation", x: 57, y: 68 },
     ],
-    crowd: [...chat(24, 32), ...chat(33, 33), ...chat(4, 11), ...chat(44, 12), ...chat(17, 44), ...chat(38, 45), ...chat(29, 15)],
+    crowd: [
+      ...chat(45, 47),
+      ...chat(49, 22),
+      ...chat(20, 24),
+      ...chat(70, 25),
+      ...chat(34, 50),
+      ...chat(84, 52),
+      ...chat(14, 37),
+      ...chat(66, 40),
+      ...chat(20, 61),
+      ...chat(72, 66),
+      ...chat(46, 44),
+    ],
     directories: [
-      { x: 23, y: 35 },
-      { x: 36, y: 35 },
+      { x: 43, y: 56 },
+      { x: 52, y: 56 },
     ],
   };
 }

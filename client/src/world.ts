@@ -911,7 +911,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
       ctx.fillRect(px + 1, y + 9, 10, 5);
     }
   }
-  if (style === "hackathon" && roof.open && roof.color) {
+  if ((style === "hackathon" || style === "stellar") && roof.open && roof.color) {
     // Sala de charla: un edificio del color de la sala, con borde de luz, para que no se confunda con el muro.
     ctx.fillStyle = shade(roof.color, -0.45);
     ctx.fillRect(x, y, w, h);
@@ -930,7 +930,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
     ctx.fillStyle = "#f472b6";
     ctx.fillRect(x, y + 4, w, 2);
   }
-  if (style === "stellar") {
+  if (style === "stellar" && !(roof.open && roof.color)) {
     // Techo oscuro con estrellas y una franja amarilla.
     for (let i = 0; i < roof.w * roof.h; i++) {
       ctx.fillStyle = i % 4 ? "rgba(255,255,255,0.7)" : "#fdda24";
