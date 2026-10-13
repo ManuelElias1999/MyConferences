@@ -1235,25 +1235,27 @@ function villageGround(): Level {
 /*
  * Como el hackathon, pero con la temática Stellar: una avenida principal
  * (norte–sur) va de la entrada al auditorio y la cruzan dos avenidas
- * (este–oeste). Entre ellas, cuatro zonas abiertas con varias entradas cada
- * una: observatorio, nodo de juegos, Café Ancla y Galaxy Lounge. Las salas van
- * de a dos en cuatro puntos lejanos: sobre la avenida de arriba (oeste y este)
- * y en las puntas de la avenida de abajo. Cada sala tiene un camino de su
- * color desde la entrada.
+ * (este–oeste). A propósito no es simétrico: al oeste, una gran expo llena de
+ * stands, abierta de par en par a la avenida principal, con el Café Ancla
+ * abajo; al este, la avenida de abajo con el nodo de juegos y el Galaxy Lounge,
+ * más chicos y corridos. Las salas van de a dos en cuatro puntos lejanos, cada
+ * una con un camino de su color desde la entrada.
  */
 const ST_MAIN: Rect = { x: 42, y: 14, w: 12, h: 52 };
 const ST_CROSS_A: Rect = { x: 8, y: 20, w: 80, h: 10 };
-const ST_CROSS_B: Rect = { x: 8, y: 46, w: 80, h: 10 };
+// La avenida de abajo solo va hacia el este: al oeste, la expo ocupa todo el alto.
+const ST_CROSS_B: Rect = { x: 42, y: 46, w: 46, h: 10 };
 
 /** Una zona entre avenidas: su piso, sus pasos y el nombre en cada puerta que da a una avenida. */
 function stZone(r: Rect, name: string, side: "west" | "east", doors: { top?: boolean; bottom?: boolean }) {
   const floors: Rect[] = [r];
   const decor: Decor[] = [];
-  const mid = side === "west" ? r.x + r.w : ST_MAIN.x + ST_MAIN.w;
-  // Paso lateral desde la avenida principal.
-  floors.push({ x: mid, y: r.y + 3, w: 3, h: 4 });
+  // Paso lateral desde la avenida principal (más largo si la zona queda más lejos).
+  const from = side === "west" ? r.x + r.w : ST_MAIN.x + ST_MAIN.w;
+  const to = side === "west" ? ST_MAIN.x : r.x;
+  floors.push({ x: from, y: r.y + 3, w: to - from, h: 4 });
   if (doors.top)
-    for (const dx of [6, 22]) {
+    for (const dx of [6, r.w - 10]) {
       floors.push({ x: r.x + dx, y: r.y - 3, w: 4, h: 3 });
       decor.push({ kind: "portal", x: r.x + dx, y: r.y - 1, w: 4, text: name });
     }
@@ -1273,26 +1275,28 @@ const stTrail = (lane: number, row: number, doorX: number, doorY?: number): Tile
 ];
 
 function stellarGround(): Level {
-  const q1 = { x: 8, y: 33, w: 31, h: 10 };
-  const q2 = { x: 57, y: 33, w: 31, h: 10 };
+  // Expo: todo el alto del lado oeste, entre la avenida de arriba y el café.
+  const expo = { x: 8, y: 33, w: 31, h: 23 };
+  const expoOpening = { x: 39, y: 40, w: 3, h: 13 };
+  const expoDoors = [14, 30].map((x) => ({ x, y: 30, w: 4, h: 3 }));
+  const q2 = { x: 60, y: 33, w: 28, h: 10 };
   const q3 = { x: 8, y: 59, w: 31, h: 10 };
-  const q4 = { x: 57, y: 59, w: 31, h: 10 };
-  const obs = stZone(q1, "✦ OBSERVATORIO", "west", { top: true, bottom: true });
+  const q4 = { x: 62, y: 59, w: 26, h: 10 };
   const nodo = stZone(q2, "NODO DE JUEGOS", "east", { top: true, bottom: true });
   const cafe = stZone(q3, "CAFÉ ANCLA", "west", { top: true });
   const lng = stZone(q4, "GALAXY LOUNGE", "east", { top: true });
-  // Salas de a dos: arriba al oeste y al este (puerta en la pared norte), abajo en las puntas.
-  const [aw1, aw2] = pairH(12, 19, "Avenida de arriba (oeste)");
-  const [ae1, ae2] = pairH(75, 19, "Avenida de arriba (este)");
-  const [bw1, bw2] = pairV(7, 47, "left", "Punta oeste");
+  // Salas de a dos: arriba al oeste y al este (puerta en la pared norte), una pareja que da a la expo y otra en la punta este.
+  const [aw1, aw2] = pairH(11, 19, "Avenida de arriba (oeste)");
+  const [ae1, ae2] = pairH(70, 19, "Avenida de arriba (este)");
+  const [bw1, bw2] = pairV(7, 42, "left", "Junto a la expo");
   const [be1, be2] = pairV(88, 47, "right", "Punta este");
   return {
     name: "Hub",
     w: 96,
     h: 72,
-    floors: [ST_MAIN, ST_CROSS_A, ST_CROSS_B, ...obs.floors, ...nodo.floors, ...cafe.floors, ...lng.floors],
+    floors: [ST_MAIN, ST_CROSS_A, ST_CROSS_B, expo, expoOpening, ...expoDoors, ...nodo.floors, ...cafe.floors, ...lng.floors],
     areas: [
-      { ...q1, floor: "tiles" },
+      { ...expo, floor: "tiles" },
       { ...q3, floor: "deck" },
     ],
     exit: { x: 47, y: 66 },
@@ -1308,106 +1312,111 @@ function stellarGround(): Level {
       { ...ae2!, trail: stTrail(49, 24, ae2!.door.x, 20) },
       { ...bw2!, trail: stTrail(46, bw2!.door.y, 8) },
     ],
-    // Stands contra la pared norte de las dos avenidas, lejos de puertas y pasos.
+    // Primero los de la expo (los patrocinadores se ubican en orden), después unos pocos en las avenidas.
+    expo: true,
     stands: [
+      // Contra la pared norte de la expo, entre sus dos puertas.
+      { x: 9, y: 33 },
+      { x: 20, y: 33 },
+      { x: 25, y: 33 },
+      { x: 35, y: 33 },
+      // Dos filas sueltas, corridas entre sí; el pasillo del medio queda libre.
+      { x: 12, y: 39, free: true },
+      { x: 19, y: 39, free: true },
+      { x: 27, y: 39, free: true },
+      { x: 15, y: 51, free: true },
+      { x: 23, y: 51, free: true },
+      { x: 31, y: 51, free: true },
+      // Avenidas.
       { x: 25, y: 20 },
-      { x: 33, y: 20 },
       { x: 58, y: 20 },
-      { x: 66, y: 20 },
-      { x: 12, y: 46 },
-      { x: 30, y: 46 },
       { x: 60, y: 46 },
-      { x: 78, y: 46 },
     ],
     stairs: [{ x: 42, y: 13, w: 2, dir: "up", to: 1, label: "Subir a la estación" }],
     decor: [
-      ...obs.decor,
+      ...expoDoors.map((d): Decor => ({ kind: "portal", x: d.x, y: d.y + 2, w: d.w, text: "✦ EXPO STELLAR" })),
       ...nodo.decor,
       ...cafe.decor,
       ...lng.decor,
       { kind: "neon", x: 50, y: 13, w: 3, text: "✦", color: "#fdda24" },
-      { kind: "sponsors", x: 37, y: 19, w: 4 },
-      { kind: "sponsors", x: 55, y: 19, w: 3 },
-      { kind: "neon", x: 70, y: 19, w: 4, text: "STELLAR", color: "#fdda24" },
-      { kind: "sponsors", x: 17, y: 45, w: 4 },
-      { kind: "neon", x: 36, y: 45, w: 4, text: "SOROBAN", color: "#b7ace8" },
+      { kind: "sponsors", x: 34, y: 19, w: 5 },
+      { kind: "neon", x: 62, y: 19, w: 4, text: "STELLAR", color: "#fdda24" },
+      { kind: "neon", x: 55, y: 45, w: 4, text: "SOROBAN", color: "#b7ace8" },
       { kind: "sponsors", x: 66, y: 45, w: 4 },
       { kind: "neon", x: 83, y: 45, w: 4, text: "HORIZON", color: "#b7ace8" },
     ],
     furni: [
-      // Avenida principal: la entrada con su pantalla, un cohete en cada cruce y constelaciones a los lados.
+      // Avenida principal: la entrada con su pantalla, el cartel de Stellar, un cohete y constelaciones.
       { kind: "eventscreen", x: 45, y: 58, w: 6, floating: true },
       { kind: "adboard", x: 45, y: 26, w: 6, label: "/assets/logos/stellar.svg" },
-      { kind: "rocket", x: 47, y: 52 },
-      { kind: "hologram", x: 47, y: 37, w: 2, d: 2 },
-      ...[34, 41].flatMap((y): Furni[] => [
-        { kind: "constellation", x: 42, y },
-        { kind: "constellation", x: 53, y },
-      ]),
-      ...[16, 61].flatMap((y): Furni[] => [
-        { kind: "totem", x: 43, y },
-        { kind: "totem", x: 52, y },
-      ]),
-      { kind: "signpost", x: 50, y: 61, label: "↑ Auditorio y salas|← Observatorio · Café|Nodo · Lounge →" },
-      { kind: "signpost", x: 50, y: 31, label: "↑ Auditorio · ascensor|← Salas oeste · Salas este →" },
+      { kind: "rocket", x: 50, y: 53 },
+      { kind: "hologram", x: 48, y: 36, w: 2, d: 2 },
+      { kind: "constellation", x: 53, y: 34 },
+      { kind: "constellation", x: 53, y: 40 },
+      { kind: "constellation", x: 42, y: 33 },
+      { kind: "totem", x: 43, y: 16 },
+      { kind: "totem", x: 52, y: 17 },
+      { kind: "totem", x: 52, y: 61 },
+      { kind: "signpost", x: 50, y: 61, label: "↑ Auditorio y salas|← Expo · Café|Nodo · Lounge →" },
+      { kind: "signpost", x: 50, y: 31, label: "↑ Auditorio · ascensor|← Expo · Salas oeste|Salas este →" },
       { kind: "bigplant", x: 42, y: 64 },
       { kind: "bigplant", x: 53, y: 64 },
-      // Avenidas cruzadas: cohetes, constelaciones, robots y tótems con los patrocinadores.
-      ...[16, 80].flatMap((x): Furni[] => [
-        { kind: "constellation", x, y: 27 },
-        { kind: "constellation", x, y: 53 },
-      ]),
-      { kind: "rocket", x: 28, y: 27 },
-      { kind: "rocket", x: 68, y: 53 },
-      { kind: "telescope", x: 22, y: 51 },
-      { kind: "telescope", x: 74, y: 27 },
-      { kind: "robot", x: 37, y: 26 },
-      { kind: "robot", x: 60, y: 52 },
-      ...[20, 35, 61, 77].map((x): Furni => ({ kind: "totem", x, y: 29 })),
-      ...[24, 40, 55, 72].map((x): Furni => ({ kind: "totem", x, y: 55 })),
-      { kind: "drone", x: 30, y: 24 },
-      { kind: "drone", x: 64, y: 50 },
-      // Observatorio: telescopios, bancos y constelaciones.
-      ...[11, 19, 27, 35].map((x): Furni => ({ kind: "telescope", x, y: 35 })),
-      { kind: "bench", x: 12, y: 39, w: 3 },
-      { kind: "bench", x: 28, y: 39, w: 3 },
-      { kind: "constellation", x: 8, y: 33 },
-      { kind: "constellation", x: 38, y: 42 },
-      { kind: "bigplant", x: 20, y: 41 },
-      // Nodo de juegos: arcades, ping-pong, metegol y puffs.
-      ...[78, 79, 80, 84, 85, 86].map((x): Furni => ({ kind: "arcade", x, y: 33 })),
-      { kind: "pingpong", x: 62, y: 37, w: 3 },
-      { kind: "foosball", x: 70, y: 37, w: 2 },
-      { kind: "chess", x: 77, y: 39, w: 2 },
-      ...[80, 82, 84, 86].map((x, i): Furni => ({ kind: "beanbag", x, y: 40, color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      // Avenida de arriba.
+      { kind: "constellation", x: 9, y: 27 },
+      { kind: "rocket", x: 30, y: 27 },
+      { kind: "robot", x: 37, y: 25 },
+      { kind: "telescope", x: 77, y: 27 },
+      { kind: "constellation", x: 86, y: 28 },
+      { kind: "drone", x: 22, y: 25 },
+      ...[19, 61, 79].map((x): Furni => ({ kind: "totem", x, y: 29 })),
+      // Avenida de abajo (solo al este).
+      { kind: "rocket", x: 70, y: 53 },
+      { kind: "robot", x: 57, y: 52 },
+      { kind: "constellation", x: 84, y: 54 },
+      { kind: "drone", x: 76, y: 50 },
+      ...[55, 66].map((x): Furni => ({ kind: "totem", x, y: 55 })),
+      // Expo: además de los stands, tótems, plantas, un robot que da la bienvenida y un telescopio.
+      { kind: "robot", x: 36, y: 43 },
+      { kind: "totem", x: 34, y: 46 },
+      { kind: "totem", x: 11, y: 54 },
+      { kind: "bigplant", x: 38, y: 33 },
+      { kind: "bigplant", x: 8, y: 55 },
+      { kind: "bigplant", x: 38, y: 55 },
+      { kind: "telescope", x: 19, y: 54 },
+      { kind: "constellation", x: 27, y: 46 },
+      // Nodo de juegos.
+      ...[79, 80, 81, 85, 86, 87].map((x): Furni => ({ kind: "arcade", x, y: 33 })),
+      { kind: "pingpong", x: 63, y: 37, w: 3 },
+      { kind: "foosball", x: 70, y: 36, w: 2 },
+      { kind: "chess", x: 76, y: 40, w: 2 },
+      ...[81, 83, 86].map((x, i): Furni => ({ kind: "beanbag", x, y: 40, color: i % 2 ? "#fdda24" : "#b7ace8" })),
       // Café Ancla.
       { kind: "coffeebar", x: 9, y: 59, w: 4 },
-      { kind: "vending", x: 14, y: 59 },
-      ...[12, 18, 24, 30].flatMap((x): Furni[] => [
-        { kind: "cafetable", x, y: 63, w: 2 },
-        { kind: "cafetable", x: x + 1, y: 66, w: 2 },
-      ]),
+      { kind: "vending", x: 20, y: 59 },
+      ...[11, 18, 26, 33].map((x, i): Furni => ({ kind: "cafetable", x, y: 62 + (i % 2) * 2, w: 2 })),
+      ...[14, 22, 30].map((x): Furni => ({ kind: "cafetable", x, y: 67, w: 2 })),
       { kind: "bigplant", x: 8, y: 68 },
-      { kind: "bigplant", x: 38, y: 68 },
+      { kind: "bigplant", x: 38, y: 64 },
       // Galaxy Lounge.
-      ...lounge(60, 62, "#fdda24"),
-      ...lounge(70, 62, "#b7ace8"),
-      ...lounge(80, 62, "#fdda24"),
-      { kind: "rocket", x: 86, y: 67 },
-      ...[61, 65, 75, 79].map((x, i): Furni => ({ kind: "beanbag", x, y: 67, color: i % 2 ? "#fdda24" : "#b7ace8" })),
-      { kind: "constellation", x: 57, y: 68 },
+      ...lounge(64, 62, "#fdda24"),
+      ...lounge(74, 61, "#b7ace8"),
+      ...lounge(80, 65, "#fdda24"),
+      { kind: "rocket", x: 86, y: 61 },
+      ...[65, 70, 76].map((x, i): Furni => ({ kind: "beanbag", x, y: 67, color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      { kind: "constellation", x: 62, y: 68 },
     ],
     crowd: [
       ...chat(45, 47),
       ...chat(49, 22),
-      ...chat(20, 24),
-      ...chat(70, 25),
-      ...chat(34, 50),
-      ...chat(84, 52),
-      ...chat(14, 37),
+      ...chat(17, 24),
+      ...chat(68, 25),
+      ...chat(80, 52),
+      ...chat(11, 47),
+      ...chat(22, 43),
+      ...chat(30, 47),
       ...chat(66, 40),
       ...chat(20, 61),
-      ...chat(72, 66),
+      ...chat(70, 66),
       ...chat(46, 44),
     ],
     directories: [

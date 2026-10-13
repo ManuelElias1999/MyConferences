@@ -22,6 +22,7 @@ interface VenueSeed {
 
 /** Lo que cuenta el representante de cada patrocinador de ejemplo en su stand. */
 const PITCH: Record<string, string> = {
+  stellar: "Pagos globales en segundos y por centavos, y contratos inteligentes con Soroban. Pregúntanos cómo lanzar tu primer token.",
   novapay: "Cobros en línea en 5 minutos, con tarjetas, transferencias y billeteras. Hoy te damos 3 meses sin comisión.",
   "orbit-cloud": "Servidores y bases de datos que escalan solos. Si te registras en el evento, tienes USD 300 de crédito.",
   devforge: "Integración continua y despliegues sin configurar nada. Pasa a ver la demo de pipelines en 30 segundos.",
@@ -230,7 +231,19 @@ const seeds: VenueSeed[] = [
     private: false,
     theme: "stellar",
     organizer: "Comunidad Stellar LatAm",
-    sponsors: [logo("pixel-bank", "Pixel Bank"), logo("novapay", "NovaPay"), logo("orbit-cloud", "Orbit Cloud"), logo("devforge", "DevForge")],
+    // Muchos patrocinadores: llenan la expo del hub.
+    sponsors: [
+      logo("stellar", "Stellar"),
+      logo("pixel-bank", "Pixel Bank"),
+      logo("novapay", "NovaPay"),
+      logo("orbit-cloud", "Orbit Cloud"),
+      logo("devforge", "DevForge"),
+      logo("ledgerx", "LedgerX"),
+      logo("nimbus-ai", "Nimbus AI"),
+      logo("quanta", "Quanta"),
+      logo("pulse-api", "Pulse API"),
+      logo("bytelabs", "ByteLabs"),
+    ],
     rooms: [
       { id: "auditorio", name: "Auditorio principal", topic: "Keynotes de la red", color: "#f59e0b", main: true },
       { id: "soroban", name: "Sala Soroban", topic: "Contratos inteligentes", color: "#6366f1", main: false },
