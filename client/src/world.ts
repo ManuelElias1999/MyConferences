@@ -663,6 +663,18 @@ const AREA_FLOOR: Record<AreaFloor, Painter> = {
   deck: flat("#cfbea6"),
   stone: flat("#d2ccbf"),
   tiles: flat("#eeebe5"),
+  water: (ctx, x0, y0, x1, y1) => {
+    // Lago: azul con una orilla más clara y reflejos.
+    ctx.fillStyle = "#8fd3e8";
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = "#5bb8d6";
+    ctx.fillRect(x0 + 6, y0 + 6, x1 - x0 - 12, y1 - y0 - 12);
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    for (let y = y0 + 16; y < y1 - 10; y += 22) for (let x = x0 + 14 + ((y / 22) % 2) * 18; x < x1 - 24; x += 44) ctx.fillRect(x, y, 14, 2);
+    ctx.strokeStyle = "#e9dfc4";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(x0 + 2, y0 + 2, x1 - x0 - 4, y1 - y0 - 4);
+  },
 };
 
 const STEP: Record<StyleId, { tread: string; rail: string }> = {
@@ -902,7 +914,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = r.line;
   for (let ly = y + 8; ly < y + h; ly += 8) ctx.fillRect(x, ly, w, 1);
-  if (style === "tech") {
+  if (style === "tech" && !(roof.open && roof.color)) {
     // Paneles solares y ventilaciones.
     for (let px = x + 10; px < x + w - 26; px += 34) {
       ctx.fillStyle = "#2f4a7a";
@@ -911,9 +923,9 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
       ctx.fillRect(px + 1, y + 9, 10, 5);
     }
   }
-  if ((style === "hackathon" || style === "stellar") && roof.open && roof.color) {
+  if (roof.open && roof.color) {
     // Sala de charla: un edificio del color de la sala, con borde de luz, para que no se confunda con el muro.
-    ctx.fillStyle = shade(roof.color, -0.45);
+    ctx.fillStyle = shade(roof.color, style === "hackathon" || style === "stellar" ? -0.45 : -0.15);
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = hexA(roof.color, 0.35);
     for (let lx = x + 12; lx < x + w - 8; lx += 20) ctx.fillRect(lx, y + 8, 3, h - 16);
@@ -939,7 +951,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
     ctx.fillStyle = "#fdda24";
     ctx.fillRect(x, y + 4, w, 2);
   }
-  if (style === "garden") {
+  if (style === "garden" && !(roof.open && roof.color)) {
     // Pabellón con tejas: una cumbrera al medio.
     ctx.fillStyle = "#a8683e";
     ctx.fillRect(x, y + 4, w, 3);
@@ -951,7 +963,7 @@ function drawRoof(ctx: CanvasRenderingContext2D, style: StyleId, roof: Roof) {
   ctx.fillStyle = roof.open ? roof.color : "#b9b4ab";
   ctx.fillRect(x, y + h - 6, w, 6);
   // Nombre pintado sobre un cartel en el techo.
-  ctx.font = `700 ${roof.w > 12 || (style === "hackathon" && roof.w >= 6) ? 16 : 12}px ${FONT}`;
+  ctx.font = `700 ${roof.w > 12 || roof.w >= 6 ? 16 : 12}px ${FONT}`;
   const label = roof.open ? `🎤 ${roof.label.toUpperCase()}` : roof.label.toUpperCase();
   const tw = Math.min(w - 16, ctx.measureText(label).width + 18);
   const ty = y + Math.round(h * 0.38);
