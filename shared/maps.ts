@@ -471,7 +471,10 @@ export function receptionMap(): SceneMap {
   const h = 22;
   const sit = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker", sit: true });
   const stand = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker" });
-  const front = Array.from({ length: 16 }, (_, i) => ({ x: 10 + i, y: 8 }));
+  // Desde cualquier baldosa de la tarima de madera (el rectángulo de la recepción) se puede hablar con la recepcionista.
+  const platform = { x: 7, y: 3, w: 22, h: 11 };
+  const front: Tile[] = [];
+  for (let y = platform.y; y < platform.y + platform.h; y++) for (let x = platform.x; x < platform.x + platform.w; x++) front.push({ x, y });
   return finish(
     {
       ...empty,
@@ -481,7 +484,7 @@ export function receptionMap(): SceneMap {
       style: "cowork",
       spawn: { x: 17, y: 17 },
       // La recepción va sobre una tarima de madera que ocupa todo el fondo, de columna a columna.
-      areas: [{ x: 7, y: 3, w: 22, h: 11, floor: "wood" }],
+      areas: [{ ...platform, floor: "wood" }],
       furni: [
         // El gran mostrador, con dos recepcionistas detrás, columnas de luz y plantas a los lados.
         { kind: "frontdesk", x: 10, y: 6, w: 16 },

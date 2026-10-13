@@ -164,7 +164,10 @@ export default function Scene(props: SceneProps) {
   const nearbyNpc = () => {
     if (my.current.seg) return null;
     const h = here();
-    return map.npcs.find((n) => n.talkFrom?.some((t) => sameTile(h, t)) || Math.abs(n.x - h.x) + Math.abs(n.y - h.y) === 1) ?? null;
+    // Si hay varias personas que te pueden atender desde aquí, la más cercana.
+    const dist = (n: Npc) => Math.abs(n.x - h.x) + Math.abs(n.y - h.y);
+    const near = map.npcs.filter((n) => n.talkFrom?.some((t) => sameTile(h, t)) || dist(n) === 1);
+    return near.sort((a, b) => dist(a) - dist(b))[0] ?? null;
   };
   const nearbyDirectory = () => (my.current.seg ? null : (map.directories.find((d) => near(d, here())) ?? null));
 
