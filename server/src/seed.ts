@@ -22,6 +22,7 @@ interface VenueSeed {
 
 /** Lo que cuenta el representante de cada patrocinador de ejemplo en su stand. */
 const PITCH: Record<string, string> = {
+  thebafnetwork: "Acompañamos a quienes construyen en Stellar: mentorías, recursos y una comunidad para lanzar tu proyecto. Pasa por el Salón BAF y pregúntanos.",
   stellar: "Pagos globales en segundos y por centavos, y contratos inteligentes con Soroban. Pregúntanos cómo lanzar tu primer token.",
   novapay: "Cobros en línea en 5 minutos, con tarjetas, transferencias y billeteras. Hoy te damos 3 meses sin comisión.",
   "orbit-cloud": "Servidores y bases de datos que escalan solos. Si te registras en el evento, tienes USD 300 de crédito.",
@@ -283,6 +284,29 @@ const seeds: VenueSeed[] = [
         ["Arranque del hackathon", "Mentores", "Formación de equipos y reglas."],
         ["Demo day", "Equipos", "Cada equipo presenta lo que construyó."],
       ],
+    },
+  },
+  {
+    id: "606",
+    name: "Starmaker Stellar LATAM",
+    tagline: "Las oficinas de los embajadores de Stellar en LATAM: la reunión de los martes, cowork, sala de estudio, mentores y BAF.",
+    private: false,
+    theme: "starmaker",
+    organizer: "Stellar LATAM · The BAF Network",
+    // Solo Stellar y The BAF Network.
+    sponsors: [logo("stellar", "Stellar"), logo("thebafnetwork", "The BAF Network")],
+    rooms: [
+      { id: "presentaciones", name: "Sala de presentaciones", topic: "Demos y charlas de la comunidad", color: "#f59e0b", main: true },
+      { id: "taller", name: "Taller Soroban", topic: "Construir juntos sobre Stellar", color: "#6366f1", main: false },
+      { id: "office-hours", name: "Office hours", topic: "Preguntas al equipo de Stellar", color: "#14b8a6", main: false },
+    ],
+    program: {
+      presentaciones: [
+        ["Novedades de la red", "Equipo de Stellar LATAM", "Qué pasó esta semana en el ecosistema."],
+        ["Demo de la comunidad", "Embajadores", "Un proyecto de la comunidad muestra en qué está trabajando."],
+      ],
+      taller: [["Tu primer contrato en Soroban", "Mentores", "De cero a un contrato en testnet, en grupo."]],
+      "office-hours": [["Preguntas abiertas", "Equipo de Stellar", "Trae tus dudas sobre la red, Soroban o tu proyecto."]],
     },
   },
   {

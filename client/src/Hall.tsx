@@ -6,6 +6,7 @@ import { THEMES } from "../../shared/themes.ts";
 import type { Sponsor, Talk, User, Venue } from "../../shared/types.ts";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import { formatTime, minutesUntil, roomSchedule } from "./lib.ts";
+import MeetingPanel from "./MeetingPanel.tsx";
 import Modal from "./Modal.tsx";
 import SayBar from "./SayBar.tsx";
 import Scene, { type SceneHandle } from "./Scene.tsx";
@@ -173,6 +174,13 @@ export default function Hall({
             Cómo llegar a cada sala
           </button>
         </section>
+
+        <MeetingPanel
+          map={map}
+          me={me}
+          people={everyone.filter((u) => u.venueId === venue.id && !u.roomId && u.floor === floor)}
+          onGo={(tile) => scene.current?.walkTo(tile)}
+        />
 
         {venue.sponsors.length > 0 && (
           <section>

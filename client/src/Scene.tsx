@@ -201,11 +201,19 @@ export default function Scene(props: SceneProps) {
   useEffect(() => {
     const onBubble = (b: Bubble) => bubbles.current.set(b.userId, { text: b.text, at: performance.now() });
     const onEmote = (e: { userId: string; emoji: string }) => emotes.current.set(e.userId, { emoji: e.emoji, at: performance.now() });
+    // El servidor te movió (por ejemplo, al repartir la reunión en salas): apareces ahí y la cámara te sigue.
+    const onTeleport = (pos: { x: number; y: number }) => {
+      Object.assign(my.current, { x: pos.x, y: pos.y, seg: null, path: [], then: null, moving: false });
+      keys.current = [];
+      pan.current = { x: 0, y: 0 };
+    };
     socket.on("bubble", onBubble);
     socket.on("emote", onEmote);
+    socket.on("teleport", onTeleport);
     return () => {
       socket.off("bubble", onBubble);
       socket.off("emote", onEmote);
+      socket.off("teleport", onTeleport);
     };
   }, []);
 

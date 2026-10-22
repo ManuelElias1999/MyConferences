@@ -268,6 +268,10 @@ export interface ClientToServerEvents {
   callLeave: () => void;
   callSignal: (to: string, signal: CallSignal) => void;
   callMedia: (media: CallMedia) => void;
+  /** Equipo organizador: reparte al azar a quienes están en la sala de reunión entre `count` salas chicas. */
+  breakout: (count: number, ack: Ack<{ moved: number; rooms: number }>) => void;
+  /** Equipo organizador: trae de vuelta a la sala de reunión a todos los que están en las salas chicas. */
+  gather: (ack: Ack<{ moved: number }>) => void;
 }
 
 export interface ServerToClientEvents {
@@ -294,4 +298,6 @@ export interface ServerToClientEvents {
   callSignal: (from: string, signal: CallSignal) => void;
   /** Aviso sobre las charlas (por ejemplo, una mesa llena). */
   callNotice: (text: string) => void;
+  /** El servidor te movió a otro lugar del plano (por ejemplo, al repartir en salas). */
+  teleport: (pos: { x: number; y: number }) => void;
 }

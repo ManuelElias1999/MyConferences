@@ -16,7 +16,10 @@ export interface Tile {
 export type Dir = "down" | "up" | "left" | "right";
 
 /** Estilo visual de un mapa: los de evento más el de la recepción. */
-export type StyleId = ThemeId | "cowork";
+export type StyleId = Exclude<ThemeId, "starmaker"> | "cowork";
+
+/** Estilo visual de una temática: las oficinas Starmaker se ven como Stellar. */
+export const styleFor = (theme: ThemeId): StyleId => (theme === "starmaker" ? "stellar" : theme);
 
 export type FurniKind =
   | "workdesk"
@@ -192,6 +195,12 @@ export interface Zone {
   staff?: boolean;
   /** Es toda una sala (mentores, organizadores): sus paredes ya la marcan, no se dibuja el rectángulo. */
   room?: boolean;
+  /** En una sala (`room`), igual se puede compartir pantalla: por ejemplo, la sala de reunión. */
+  share?: boolean;
+  /** La sala donde se reúne todo el mundo; desde ahí el equipo organizador reparte en salas al azar. */
+  gather?: boolean;
+  /** Una de las salas chicas a las que se reparte la gente al azar. */
+  breakout?: boolean;
 }
 
 /** Lugar al que solo entra cierta gente. */
@@ -569,7 +578,7 @@ export function receptionMap(): SceneMap {
 
 // ---------- Recinto del evento ----------
 
-const SOFA: Record<ThemeId, string> = { tech: "#2f6bff", minimal: "#9aa5b1", rustic: "#a0522d", medieval: "#7a2a3a", garden: "#5a8f3e", stellar: "#2a2a33", hackathon: "#ff7a1a" };
+const SOFA: Record<ThemeId, string> = { tech: "#2f6bff", minimal: "#9aa5b1", rustic: "#a0522d", medieval: "#7a2a3a", garden: "#5a8f3e", stellar: "#2a2a33", hackathon: "#ff7a1a", starmaker: "#2a2a33" };
 
 /** Objetos de ambiente de cada estilo (también se usan en las salas). */
 const ACCENTS: Record<ThemeId, FurniKind[]> = {
@@ -579,6 +588,7 @@ const ACCENTS: Record<ThemeId, FurniKind[]> = {
   medieval: ["armor", "candelabra", "pillar", "armor"],
   garden: ["tree", "lantern", "tree", "flowerbed"],
   stellar: ["constellation", "rocket", "bigplant", "constellation"],
+  starmaker: ["constellation", "rocket", "bigplant", "constellation"],
   hackathon: ["rack", "ledpillar", "bigplant", "robot"],
 };
 
@@ -589,7 +599,11 @@ export const MAX_ROOMS = ROOMS_PER_FLOOR * 2 + 1;
 /** Un hackathon tiene el auditorio y 8 salas de charla: cuatro por piso, separadas entre sí. */
 export const HACKATHON_ROOMS = 9;
 /** Máximo de salas (con el auditorio) según la temática. */
-export const maxRoomsFor = (theme: ThemeId) => (theme === "hackathon" ? HACKATHON_ROOMS : MAX_ROOMS);
+/** Las oficinas Starmaker tienen la sala de presentaciones y hasta 2 salas más. */
+export const STARMAKER_ROOMS = 3;
+export const maxRoomsFor = (theme: ThemeId) => (theme === "hackathon" ? HACKATHON_ROOMS : theme === "starmaker" ? STARMAKER_ROOMS : MAX_ROOMS);
+/** Mínimo de salas (con el auditorio) según la temática. */
+export const minRoomsFor = (theme: ThemeId) => (theme === "starmaker" ? 1 : MIN_ROOMS);
 
 /** Edificio de una sala: la puerta en el muro y el techo donde va su nombre. */
 interface Slot {
@@ -619,7 +633,8 @@ interface Level {
   exit?: Tile;
   spawn: Tile;
   /** Entrada del auditorio principal (solo en la planta baja) y su edificio. */
-  main?: Tile & { roof: Rect; trail?: Tile[] };
+  /** La puerta va en la pared de arriba, salvo que `side` diga que va en un muro lateral. */
+  main?: Tile & { roof: Rect; trail?: Tile[]; side?: "left" | "right" };
   /** Bloques de muro dentro de los pisos: edificios sueltos, como los pabellones de un parque. */
   holes?: Rect[];
   /** Salas en el orden en que se llenan: siempre de a dos, en distintas zonas. */
@@ -834,7 +849,7 @@ interface UpperTheme {
   decor: Decor[];
 }
 
-const UPPER: Record<ThemeId, UpperTheme> = {
+const UPPER: Record<Exclude<ThemeId, "starmaker">, UpperTheme> = {
   tech: {
     name: "Piso 1",
     terrace: "SKY LOUNGE",
@@ -969,7 +984,7 @@ const UPPER: Record<ThemeId, UpperTheme> = {
  * stands van contra la pared. La terraza, el rincón tranquilo y la barra quedan
  * detrás de portales.
  */
-function upperFloor(theme: ThemeId): Level {
+function upperFloor(theme: Exclude<ThemeId, "starmaker">): Level {
   const u = UPPER[theme];
   return {
     name: u.name,
@@ -1715,6 +1730,209 @@ function stellarGround(): Level {
   };
 }
 
+// ----- Starmaker: las oficinas de la comunidad, en un solo piso -----
+
+/*
+ * Oficinas de Starmaker Stellar LATAM. Arriba, la Sala Starmaker: la reunión
+ * de los martes, donde todo el mundo habla y comparte pantalla; a sus lados,
+ * seis salas chicas a las que el equipo organizador reparte a la gente al azar.
+ * A la izquierda, el cowork (mesas de 2 a 6) y, debajo, los salones de
+ * mentores y de BAF; a la derecha, la sala de estudio (cada mesa se escucha
+ * solo entre sí), el café, el descanso con juegos y el patio. Se entra por el
+ * lobby, con los stands de Stellar y de BAF.
+ */
+function starmakerOffice(): Level {
+  const hall = { x: 32, y: 3, w: 28, h: 11 };
+  const cowork = { x: 6, y: 28, w: 32, h: 20 };
+  const study = { x: 54, y: 28, w: 32, h: 12 };
+  const cafe = { x: 58, y: 43, w: 14, h: 10 };
+  const rest = { x: 74, y: 43, w: 12, h: 10 };
+  const patio = { x: 56, y: 55, w: 30, h: 8 };
+  const lobby = { x: 38, y: 52, w: 16, h: 11 };
+  const mentors = { x: 6, y: 51, w: 14, h: 11 };
+  const baf = { x: 22, y: 51, w: 14, h: 11 };
+  const breakouts = [8, 16, 24, 62, 70, 78].map((x, i) => ({ n: i + 1, ...doorRoom({ x, y: 10, w: 7, h: 6 }, 18, `SALA ${i + 1}`, "#fdda24") }));
+  // Mesas del cowork (de 2 a 6 lugares) y de la sala de estudio: cada una con su propia conversación.
+  let n = 0;
+  const cw = (seats: number, x: number, y: number) => teamTable(++n, seats, x, y, "#22d3ee");
+  const coworkTables = [
+    cw(6, 8, 30), cw(5, 14, 30), cw(4, 20, 30), cw(3, 25, 30), cw(2, 30, 30), cw(2, 34, 30),
+    cw(4, 9, 36), cw(6, 14, 36), cw(3, 20, 36), cw(5, 25, 36), cw(4, 31, 36),
+    cw(2, 8, 42), cw(3, 12, 42), cw(6, 17, 42), cw(2, 23, 42), cw(4, 27, 42), cw(5, 32, 42),
+  ];
+  let m = 0;
+  const st = (seats: number, x: number, y: number) => {
+    const t = teamTable(100 + ++m, seats, x, y, "#a78bfa");
+    return { ...t, zone: { ...t.zone, id: `estudio-${m}`, label: `Estudio ${m}` } };
+  };
+  const studyTables = [st(4, 56, 29), st(2, 61, 29), st(4, 71, 29), st(4, 76, 29), st(2, 81, 29), st(4, 56, 34), st(2, 61, 34), st(4, 66, 34), st(2, 71, 34), st(4, 75, 34), st(4, 80, 34)];
+  const [w1, w2] = pairV(5, 30, "left", "Cowork");
+  return {
+    name: "Oficinas",
+    w: 92,
+    h: 66,
+    floors: [
+      hall,
+      { x: 42, y: 14, w: 8, h: 5 },
+      { x: 6, y: 19, w: 80, h: 6 }, // pasillo de las salas
+      ...breakouts.flatMap((b) => [b.room, b.passage]),
+      { x: 42, y: 25, w: 8, h: 27 }, // pasillo central
+      lobby,
+      cowork,
+      { x: 12, y: 25, w: 4, h: 3 },
+      { x: 28, y: 25, w: 4, h: 3 },
+      { x: 38, y: 33, w: 4, h: 8 },
+      study,
+      { x: 66, y: 25, w: 4, h: 3 },
+      { x: 50, y: 31, w: 4, h: 4 },
+      cafe,
+      { x: 62, y: 40, w: 4, h: 3 },
+      { x: 50, y: 45, w: 8, h: 4 },
+      rest,
+      { x: 72, y: 46, w: 2, h: 4 },
+      patio,
+      { x: 54, y: 57, w: 2, h: 4 },
+      { x: 62, y: 53, w: 4, h: 2 },
+      { x: 78, y: 53, w: 3, h: 2 },
+      mentors,
+      { x: 11, y: 48, w: 4, h: 3 },
+      baf,
+      { x: 27, y: 48, w: 4, h: 3 },
+      { x: 36, y: 55, w: 2, h: 3 },
+    ],
+    areas: [
+      { ...hall, floor: "wood" },
+      { ...cowork, floor: "tiles" },
+      { ...study, floor: "tiles" },
+      { ...cafe, floor: "wood" },
+      { ...rest, floor: "deck" },
+      { ...patio, floor: "grass" },
+      { ...mentors, floor: "wood" },
+      { ...baf, floor: "wood" },
+    ],
+    exit: { x: 46, y: 63 },
+    spawn: { x: 46, y: 60 },
+    // La sala de presentaciones tiene la puerta en la pared este de la sala de estudio.
+    main: { x: 86, y: 31, side: "right", roof: { x: 87, y: 29, w: 5, h: 6 }, trail: path([46, 61], [46, 32], [85, 32]) },
+    slots: [
+      { ...w1!, trail: path([43, 61], [43, 38], [7, 38], [7, 31], [6, 31]) },
+      { ...w2!, trail: path([44, 61], [44, 39], [6, 39], [6, 36]) },
+    ],
+    zones: [
+      { id: "starmaker", label: "Sala Starmaker", ...hall, color: "#fdda24", seats: 100, room: true, share: true, gather: true },
+      ...breakouts.map((b): Zone => ({ id: `sala-${b.n}`, label: `Sala ${b.n}`, ...b.room, color: "#fdda24", seats: 20, room: true, share: true, breakout: true })),
+      { id: "mentores", label: "Salón de mentores", ...mentors, color: "#f59e0b", seats: 30, room: true },
+      { id: "baf", label: "Salón BAF", ...baf, color: "#22d3ee", seats: 30, room: true },
+      ...coworkTables.map((t) => t.zone),
+      ...studyTables.map((t) => t.zone),
+    ],
+    // Solo dos stands: Stellar y BAF, a los lados del lobby.
+    stands: [
+      { x: 38, y: 52 },
+      { x: 51, y: 52 },
+    ],
+    stairs: [],
+    decor: [
+      { kind: "neon", x: 33, y: 2, w: 10, text: "✦ STARMAKER STELLAR LATAM", color: "#fdda24" },
+      { kind: "sponsors", x: 44, y: 2, w: 5 },
+      { kind: "neon", x: 50, y: 2, w: 9, text: "MARTES · REUNIÓN", color: "#b7ace8" },
+      { kind: "portal", x: 42, y: 18, w: 8, text: "✦ SALA STARMAKER" },
+      ...breakouts.map((b) => b.door),
+      ...breakouts.map((b): Decor => ({ kind: "whiteboard", x: b.room.x + 2, y: 9, w: 3 })),
+      { kind: "portal", x: 12, y: 27, w: 4, text: "COWORK" },
+      { kind: "portal", x: 28, y: 27, w: 4, text: "COWORK" },
+      { kind: "window", x: 18, y: 27, w: 3 },
+      { kind: "whiteboard", x: 22, y: 27, w: 3 },
+      { kind: "portal", x: 66, y: 27, w: 4, text: "SALA DE ESTUDIO · SILENCIO" },
+      { kind: "window", x: 58, y: 27, w: 3 },
+      { kind: "window", x: 76, y: 27, w: 3 },
+      { kind: "portal", x: 62, y: 42, w: 4, text: "CAFÉ" },
+      { kind: "portal", x: 11, y: 50, w: 4, text: "🧭 SALÓN DE MENTORES" },
+      { kind: "portal", x: 27, y: 50, w: 4, text: "SALÓN BAF" },
+      { kind: "neon", x: 76, y: 42, w: 4, text: "DESCANSO", color: "#fdda24" },
+    ],
+    furni: [
+      // Sala Starmaker: la pantalla grande, puffs y sillones en semicírculo, y los rincones.
+      { kind: "eventscreen", x: 43, y: 5, w: 6, floating: true },
+      ...[35, 38, 41, 51, 54, 57].map((x, i): Furni => ({ kind: "beanbag", x, y: 9 + (i % 3 === 1 ? 1 : 0), color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      ...[39, 44, 49].map((x, i): Furni => ({ kind: "sofa", x, y: 11, w: 3, color: i === 1 ? "#fdda24" : "#2a2a33", dir: "down" })),
+      { kind: "constellation", x: 32, y: 3 },
+      { kind: "constellation", x: 59, y: 3 },
+      { kind: "rocket", x: 33, y: 12 },
+      { kind: "bigplant", x: 58, y: 12 },
+      // Salas chicas: una mesa con sillas en cada una.
+      ...breakouts.flatMap((b): Furni[] => [
+        { kind: "table", x: b.room.x + 2, y: b.room.y + 2, w: 3 },
+        ...[0, 1, 2].flatMap((dx): Furni[] => [
+          { kind: "officechair", x: b.room.x + 2 + dx, y: b.room.y + 1 },
+          { kind: "officechair", x: b.room.x + 2 + dx, y: b.room.y + 3 },
+        ]),
+        { kind: "plant", x: b.room.x, y: b.room.y + 5 },
+      ]),
+      // Pasillos.
+      ...[30, 37, 44].flatMap((y): Furni[] => [
+        { kind: "constellation", x: 42, y },
+        { kind: "constellation", x: 49, y },
+      ]),
+      { kind: "adboard", x: 43, y: 26, w: 6, label: "/assets/logos/stellar.svg" },
+      ...[20, 36, 56, 74].map((x): Furni => ({ kind: "totem", x, y: 24 })),
+      { kind: "signpost", x: 50, y: 22, label: "↑ Sala Starmaker · Salas 1 a 6|← Cowork · Mentores · BAF|Estudio · Café · Patio →" },
+      // Cowork.
+      ...coworkTables.flatMap((t) => t.furni),
+      { kind: "printer3d", x: 6, y: 47 },
+      { kind: "charger", x: 37, y: 28 },
+      { kind: "bigplant", x: 37, y: 47 },
+      { kind: "coffeebar", x: 17, y: 28, w: 3 },
+      // Sala de estudio.
+      ...studyTables.flatMap((t) => t.furni),
+      ...[54, 85].map((x): Furni => ({ kind: "bookshelf", x, y: 28 })),
+      { kind: "lamp", x: 85, y: 39 },
+      // Salones de mentores y de BAF.
+      ...meetingRoom(mentors, "#b45309", [{ kind: "bookshelf", x: 6, y: 55 }]),
+      ...meetingRoom(baf, "#0e7490", [{ kind: "adboard", x: 30, y: 59, w: 4, label: "/assets/logos/thebafnetwork.svg" }]),
+      // Café.
+      { kind: "coffeebar", x: 58, y: 43, w: 4 },
+      { kind: "vending", x: 69, y: 43 },
+      { kind: "cooler", x: 70, y: 43 },
+      ...[59, 64, 68].map((x, i): Furni => ({ kind: "cafetable", x, y: 47 + (i % 2) * 2, w: 2 })),
+      { kind: "bigplant", x: 71, y: 52 },
+      // Descanso: sillones, puffs y juegos.
+      ...lounge(75, 44, "#fdda24"),
+      { kind: "pingpong", x: 75, y: 48, w: 3 },
+      { kind: "foosball", x: 80, y: 48, w: 2 },
+      ...[83, 84, 85].map((x): Furni => ({ kind: "arcade", x, y: 43 })),
+      ...[75, 78, 82].map((x, i): Furni => ({ kind: "beanbag", x, y: 52, color: ["#fdda24", "#b7ace8", "#22d3ee"][i] })),
+      // Patio.
+      ...[56, 63, 70, 85].map((x): Furni => ({ kind: "tree", x, y: 62 })),
+      { kind: "fountain", x: 72, y: 57, w: 2, d: 2 },
+      { kind: "parasol", x: 59, y: 58, w: 2, color: "#fdda24" },
+      { kind: "parasol", x: 80, y: 58, w: 2, color: "#22d3ee" },
+      { kind: "bench", x: 66, y: 61, w: 3 },
+      { kind: "bench", x: 76, y: 61, w: 3 },
+      { kind: "flowerbed", x: 84, y: 56, w: 2 },
+      // Lobby.
+      { kind: "eventscreen", x: 43, y: 56, w: 6, floating: true },
+      { kind: "signpost", x: 50, y: 59, label: "↑ Sala Starmaker · Cowork · Estudio|← Salón BAF · Mentores|Patio · Café →" },
+      { kind: "bigplant", x: 38, y: 62 },
+      { kind: "bigplant", x: 53, y: 62 },
+    ],
+    crowd: [
+      ...chat(36, 6),
+      ...chat(55, 6),
+      ...chat(46, 21),
+      ...chat(60, 50),
+      ...chat(77, 50),
+      ...chat(64, 59),
+      ...chat(44, 53),
+      ...chat(30, 22),
+    ],
+    directories: [
+      { x: 41, y: 60 },
+      { x: 49, y: 47 },
+    ],
+  };
+}
+
 // ----- Hackathon: un pasillo principal con stands, cuatro salas de equipos por piso y salas de charla separadas -----
 
 const TEAM_COLORS = ["#22d3ee", "#a78bfa", "#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#fb7185", "#4ade80"];
@@ -1726,16 +1944,16 @@ export const TEAM_HALL_SEATS = 64;
 export const teamHallsFor = (capacity: number) => Math.min(8, Math.ceil(capacity / TEAM_HALL_SEATS));
 
 /** Mesa de equipo: una mesa con sus sillas a los dos lados, adentro de su rectángulo (5 de alto). */
-function teamTable(n: number, seats: 6 | 4 | 2, x: number, y: number, color: string): { zone: Zone; furni: Furni[] } {
-  const cols = seats / 2;
+function teamTable(n: number, seats: number, x: number, y: number, color: string): { zone: Zone; furni: Furni[] } {
+  // Con un número impar de lugares, del lado de abajo queda una silla menos.
+  const cols = Math.ceil(seats / 2);
+  const below = Math.floor(seats / 2);
   return {
     zone: { id: `mesa-${n}`, label: `Mesa ${n}`, x, y, w: cols + 2, h: 5, color, seats },
     furni: [
       { kind: "table", x: x + 1, y: y + 2, w: cols },
-      ...Array.from({ length: cols }, (_, i) => [
-        { kind: "officechair" as const, x: x + 1 + i, y: y + 1 },
-        { kind: "officechair" as const, x: x + 1 + i, y: y + 3 },
-      ]).flat(),
+      ...Array.from({ length: cols }, (_, i) => ({ kind: "officechair" as const, x: x + 1 + i, y: y + 1 })),
+      ...Array.from({ length: below }, (_, i) => ({ kind: "officechair" as const, x: x + 1 + i, y: y + 3 })),
     ],
   };
 }
@@ -2280,6 +2498,8 @@ const LEVELS: Record<ThemeId, (capacity: number) => Level[]> = {
   minimal: () => [galleryGround(), upperFloor("minimal")],
   rustic: () => [villageGround(), upperFloor("rustic")],
   stellar: () => [stellarGround(), upperFloor("stellar")],
+  // Un solo piso.
+  starmaker: () => [starmakerOffice()],
   hackathon: (capacity) => [hackathonGround(capacity), hackathonUpper(capacity)],
 };
 
@@ -2304,7 +2524,7 @@ function buildLevel(
   const trails: Trail[] = [];
   if (main && L.main?.trail) trails.push({ points: L.main.trail, color: main.color, w: 2 });
   if (main && L.main) {
-    doors.push({ side: "top", x: L.main.x, y: L.main.y, w: 4, id: main.id, label: main.name, color: main.color, theme: main.theme ?? theme, zone: "Auditorio principal", main: true });
+    doors.push({ side: L.main.side ?? "top", x: L.main.x, y: L.main.y, w: L.main.side ? 2 : 4, id: main.id, label: main.name, color: main.color, theme: main.theme ?? theme, zone: "Auditorio principal", main: true });
     roofs.push({ ...L.main.roof, label: main.name, color: main.color, open: true });
   }
   const decor = [...L.decor];
@@ -2351,7 +2571,7 @@ function buildLevel(
     w: L.w,
     h: L.h,
     tiles: carve(L.w, L.h, L.floors, undefined, L.holes),
-    style: theme,
+    style: styleFor(theme),
     floorName: L.name,
     spawn: L.spawn,
     furni: [...L.furni, ...booths, ...L.directories.map((d): Furni => ({ kind: "directory", x: d.x, y: d.y }))],
@@ -2529,7 +2749,7 @@ function themedCorners(theme: ThemeId, w: number, h: number, color: string): { f
   return { furni, decor };
 }
 
-const STAGE_RUG: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4", stellar: "#2a2a33", hackathon: "#2b3a3a" };
+const STAGE_RUG: Record<ThemeId, string> = { tech: "#cfe3f7", minimal: "#e9e3d8", rustic: "#b5523b", medieval: "#7a2a3a", garden: "#e9dfc4", stellar: "#2a2a33", hackathon: "#2b3a3a", starmaker: "#2a2a33" };
 
 interface InteriorSpec {
   w: number;
@@ -2561,7 +2781,7 @@ function interior(theme: ThemeId, color: string, spec: InteriorSpec): SceneMap {
     w,
     h,
     tiles: enclosure(w, h),
-    style: theme,
+    style: styleFor(theme),
     spawn: { x: aisle, y: h - 1 },
     furni,
     decor: [

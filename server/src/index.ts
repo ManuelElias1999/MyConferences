@@ -17,12 +17,13 @@ import {
   interiorFor,
   isWalkable,
   MAX_ROOMS,
-  MIN_ROOMS,
+  minRoomsFor,
   receptionMap,
   stairsArrival,
   venueFloors,
   type SceneMap,
   type Tile,
+  type Zone,
 } from "../../shared/maps.ts";
 import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
@@ -294,8 +295,16 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
   if (!name) return { error: "Ponle un nombre al evento" };
   if (!isTheme(body.theme)) return { error: "Elige un estilo para el evento" };
   const rawRooms = Array.isArray(body.rooms) ? body.rooms.slice(0, MAX_ROOMS) : [];
-  if (rawRooms.length < MIN_ROOMS) return { error: `El evento necesita el auditorio principal y al menos ${MIN_ROOMS - 1} salas` };
-  if (rawRooms.length > maxRoomsFor(body.theme)) return { error: "Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso)" };
+  const minRooms = minRoomsFor(body.theme);
+  if (rawRooms.length < minRooms)
+    return { error: minRooms > 1 ? `El evento necesita el auditorio principal y al menos ${minRooms - 1} salas` : "El evento necesita al menos la sala principal" };
+  if (rawRooms.length > maxRoomsFor(body.theme))
+    return {
+      error:
+        body.theme === "starmaker"
+          ? `Las oficinas Starmaker tienen la sala de presentaciones y hasta ${maxRoomsFor(body.theme) - 1} salas más`
+          : "Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso)",
+    };
   const emails = (list: unknown, max: number) =>
     [
       ...new Set(
@@ -657,7 +666,7 @@ function syncZone(u: User) {
   }
   if (callOfUser.has(u.id)) leaveCall(u.id);
   if (!call) {
-    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats, meeting: Boolean(zone.room) }, media: new Map() };
+    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats, meeting: Boolean(zone.room) && !zone.share }, media: new Map() };
     calls.set(key, call);
   }
   call.members.add(u.id);
@@ -665,6 +674,35 @@ function syncZone(u: User) {
   setInCall(u.id, true);
   emitCall(call);
 }
+
+/** Baldosas libres dentro de una zona, en orden al azar (para repartir gente sin apilarla). */
+function freeTilesIn(map: SceneMap, zone: Zone): Tile[] {
+  const tiles: Tile[] = [];
+  for (let y = zone.y; y < zone.y + zone.h; y++)
+    for (let x = zone.x; x < zone.x + zone.w; x++) if (isWalkable(map, x, y) && !map.soft[y * map.w + x]) tiles.push({ x, y });
+  return shuffle(tiles);
+}
+
+function shuffle<T>(list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j]!, list[i]!];
+  }
+  return list;
+}
+
+/** Lleva a alguien a otra baldosa del mismo plano: le avisa, lo muestra a los demás y lo suma a la conversación del lugar. */
+function teleport(u: User, tile: Tile) {
+  u.x = tile.x;
+  u.y = tile.y;
+  io.to(u.id).emit("teleport", tile);
+  io.to(sceneChannel(u)).emit("moved", { id: u.id, x: u.x, y: u.y });
+  syncZone(u);
+}
+
+/** Quienes están en el salón (no dentro de una sala de charla), en el mismo piso, parados dentro de la zona. */
+const peopleInZone = (venueId: string, floor: number, zone: Zone) =>
+  usersIn(venueId).filter((u) => !u.roomId && u.floor === floor && inZone({ x: Math.round(u.x), y: Math.round(u.y) }, zone));
 
 io.on("connection", (socket) => {
   let conn: Connection | null = null;
@@ -1074,6 +1112,45 @@ io.on("connection", (socket) => {
     if (!callId || callOfUser.get(String(to)) !== callId || !signal || typeof signal !== "object") return;
     if (!["offer", "answer", "ice"].includes(signal.kind)) return;
     io.to(String(to)).emit("callSignal", me.id, signal);
+  });
+
+  // Reunión: el equipo organizador reparte al azar a quienes están en la sala de reunión entre las salas chicas.
+  socket.on("breakout", (count, ack) => {
+    const u = conn?.user;
+    if (!u?.venueId || u.roomId) return ack({ ok: false, error: "Primero entra al evento" });
+    if (u.role !== "staff") return ack({ ok: false, error: "Solo el equipo organizador puede repartir en salas" });
+    const map = venues.get(u.venueId)!.floors[u.floor]!;
+    const gather = map.zones.find((z) => z.gather);
+    const rooms = map.zones.filter((z) => z.breakout);
+    if (!gather || !rooms.length) return ack({ ok: false, error: "Este lugar no tiene salas para repartir" });
+    // Quien reparte se queda en la sala de reunión: después puede pasar por cada sala.
+    const people = shuffle(peopleInZone(u.venueId, u.floor, gather).filter((p) => p.id !== u.id));
+    if (!people.length) return ack({ ok: false, error: `No hay nadie en ${gather.label}` });
+    const used = shuffle([...rooms]).slice(0, Math.max(1, Math.min(rooms.length, Math.round(Number(count)) || 1, people.length)));
+    const spots = used.map((z) => freeTilesIn(map, z));
+    people.forEach((p, i) => {
+      const k = i % used.length;
+      const tile = spots[k]!.pop() ?? { x: used[k]!.x + 1, y: used[k]!.y + 1 };
+      teleport(p, tile);
+      io.to(p.id).emit("callNotice", `🎲 Te tocó la ${used[k]!.label}`);
+    });
+    ack({ ok: true, data: { moved: people.length, rooms: used.length } });
+  });
+
+  socket.on("gather", (ack) => {
+    const u = conn?.user;
+    if (!u?.venueId || u.roomId) return ack({ ok: false, error: "Primero entra al evento" });
+    if (u.role !== "staff") return ack({ ok: false, error: "Solo el equipo organizador puede reunir a todos" });
+    const map = venues.get(u.venueId)!.floors[u.floor]!;
+    const gather = map.zones.find((z) => z.gather);
+    if (!gather) return ack({ ok: false, error: "Este lugar no tiene sala de reunión" });
+    const people = map.zones.filter((z) => z.breakout).flatMap((z) => peopleInZone(u.venueId!, u.floor, z));
+    const spots = freeTilesIn(map, gather);
+    for (const p of people) {
+      teleport(p, spots.pop() ?? { x: gather.x + 1, y: gather.y + 1 });
+      io.to(p.id).emit("callNotice", `📣 De vuelta en ${gather.label}`);
+    }
+    ack({ ok: true, data: { moved: people.length } });
   });
 
   socket.on("disconnect", () => {

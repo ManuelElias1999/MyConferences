@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MIN_ROOMS, ROOMS_PER_FLOOR, maxRoomsFor, venueFloors } from "../../shared/maps.ts";
+import { ROOMS_PER_FLOOR, maxRoomsFor, minRoomsFor, venueFloors } from "../../shared/maps.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import { HACKATHON_CAPACITIES, type Account, type CompanyEvent, type EventInput, type TalkInput } from "../../shared/types.ts";
 import { companyApi, loadToken } from "./lib.ts";
@@ -206,7 +206,11 @@ function EventEditor({
         <fieldset className="themes">
           <legend>Estilo del lugar</legend>
           {THEMES.map((t) => (
-            <button key={t.id} type="button" className={`theme-card ${theme === t.id ? "selected" : ""}`} aria-pressed={theme === t.id} onClick={() => setTheme(t.id)}>
+            <button key={t.id} type="button" className={`theme-card ${theme === t.id ? "selected" : ""}`} aria-pressed={theme === t.id} onClick={() => {
+                setTheme(t.id);
+                // Si la temática admite menos salas (por ejemplo, las oficinas Starmaker), se quitan las que sobran del final.
+                setRooms((rs) => rs.slice(0, maxRoomsFor(t.id)));
+              }}>
               <ThemePreview theme={t.id} />
               <strong>{t.label}</strong>
               <span>{t.description}</span>
@@ -270,7 +274,9 @@ function EventEditor({
           <p className="muted small">
             {theme === "hackathon"
               ? `Un hackathon tiene el auditorio principal y ${maxRoomsFor(theme) - 1} salas de charla: 4 en la planta baja y 4 arriba, cada una lejos de las demás.`
-              : `Mínimo ${MIN_ROOMS - 1} salas más el auditorio principal, y hasta ${maxRoomsFor(theme) - 1}. Las primeras ${ROOMS_PER_FLOOR} van en la planta baja; las siguientes, en el piso de arriba.`} Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
+              : theme === "starmaker"
+                ? `Las oficinas Starmaker son de un solo piso: la sala de presentaciones (la primera) y hasta ${maxRoomsFor(theme) - 1} salas más. La reunión se hace en la Sala Starmaker, donde todos hablan y comparten pantalla y el equipo organizador puede repartir en salas al azar; no hace falta cargarla acá.`
+                : `Mínimo ${minRoomsFor(theme) - 1} salas más el auditorio principal, y hasta ${maxRoomsFor(theme) - 1}. Las primeras ${ROOMS_PER_FLOOR} van en la planta baja; las siguientes, en el piso de arriba.`} Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
           </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
@@ -302,7 +308,7 @@ function EventEditor({
                 <button type="button" className="btn ghost sm" onClick={() => setOpenAgenda(openAgenda === i ? null : i)} aria-expanded={openAgenda === i}>
                   Agenda ({r.talks.length})
                 </button>
-                {i > 0 && rooms.length > MIN_ROOMS && (
+                {i > 0 && rooms.length > minRoomsFor(theme) && (
                   <button type="button" className="btn ghost sm" onClick={() => setRooms((rs) => rs.filter((_, j) => j !== i))} aria-label="Quitar sala">
                     ✕
                   </button>
@@ -311,8 +317,8 @@ function EventEditor({
               {openAgenda === i && <TalksEditor talks={r.talks} onChange={(talks) => setRoom(i, { talks })} />}
             </div>
           ))}
-          {theme === "hackathon" && rooms.length > maxRoomsFor(theme) && (
-            <p className="error small">Para un hackathon quita salas hasta dejar el auditorio y {maxRoomsFor(theme) - 1} salas.</p>
+          {rooms.length > maxRoomsFor(theme) && (
+            <p className="error small">Con esta temática quita salas hasta dejar la principal y {maxRoomsFor(theme) - 1} más.</p>
           )}
           {rooms.length < maxRoomsFor(theme) && (
             <button type="button" className="link" onClick={() => setRooms((rs) => [...rs, { ...blankRoom(rs.length), name: `Sala ${rs.length}` }])}>
