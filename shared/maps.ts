@@ -96,6 +96,10 @@ export type FurniKind =
   | "countdown"
   /** Pantalla grande detrás de una tarima: muestra lo que comparte quien presenta. */
   | "stagescreen"
+  /** Frente de una tarima: el borde alto que no se puede cruzar. */
+  | "stagefront"
+  /** Escalones para subir a una tarima. */
+  | "steps"
   | "rug"
   | "carpet";
 
@@ -115,6 +119,8 @@ export interface Furni {
   label?: string;
   /** Pantalla holográfica que flota en el aire, sin patas. */
   floating?: boolean;
+  /** No se puede atravesar (por ejemplo, el borde de una tarima). */
+  solid?: boolean;
 }
 
 /** Adornos pegados a una cara de muro; `y` es la fila de abajo de esa cara. */
@@ -421,7 +427,7 @@ function finish(map: Omit<SceneMap, "blocked" | "soft">, solid = false): SceneMa
     }
     for (let dx = 0; dx < (f.w ?? 1); dx++) for (let dy = 0; dy < (f.d ?? 1); dy++) {
       const k = (f.y + dy) * map.w + f.x + dx;
-      if (solid) blocked[k] = true;
+      if (solid || f.solid) blocked[k] = true;
       else soft[k] = true;
     }
   }
@@ -1754,17 +1760,19 @@ function stellarGround(): Level {
 function starmakerOffice(): Level {
   // La sala empieza un poco más abajo: la pared de arriba deja lugar a la pantalla grande.
   const hall = { x: 40, y: 4, w: 24, h: 13 };
-  // La tarima, al frente de la sala: solo quien está parado en ella puede compartir pantalla.
-  const stage = { x: 44, y: 4, w: 16, h: 3 };
-  // Filas de asientos mirando a la tarima, con un pasillo al medio.
-  const hallSeats: Seat[] = [9, 11, 13, 15].flatMap((y) => [...range(42, 49), ...range(54, 61)].map((x): Seat => ({ x, y, dir: "up" })));
+  // La tarima ocupa todo el frente y está más alta: su borde no se cruza, se sube por los escalones de los costados.
+  const stage = { x: 40, y: 4, w: 24, h: 3 };
+  // 100 asientos: 5 filas de 20 mirando a la tarima, con un pasillo al medio y a los costados.
+  const hallSeats: Seat[] = range(9, 13).flatMap((y) => [...range(41, 50), ...range(53, 62)].map((x): Seat => ({ x, y, dir: "up" })));
   const cowork = { x: 6, y: 30, w: 34, h: 22 };
-  const study = { x: 60, y: 30, w: 36, h: 12 };
-  const cafe = { x: 60, y: 45, w: 14, h: 10 };
-  const rest = { x: 76, y: 45, w: 20, h: 10 };
-  const patio = { x: 62, y: 58, w: 34, h: 8 };
+  const study = { x: 60, y: 30, w: 36, h: 16 };
+  const cafe = { x: 60, y: 49, w: 14, h: 10 };
+  const rest = { x: 76, y: 49, w: 20, h: 10 };
+  const patio = { x: 62, y: 62, w: 34, h: 8 };
   const lobby = { x: 44, y: 54, w: 16, h: 11 };
   const karaoke = { x: 6, y: 55, w: 16, h: 12 };
+  // El escenario del karaoke: quien canta en el micrófono se escucha fuerte y puede poner la letra en la pantalla.
+  const mic = { x: 10, y: 56, w: 8, h: 2 };
   const games = { x: 24, y: 55, w: 16, h: 12 };
   // Mentores y BAF, con la puerta directo sobre el pasillo principal.
   const mentors = doorRoom({ x: 66, y: 4, w: 14, h: 15 }, 20, "🧭 MENTORES", "#f59e0b");
@@ -1791,14 +1799,15 @@ function starmakerOffice(): Level {
     const t = teamTable(100 + ++m, seats!, x!, y!, "#a78bfa");
     return { ...t, zone: { ...t.zone, id: `estudio-${m}`, label: `Estudio ${m}` } };
   };
+  // Sala de estudio: dos filas de mesas bien separadas.
   const studyTables = [
-    [4, 62, 31], [2, 67, 31], [4, 77, 31], [4, 82, 31], [2, 87, 31], [4, 91, 31],
-    [4, 62, 36], [2, 69, 36], [4, 72, 36], [2, 78, 36], [4, 81, 36], [4, 86, 36], [2, 92, 36],
+    [4, 62, 31], [2, 69, 31], [4, 75, 31], [2, 82, 31], [4, 88, 31],
+    [2, 62, 39], [4, 68, 39], [2, 76, 39], [4, 82, 39], [4, 89, 39],
   ].map(st);
   return {
     name: "Oficinas",
     w: 100,
-    h: 70,
+    h: 72,
     floors: [
       hall,
       { x: 48, y: 17, w: 8, h: 4 },
@@ -1817,23 +1826,23 @@ function starmakerOffice(): Level {
       { x: 12, y: 27, w: 4, h: 3 },
       { x: 30, y: 27, w: 4, h: 3 },
       { x: 40, y: 35, w: 8, h: 8 },
-      karaoke,
-      { x: 12, y: 52, w: 4, h: 3 },
       games,
       { x: 30, y: 52, w: 4, h: 3 },
       { x: 40, y: 59, w: 4, h: 3 },
+      karaoke,
+      { x: 22, y: 60, w: 2, h: 3 }, // del karaoke a la sala de juegos
       study,
       { x: 72, y: 27, w: 4, h: 3 },
       { x: 56, y: 33, w: 4, h: 4 },
       cafe,
-      { x: 64, y: 42, w: 4, h: 3 },
-      { x: 56, y: 47, w: 4, h: 4 },
+      { x: 64, y: 46, w: 4, h: 3 },
+      { x: 56, y: 51, w: 4, h: 4 },
       rest,
-      { x: 74, y: 48, w: 2, h: 4 },
+      { x: 74, y: 52, w: 2, h: 4 },
       patio,
-      { x: 60, y: 59, w: 2, h: 4 },
-      { x: 66, y: 55, w: 4, h: 3 },
-      { x: 84, y: 55, w: 3, h: 3 },
+      { x: 60, y: 62, w: 2, h: 3 },
+      { x: 66, y: 59, w: 4, h: 3 },
+      { x: 84, y: 59, w: 3, h: 3 },
     ],
     areas: [
       { ...hall, floor: "wood" },
@@ -1841,6 +1850,7 @@ function starmakerOffice(): Level {
       { ...cowork, floor: "tiles" },
       { ...study, floor: "tiles" },
       { ...karaoke, floor: "deck" },
+      { ...mic, floor: "stage" },
       { ...games, floor: "tiles" },
       { ...cafe, floor: "wood" },
       { ...rest, floor: "deck" },
@@ -1854,12 +1864,12 @@ function starmakerOffice(): Level {
     seats: hallSeats,
     zones: [
       // La sala principal del evento (toma su nombre).
-      { id: "reunion", label: "Sala de reunión", ...hall, color: "#fdda24", seats: 100, room: true, share: true, gather: true, stage },
+      { id: "reunion", label: "Sala de reunión", ...hall, color: "#fdda24", seats: 140, room: true, share: true, gather: true, stage },
       ...breakouts.map((b): Zone => ({ id: `sala-${b.n}`, label: `Sala ${b.n}`, ...withDoor(b.room, b.passage), color: "#fdda24", seats: 12, room: true, share: true, breakout: true })),
       { id: "mentores", label: "Salón de mentores", ...withDoor(mentors.room, mentors.passage), color: "#f59e0b", seats: 30, room: true },
       { id: "baf", label: "Salón BAF", ...withDoor(baf.room, baf.passage), color: "#22d3ee", seats: 30, room: true },
-      { id: "karaoke", label: "Karaoke", ...karaoke, y: 52, h: karaoke.h + 3, color: "#ec4899", seats: 40, room: true, share: true },
-      { id: "juegos", label: "Sala de juegos", ...games, y: 52, h: games.h + 3, color: "#a78bfa", seats: 30, room: true, share: true },
+      // Karaoke: se escuchan todos, pero quien está en el micrófono suena más fuerte. La sala de juegos es como el café: sin conversación de toda la sala.
+      { id: "karaoke", label: "Karaoke", ...karaoke, color: "#ec4899", seats: 40, room: true, share: true, stage: mic },
       ...coworkTables.map((t) => t.zone),
       ...studyTables.map((t) => t.zone),
     ],
@@ -1879,25 +1889,24 @@ function starmakerOffice(): Level {
       { kind: "portal", x: 72, y: 29, w: 4, text: "SALA DE ESTUDIO · SILENCIO" },
       { kind: "window", x: 64, y: 29, w: 3 },
       { kind: "window", x: 84, y: 29, w: 3 },
-      { kind: "portal", x: 12, y: 54, w: 4, text: "🎤 KARAOKE" },
-      { kind: "neon", x: 17, y: 54, w: 5, text: "KARAOKE", color: "#ec4899" },
       { kind: "portal", x: 30, y: 54, w: 4, text: "🎮 SALA DE JUEGOS" },
       { kind: "window", x: 45, y: 53, w: 2 },
-      { kind: "window", x: 57, y: 53, w: 2 },
-      { kind: "portal", x: 64, y: 44, w: 4, text: "CAFÉ" },
-      { kind: "neon", x: 80, y: 44, w: 5, text: "DESCANSO", color: "#fdda24" },
+      { kind: "portal", x: 64, y: 48, w: 4, text: "CAFÉ" },
+      { kind: "neon", x: 80, y: 48, w: 5, text: "DESCANSO", color: "#fdda24" },
     ],
     furni: [
-      // Sala principal: la tarima con la pantalla grande detrás, un atril y las filas de asientos.
-      { kind: "stagescreen", x: 45, y: 4, w: 14 },
-      { kind: "lectern", x: 58, y: 5, color: "#fdda24" },
-      { kind: "ledpillar", x: 44, y: 6 },
-      { kind: "ledpillar", x: 59, y: 6 },
+      // Sala principal: la pantalla grande, la tarima con su borde, los escalones a los costados y el atril.
+      { kind: "stagescreen", x: 44, y: 4, w: 16 },
+      { kind: "stagefront", x: 42, y: 7, w: 20, solid: true },
+      { kind: "steps", x: 40, y: 7, w: 2 },
+      { kind: "steps", x: 62, y: 7, w: 2 },
+      { kind: "lectern", x: 60, y: 5, color: "#fdda24" },
+      { kind: "ledpillar", x: 41, y: 4 },
+      { kind: "ledpillar", x: 62, y: 4 },
       ...hallSeats.map((t): Furni => ({ kind: "chair", x: t.x, y: t.y, dir: "up", color: t.x % 3 ? "#2a2a33" : "#fdda24" })),
-      { kind: "constellation", x: 40, y: 4 },
-      { kind: "constellation", x: 63, y: 4 },
       { kind: "rocket", x: 41, y: 15 },
       { kind: "bigplant", x: 62, y: 15 },
+      { kind: "signpost", x: 46, y: 15, label: "← ↑ Escalones a la tarima ↑ →" },
       // Salas chiquitas: una mesa con sillas en cada una.
       ...breakouts.flatMap((b): Furni[] => [
         { kind: "table", x: b.room.x + 2, y: b.room.y + 2, w: 2 },
@@ -1925,9 +1934,9 @@ function starmakerOffice(): Level {
       { kind: "bigplant", x: 39, y: 51 },
       { kind: "bigplant", x: 27, y: 35 },
       { kind: "coffeebar", x: 17, y: 30, w: 3 },
-      // Karaoke: escenario con micrófono, la pantalla con la letra, luces y lugares para mirar.
-      { kind: "eventscreen", x: 10, y: 56, w: 6, floating: true },
-      { kind: "lectern", x: 13, y: 60, color: "#ec4899" },
+      // Karaoke: el escenario con su pantalla para la letra, el micrófono, luces y lugares para mirar.
+      { kind: "stagescreen", x: 10, y: 56, w: 8, d: 2.4 },
+      { kind: "lectern", x: 13, y: 57, color: "#ec4899" },
       ...[7, 20].flatMap((x): Furni[] => [
         { kind: "ledpillar", x, y: 56 },
         { kind: "rack", x, y: 59 },
@@ -1941,29 +1950,31 @@ function starmakerOffice(): Level {
       { kind: "chess", x: 26, y: 63, w: 2 },
       { kind: "vrpod", x: 33, y: 63, w: 2 },
       ...[37, 38].map((x, i): Furni => ({ kind: "beanbag", x, y: 65, color: i ? "#fdda24" : "#a78bfa" })),
+      { kind: "signpost", x: 25, y: 61, label: "← 🎤 KARAOKE" },
       // Sala de estudio.
       ...studyTables.flatMap((t) => t.furni),
       ...[60, 95].map((x): Furni => ({ kind: "bookshelf", x, y: 30 })),
-      { kind: "lamp", x: 95, y: 41 },
+      { kind: "lamp", x: 95, y: 45 },
+      { kind: "bigplant", x: 60, y: 45 },
       // Café.
-      { kind: "coffeebar", x: 60, y: 45, w: 4 },
-      { kind: "vending", x: 71, y: 45 },
-      { kind: "cooler", x: 72, y: 45 },
-      ...[61, 66, 70].map((x, i): Furni => ({ kind: "cafetable", x, y: 49 + (i % 2) * 2, w: 2 })),
-      { kind: "bigplant", x: 73, y: 54 },
+      { kind: "coffeebar", x: 60, y: 49, w: 4 },
+      { kind: "vending", x: 71, y: 49 },
+      { kind: "cooler", x: 72, y: 49 },
+      ...[61, 66, 70].map((x, i): Furni => ({ kind: "cafetable", x, y: 53 + (i % 2) * 2, w: 2 })),
+      { kind: "bigplant", x: 73, y: 58 },
       // Descanso.
-      ...lounge(78, 46, "#fdda24"),
-      ...lounge(87, 46, "#b7ace8"),
-      ...[78, 81, 88, 91].map((x, i): Furni => ({ kind: "beanbag", x, y: 51, color: ["#fdda24", "#b7ace8", "#22d3ee", "#ec4899"][i] })),
-      { kind: "bigplant", x: 95, y: 54 },
+      ...lounge(78, 50, "#fdda24"),
+      ...lounge(87, 50, "#b7ace8"),
+      ...[78, 81, 88, 91].map((x, i): Furni => ({ kind: "beanbag", x, y: 55, color: ["#fdda24", "#b7ace8", "#22d3ee", "#ec4899"][i] })),
+      { kind: "bigplant", x: 95, y: 58 },
       // Patio.
-      ...[62, 70, 78, 95].map((x): Furni => ({ kind: "tree", x, y: 65 })),
-      { kind: "fountain", x: 76, y: 59, w: 2, d: 2 },
-      { kind: "parasol", x: 65, y: 60, w: 2, color: "#fdda24" },
-      { kind: "parasol", x: 88, y: 60, w: 2, color: "#22d3ee" },
-      { kind: "bench", x: 72, y: 64, w: 3 },
-      { kind: "bench", x: 83, y: 64, w: 3 },
-      { kind: "flowerbed", x: 93, y: 58, w: 2 },
+      ...[62, 70, 78, 95].map((x): Furni => ({ kind: "tree", x, y: 69 })),
+      { kind: "fountain", x: 76, y: 63, w: 2, d: 2 },
+      { kind: "parasol", x: 65, y: 64, w: 2, color: "#fdda24" },
+      { kind: "parasol", x: 88, y: 64, w: 2, color: "#22d3ee" },
+      { kind: "bench", x: 72, y: 68, w: 3 },
+      { kind: "bench", x: 83, y: 68, w: 3 },
+      { kind: "flowerbed", x: 93, y: 62, w: 2 },
       // Lobby.
       { kind: "eventscreen", x: 49, y: 58, w: 6, floating: true },
       { kind: "signpost", x: 56, y: 61, label: "↑ $MAIN · Cowork · Estudio|← Karaoke · Juegos|Café · Patio →" },
@@ -1973,17 +1984,19 @@ function starmakerOffice(): Level {
     crowd: [
       // Público sentado mirando a la tarima.
       ...([
-        [43, 11],
-        [46, 11],
-        [56, 13],
-        [60, 11],
-        [44, 15],
-        [57, 15],
+        [43, 10],
+        [46, 10],
+        [56, 11],
+        [60, 9],
+        [44, 13],
+        [57, 13],
+        [49, 12],
+        [54, 9],
       ] as const).map(([x, y]): [number, number, Dir, boolean] => [x, y, "up", true]),
       ...chat(30, 23),
-      ...chat(62, 50),
-      ...chat(84, 50),
-      ...chat(68, 61),
+      ...chat(62, 56),
+      ...chat(84, 54),
+      ...chat(68, 65),
       ...chat(50, 56),
       ...chat(9, 10),
       ...chat(14, 61),

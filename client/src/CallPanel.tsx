@@ -4,14 +4,17 @@ import AvatarCanvas from "./AvatarCanvas.tsx";
 import type { PrivateCall } from "./call.ts";
 import Modal from "./Modal.tsx";
 
-/** Reproduce el audio de alguien de la charla. */
-function Voice({ stream }: { stream: MediaStream }) {
+/** Reproduce el audio de alguien de la charla (más bajo si no es quien está en la tarima o en el micrófono). */
+function Voice({ stream, volume = 1 }: { stream: MediaStream; volume?: number }) {
   const ref = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     const el = ref.current!;
     el.srcObject = stream;
     void el.play().catch(() => {});
   }, [stream]);
+  useEffect(() => {
+    ref.current!.volume = volume;
+  }, [volume]);
   return <audio ref={ref} autoPlay />;
 }
 
@@ -184,8 +187,10 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
               </li>
             ))}
           </ul>
-          {current.stage && !presenter && <p className="muted small">🎤 Para presentar, sube a la tarima: ahí puedes compartir pantalla y se ve en la pantalla grande.</p>}
-          {current.stage && presenter && <p className="small">🎤 Estás en la tarima: lo que compartas se ve en la pantalla grande.</p>}
+          {current.stage && !presenter && (
+            <p className="muted small">🎤 Para presentar, sube a la tarima por los escalones de los costados: ahí puedes compartir pantalla, se ve en la pantalla grande y se te escucha más fuerte.</p>
+          )}
+          {current.stage && presenter && <p className="small">🎤 Estás en la tarima: se te escucha más fuerte y lo que compartas se ve en la pantalla grande.</p>}
           {call.micError && <p className="error small">{call.micError}</p>}
           {error && <p className="error small">{error}</p>}
           {adding && !zone && (
@@ -227,7 +232,12 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
               {zone ? "Salir de la conversación" : "Salir"}
             </button>
           </div>
-          {[...call.remotes].map(([id, r]) => (r.audio ? <Voice key={id} stream={r.audio} /> : null))}
+          {[...call.remotes].map(([id, r]) => {
+            // Mientras alguien está en la tarima (o en el micrófono del karaoke), se lo escucha fuerte y al resto más bajo.
+            const presenters = current.stage?.presenters ?? [];
+            const volume = presenters.length && !presenters.includes(id) ? 0.3 : 1;
+            return r.audio ? <Voice key={id} stream={r.audio} volume={volume} /> : null;
+          })}
         </section>
       )}
     </>

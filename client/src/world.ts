@@ -1957,12 +1957,44 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       }
+      case "stagefront":
+        // Frente de la tarima: un borde alto y oscuro con su línea de luz, para que se vea que la tarima está más arriba.
+        add(y + 0.95, (ctx) => {
+          const fw = w * T;
+          ctx.fillStyle = "rgba(22,22,29,0.25)";
+          ctx.fillRect(px, py + T - 2, fw, 6);
+          ctx.fillStyle = "#16161d";
+          ctx.fillRect(px, py - 2, fw, T);
+          ctx.fillStyle = "#23232c";
+          for (let k = 0; k < w; k++) ctx.fillRect(px + k * T + 2, py + 6, T - 4, T - 12);
+          ctx.fillStyle = "#fdda24";
+          ctx.fillRect(px, py - 2, fw, 3);
+          ctx.fillStyle = "rgba(253,218,36,0.35)";
+          for (let k = 0; k < w; k += 2) ctx.fillRect(px + k * T + T / 2 - 2, py + T - 10, 4, 4);
+        });
+        break;
+      case "steps":
+        // Escalones para subir a la tarima: tres peldaños que suben hacia atrás.
+        add(y + 0.95, (ctx) => {
+          const sw = w * T;
+          for (let k = 0; k < 3; k++) {
+            const ty = py + T - 10 - k * 10;
+            ctx.fillStyle = shade("#3a3a45", k * 0.12);
+            ctx.fillRect(px + 2, ty, sw - 4, 10);
+            ctx.fillStyle = "#fdda24";
+            ctx.fillRect(px + 2, ty, sw - 4, 2);
+          }
+          ctx.fillStyle = "#16161d";
+          ctx.fillRect(px, py - 2, 2, T);
+          ctx.fillRect(px + sw - 2, py - 2, 2, T);
+        });
+        break;
       case "stagescreen":
         // Pantalla grande colgada detrás de la tarima: lo que comparte quien presenta o, si nadie presenta, una invitación a subir.
         add(y + 0.5, (ctx, t) => {
           const m = media?.() ?? { sponsors: [], title: "" };
           const sw = w * T;
-          const h = 104;
+          const h = f.d ? Math.round(f.d * T) : 104;
           const top = py - h - 4;
           frame(ctx, px, top, sw, h, "#0b0b10");
           const sx = px + 4;
