@@ -85,6 +85,12 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
     if (!current) setAdding(false);
   }, [current]);
 
+  // Con tarima, solo comparte pantalla quien está parado en ella: al bajar, se deja de compartir.
+  const presenter = !current?.stage || current.stage.presenters.includes(me.id);
+  useEffect(() => {
+    if (call.screen && !presenter) void call.toggleScreen();
+  }, [presenter, call]);
+
   const add = async (userId: string) => {
     setError("");
     try {
@@ -178,6 +184,8 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
               </li>
             ))}
           </ul>
+          {current.stage && !presenter && <p className="muted small">🎤 Para presentar, sube a la tarima: ahí puedes compartir pantalla y se ve en la pantalla grande.</p>}
+          {current.stage && presenter && <p className="small">🎤 Estás en la tarima: lo que compartas se ve en la pantalla grande.</p>}
           {call.micError && <p className="error small">{call.micError}</p>}
           {error && <p className="error small">{error}</p>}
           {adding && !zone && (
@@ -205,7 +213,7 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
               {call.camera ? "📷 Apagar cámara" : "📷 Cámara"}
             </button>
             {/* En una sala de reunión se charla: no hay nada que presentar. */}
-            {!current.meeting && (
+            {!current.meeting && presenter && (
               <button className={`btn sm ${call.screen ? "primary" : ""}`} onClick={() => void call.toggleScreen()}>
                 {call.screen ? "🖥 Dejar de compartir" : "🖥 Compartir"}
               </button>

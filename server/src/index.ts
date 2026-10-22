@@ -21,6 +21,7 @@ import {
   receptionMap,
   stairsArrival,
   venueFloors,
+  type Rect,
   type SceneMap,
   type Tile,
   type Zone,
@@ -581,9 +582,17 @@ interface PrivateCall {
   members: Set<string>;
   invited: Set<string>;
   /** Si es la conversación de una mesa de equipo: su nombre y cuántos caben. */
-  zone?: { label: string; seats: number; meeting: boolean };
+  zone?: { label: string; seats: number; meeting: boolean; stage?: Rect };
   media: Map<string, CallMedia>;
 }
+
+/** true si la persona está parada sobre la tarima de esa charla. */
+const onStage = (userId: string, stage: Rect | undefined) => {
+  const u = connections.get(userId)?.user;
+  return Boolean(stage && u && inZone({ x: Math.round(u.x), y: Math.round(u.y) }, stage));
+};
+/** Quién estaba en la tarima la última vez que se avisó, para avisar solo cuando alguien sube o baja. */
+const wasOnStage = new Map<string, boolean>();
 const calls = new Map<string, PrivateCall>();
 const callOfUser = new Map<string, string>();
 const MAX_CALL = 8;
@@ -593,6 +602,7 @@ const callInfo = (call: PrivateCall): CallInfo => ({
   zone: call.zone?.label ?? null,
   meeting: call.zone?.meeting ?? false,
   media: Object.fromEntries(call.media),
+  stage: call.zone?.stage ? { presenters: [...call.members].filter((id) => onStage(id, call.zone!.stage)) } : undefined,
   members: [...call.members].flatMap((id) => {
     const user = connections.get(id)?.user;
     return user ? [user] : [];
@@ -655,6 +665,17 @@ function syncZone(u: User) {
   const current = callOfUser.get(u.id);
   if (zoneOptOut.has(u.id) && zoneOptOut.get(u.id) !== key) zoneOptOut.delete(u.id);
   if (current?.startsWith("zone:") && current !== key) leaveCall(u.id);
+  // En una sala con tarima: al subir o bajar se avisa, y quien baja deja de compartir pantalla.
+  if (key && current === key && zone?.stage) {
+    const call = calls.get(key);
+    const now = onStage(u.id, zone.stage);
+    if (call && wasOnStage.get(u.id) !== now) {
+      wasOnStage.set(u.id, now);
+      const media = call.media.get(u.id);
+      if (!now && media?.screen) call.media.set(u.id, { ...media, screen: false });
+      emitCall(call);
+    }
+  }
   if (!key || !zone || callOfUser.get(u.id) === key || zoneOptOut.get(u.id) === key) return;
   // La sala de organizadores es solo para su equipo.
   if (zone.staff && u.role !== "staff") return;
@@ -666,20 +687,29 @@ function syncZone(u: User) {
   }
   if (callOfUser.has(u.id)) leaveCall(u.id);
   if (!call) {
-    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats, meeting: Boolean(zone.room) && !zone.share }, media: new Map() };
+    call = { id: key, venueId: u.venueId!, members: new Set(), invited: new Set(), zone: { label: zone.label, seats: zone.seats, meeting: Boolean(zone.room) && !zone.share, stage: zone.stage }, media: new Map() };
     calls.set(key, call);
   }
   call.members.add(u.id);
   callOfUser.set(u.id, key);
+  wasOnStage.set(u.id, onStage(u.id, zone.stage));
   setInCall(u.id, true);
   emitCall(call);
 }
 
-/** Baldosas libres dentro de una zona, en orden al azar (para repartir gente sin apilarla). */
+/**
+ * Baldosas libres dentro de una zona, en orden al azar (para repartir gente sin apilarla): bien adentro (no en la
+ * puerta ni pegadas a un muro), sin muebles y fuera de la tarima.
+ */
 function freeTilesIn(map: SceneMap, zone: Zone): Tile[] {
   const tiles: Tile[] = [];
+  const free = (x: number, y: number) => isWalkable(map, x, y) && !map.soft[y * map.w + x];
   for (let y = zone.y; y < zone.y + zone.h; y++)
-    for (let x = zone.x; x < zone.x + zone.w; x++) if (isWalkable(map, x, y) && !map.soft[y * map.w + x]) tiles.push({ x, y });
+    for (let x = zone.x; x < zone.x + zone.w; x++) {
+      const t = { x, y };
+      const inside = [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => isWalkable(map, x + dx!, y + dy!) && inZone({ x: x + dx!, y: y + dy! }, zone));
+      if (free(x, y) && inside && !(zone.stage && inZone(t, zone.stage))) tiles.push(t);
+    }
   return shuffle(tiles);
 }
 
@@ -1102,7 +1132,9 @@ io.on("connection", (socket) => {
     if (!conn) return;
     const call = calls.get(callOfUser.get(conn.user.id) ?? "");
     if (!call) return;
-    call.media.set(conn.user.id, { cam: Boolean(media?.cam), screen: Boolean(media?.screen) });
+    // Con tarima, solo se comparte pantalla parado en ella.
+    const screen = Boolean(media?.screen) && (!call.zone?.stage || onStage(conn.user.id, call.zone.stage));
+    call.media.set(conn.user.id, { cam: Boolean(media?.cam), screen });
     emitCall(call);
   });
 

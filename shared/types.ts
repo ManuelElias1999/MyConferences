@@ -211,6 +211,8 @@ export interface CallInfo {
   meeting: boolean;
   /** Quién tiene la cámara o la pantalla compartida. */
   media: Record<string, CallMedia>;
+  /** Si la sala tiene tarima: solo quienes están parados en ella pueden compartir pantalla. */
+  stage?: { presenters: string[] };
 }
 
 export interface CallMedia {

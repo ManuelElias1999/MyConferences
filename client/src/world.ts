@@ -663,6 +663,17 @@ const AREA_FLOOR: Record<AreaFloor, Painter> = {
   deck: flat("#cfbea6"),
   stone: flat("#d2ccbf"),
   tiles: flat("#eeebe5"),
+  stage: (ctx, x0, y0, x1, y1) => {
+    // Tarima: madera oscura con tablones y un borde de luz al frente.
+    ctx.fillStyle = "#2a2a33";
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    for (let y = y0 + 8; y < y1; y += 10) ctx.fillRect(x0, y, x1 - x0, 1);
+    ctx.fillStyle = "#16161d";
+    ctx.fillRect(x0, y1 - 6, x1 - x0, 6);
+    ctx.fillStyle = "#fdda24";
+    ctx.fillRect(x0, y1 - 8, x1 - x0, 2);
+  },
   water: (ctx, x0, y0, x1, y1) => {
     // Lago: azul con una orilla más clara y reflejos.
     ctx.fillStyle = "#8fd3e8";
@@ -1946,6 +1957,49 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
         });
         break;
       }
+      case "stagescreen":
+        // Pantalla grande colgada detrás de la tarima: lo que comparte quien presenta o, si nadie presenta, una invitación a subir.
+        add(y + 0.5, (ctx, t) => {
+          const m = media?.() ?? { sponsors: [], title: "" };
+          const sw = w * T;
+          const h = 104;
+          const top = py - h - 4;
+          frame(ctx, px, top, sw, h, "#0b0b10");
+          const sx = px + 4;
+          const sy = top + 4;
+          const iw = sw - 8;
+          const ih = h - 8;
+          const v = m.stageVideo;
+          if (v && v.readyState >= 2 && v.videoWidth) {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(sx, sy, iw, ih);
+            const scale = Math.min(iw / v.videoWidth, ih / v.videoHeight);
+            const vw = v.videoWidth * scale;
+            const vh = v.videoHeight * scale;
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(v, sx + (iw - vw) / 2, sy + (ih - vh) / 2, vw, vh);
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = "#ef4444";
+            ctx.fillRect(sx + 4, sy + 4, 6, 6);
+          } else {
+            const g = ctx.createLinearGradient(sx, sy, sx + iw, sy + ih);
+            g.addColorStop(0, "#1c1c24");
+            g.addColorStop(1, "#2a2a33");
+            ctx.fillStyle = g;
+            ctx.fillRect(sx, sy, iw, ih);
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#fdda24";
+            ctx.font = `700 18px ${FONT}`;
+            ctx.fillText(m.title.toUpperCase(), sx + iw / 2, sy + ih / 2 - 4, iw - 16);
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.font = `600 11px ${FONT}`;
+            ctx.fillText("🎤 Sube a la tarima y comparte tu pantalla para presentar", sx + iw / 2, sy + ih / 2 + 14, iw - 16);
+            ctx.textAlign = "left";
+          }
+          ctx.fillStyle = `rgba(253,218,36,${0.5 + 0.3 * Math.sin(t / 600)})`;
+          ctx.fillRect(px, top + h, sw, 2);
+        });
+        break;
       case "adboard": {
         // Cartel publicitario gigante sobre dos patas, con un borde de luz que late.
         const slot = 20 + x;
@@ -2590,6 +2644,8 @@ export interface Media {
   logoUrl?: string | null;
   /** Quién atiende cada stand (los patrocinadores y el organizador). */
   stands?: Sponsor[];
+  /** Lo que se comparte desde la tarima, para la pantalla grande de la sala. */
+  stageVideo?: HTMLVideoElement | null;
 }
 
 /** Colores de los stands, para que cada patrocinador se distinga. */

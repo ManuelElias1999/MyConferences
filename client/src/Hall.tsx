@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { forVisitor, stairsEntry, venueFloors, type Door, type Tile } from "../../shared/maps.ts";
 
 const everyoneMentors = (users: Map<string, User>) => [...users.values()].filter((u) => u.role === "mentor");
@@ -26,6 +26,7 @@ export default function Hall({
   onStairs,
   onOpenAgenda,
   onUser,
+  stageScreen = null,
 }: {
   me: User;
   venue: Venue;
@@ -37,7 +38,19 @@ export default function Hall({
   onStairs: (floor: number) => void;
   onOpenAgenda: () => void;
   onUser: (userId: string) => void;
+  /** Lo que se comparte desde la tarima, para mostrarlo en la pantalla grande del plano. */
+  stageScreen?: MediaStream | null;
 }) {
+  const stageVideo = useMemo(() => {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    return v;
+  }, []);
+  useEffect(() => {
+    stageVideo.srcObject = stageScreen;
+    if (stageScreen) void stageVideo.play().catch(() => {});
+  }, [stageScreen, stageVideo]);
   // Stands: uno por patrocinador y, siempre, el del organizador (así todo evento tiene stands).
   const stands = useMemo<Sponsor[]>(
     () => [
@@ -148,7 +161,7 @@ export default function Hall({
           onNpc={(npc) => npc.sponsor !== undefined && setStand(npc.sponsor)}
           hideNpcs={hideNpcs}
           onUser={onUser}
-          media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl, stands }}
+          media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl, stands, stageVideo: stageScreen ? stageVideo : null }}
           handle={scene}
           label={`${venue.name}, ${map.floorName}`}
         />

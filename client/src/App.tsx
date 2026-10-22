@@ -37,6 +37,17 @@ export default function App() {
   const openPanelAfterAuth = useRef(false);
   const [notice, setNotice] = useState("");
   const call = usePrivateCall(me?.id ?? null);
+  // En una sala con tarima, la pantalla que comparte quien está arriba se ve en la pantalla grande del plano.
+  const stageScreen = (() => {
+    const c = call.call;
+    if (!c?.stage) return null;
+    for (const id of c.stage.presenters) {
+      if (id === me?.id && call.screen) return call.screen;
+      const remote = c.media[id]?.screen ? call.remotes.get(id)?.screen : null;
+      if (remote) return remote;
+    }
+    return null;
+  })();
   /** Persona a la que le hiciste clic (para invitarla a charlar). */
   const [cardUser, setCardUser] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -389,6 +400,7 @@ export default function App() {
           onStairs={changeFloor}
           onOpenAgenda={() => setAgendaOpen(true)}
           onUser={setCardUser}
+          stageScreen={stageScreen}
         />
       )}
       {place.kind === "room" && room && (
