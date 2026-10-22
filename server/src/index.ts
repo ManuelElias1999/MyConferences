@@ -302,7 +302,7 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     return {
       error:
         body.theme === "starmaker"
-          ? `Las oficinas Starmaker tienen la sala de presentaciones y hasta ${maxRoomsFor(body.theme) - 1} salas más`
+          ? "Las oficinas Starmaker tienen una sola sala: la principal, que es su sala de reunión"
           : "Un hackathon tiene el auditorio y hasta 8 salas de charla (4 por piso)",
     };
   const emails = (list: unknown, max: number) =>

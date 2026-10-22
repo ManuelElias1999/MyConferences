@@ -78,6 +78,17 @@ export default function Hall({
   const everyone = [...users.values()];
   const doorInfo = new Map<string, { door: Door; floor: number }>();
   floors.forEach((m, f) => m.doors.forEach((door) => doorInfo.set(door.id, { door, floor: f })));
+  // Si la sala principal es la sala de reunión del plano (no tiene puerta), «Ir» lleva caminando hasta ella.
+  floors.forEach((m, f) => {
+    const zone = m.zones.find((z) => z.gather);
+    const room = venue.rooms.find((r) => r.id === m.meetingRoom);
+    if (!zone || !room) return;
+    const spot = { x: zone.x + Math.floor(zone.w / 2), y: zone.y + zone.h - 2 };
+    doorInfo.set(room.id, {
+      door: { side: "top", ...spot, w: 1, id: room.id, label: room.name, color: room.color, theme: venue.theme, zone: "Derecho desde la entrada", main: true },
+      floor: f,
+    });
+  });
   const info = venue.rooms.map((room) => {
     const { current, next } = roomSchedule(venue, room.id, now);
     const talk = current ?? next;

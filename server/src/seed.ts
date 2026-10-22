@@ -295,18 +295,14 @@ const seeds: VenueSeed[] = [
     organizer: "Stellar LATAM · The BAF Network",
     // Solo Stellar y The BAF Network.
     sponsors: [logo("stellar", "Stellar"), logo("thebafnetwork", "The BAF Network")],
-    rooms: [
-      { id: "presentaciones", name: "Sala de presentaciones", topic: "Demos y charlas de la comunidad", color: "#f59e0b", main: true },
-      { id: "taller", name: "Taller Soroban", topic: "Construir juntos sobre Stellar", color: "#6366f1", main: false },
-      { id: "office-hours", name: "Office hours", topic: "Preguntas al equipo de Stellar", color: "#14b8a6", main: false },
-    ],
+    // Una sola sala: la Sala Stellar, que es la sala de reunión de las oficinas (derecho desde la entrada).
+    rooms: [{ id: "sala-stellar", name: "Sala Stellar", topic: "La reunión de los martes", color: "#f59e0b", main: true }],
     program: {
-      presentaciones: [
-        ["Novedades de la red", "Equipo de Stellar LATAM", "Qué pasó esta semana en el ecosistema."],
-        ["Demo de la comunidad", "Embajadores", "Un proyecto de la comunidad muestra en qué está trabajando."],
+      "sala-stellar": [
+        ["Bienvenida y novedades de la red", "Equipo de Stellar LATAM", "Qué pasó esta semana en el ecosistema."],
+        ["Trabajo en grupos", "Embajadores", "Nos repartimos al azar en las salas chiquitas."],
+        ["Demo de la comunidad y juego de cierre", "Embajadores", "Un proyecto de la comunidad muestra en qué está trabajando, y jugamos."],
       ],
-      taller: [["Tu primer contrato en Soroban", "Mentores", "De cero a un contrato en testnet, en grupo."]],
-      "office-hours": [["Preguntas abiertas", "Equipo de Stellar", "Trae tus dudas sobre la red, Soroban o tu proyecto."]],
     },
   },
   {

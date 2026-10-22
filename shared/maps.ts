@@ -287,6 +287,8 @@ export interface SceneMap {
   desk: Tile[];
   /** Pantallas de directorio: se usan para saber cómo llegar a cada sala. */
   directories: Tile[];
+  /** La sala principal del evento cuando no tiene puerta propia: es la sala de reunión (zona `gather`) de este plano. */
+  meetingRoom?: string;
   /** Techos de los edificios de sala, que llevan su nombre pintado. */
   roofs: Roof[];
   stairs: Stairs[];
@@ -599,8 +601,8 @@ export const MAX_ROOMS = ROOMS_PER_FLOOR * 2 + 1;
 /** Un hackathon tiene el auditorio y 8 salas de charla: cuatro por piso, separadas entre sí. */
 export const HACKATHON_ROOMS = 9;
 /** Máximo de salas (con el auditorio) según la temática. */
-/** Las oficinas Starmaker tienen la sala de presentaciones y hasta 2 salas más. */
-export const STARMAKER_ROOMS = 3;
+/** Las oficinas Starmaker tienen una sola sala principal: la sala de reunión. */
+export const STARMAKER_ROOMS = 1;
 export const maxRoomsFor = (theme: ThemeId) => (theme === "hackathon" ? HACKATHON_ROOMS : theme === "starmaker" ? STARMAKER_ROOMS : MAX_ROOMS);
 /** Mínimo de salas (con el auditorio) según la temática. */
 export const minRoomsFor = (theme: ThemeId) => (theme === "starmaker" ? 1 : MIN_ROOMS);
@@ -1733,202 +1735,239 @@ function stellarGround(): Level {
 // ----- Starmaker: las oficinas de la comunidad, en un solo piso -----
 
 /*
- * Oficinas de Starmaker Stellar LATAM. Arriba, la Sala Starmaker: la reunión
- * de los martes, donde todo el mundo habla y comparte pantalla; a sus lados,
- * seis salas chicas a las que el equipo organizador reparte a la gente al azar.
- * A la izquierda, el cowork (mesas de 2 a 6) y, debajo, los salones de
- * mentores y de BAF; a la derecha, la sala de estudio (cada mesa se escucha
- * solo entre sí), el café, el descanso con juegos y el patio. Se entra por el
- * lobby, con los stands de Stellar y de BAF.
+ * Oficinas de Starmaker Stellar LATAM. Derecho desde la entrada está la sala
+ * principal (la Sala Stellar): la reunión de los martes, donde todo el mundo
+ * habla y comparte pantalla; lleva el nombre de la sala principal del evento.
+ * A su izquierda, ocho salas chiquitas en dos filas, a las que el equipo
+ * organizador reparte a la gente al azar; a su derecha, el salón de mentores y,
+ * más allá, el de BAF. Abajo: el cowork (mesas de 2 a 6) con el karaoke y la
+ * sala de juegos, la sala de estudio (cada mesa se escucha solo entre sí), el
+ * café, el descanso y el patio. Se entra por el lobby, con los stands de
+ * Stellar y de BAF.
  */
 function starmakerOffice(): Level {
-  const hall = { x: 32, y: 3, w: 28, h: 11 };
-  const cowork = { x: 6, y: 28, w: 32, h: 20 };
-  const study = { x: 54, y: 28, w: 32, h: 12 };
-  const cafe = { x: 58, y: 43, w: 14, h: 10 };
-  const rest = { x: 74, y: 43, w: 12, h: 10 };
-  const patio = { x: 56, y: 55, w: 30, h: 8 };
-  const lobby = { x: 38, y: 52, w: 16, h: 11 };
-  const mentors = { x: 6, y: 51, w: 14, h: 11 };
-  const baf = { x: 22, y: 51, w: 14, h: 11 };
-  const breakouts = [8, 16, 24, 62, 70, 78].map((x, i) => ({ n: i + 1, ...doorRoom({ x, y: 10, w: 7, h: 6 }, 18, `SALA ${i + 1}`, "#fdda24") }));
+  const hall = { x: 40, y: 2, w: 24, h: 15 };
+  const cowork = { x: 6, y: 30, w: 34, h: 20 };
+  const study = { x: 60, y: 30, w: 36, h: 12 };
+  const cafe = { x: 60, y: 45, w: 14, h: 10 };
+  const rest = { x: 76, y: 45, w: 20, h: 10 };
+  const patio = { x: 62, y: 58, w: 34, h: 8 };
+  const lobby = { x: 44, y: 54, w: 16, h: 11 };
+  const karaoke = { x: 6, y: 53, w: 16, h: 12 };
+  const games = { x: 24, y: 53, w: 16, h: 12 };
+  const mentors = doorRoom({ x: 66, y: 3, w: 14, h: 12 }, 20, "🧭 MENTORES", "#f59e0b");
+  const baf = doorRoom({ x: 82, y: 3, w: 14, h: 12 }, 20, "BAF", "#22d3ee");
+  // Ocho salas chiquitas: cuatro arriba (dan a un pasillo propio) y cuatro abajo (dan al pasillo principal).
+  const cols = [6, 13, 20, 27];
+  const breakouts = [
+    ...cols.map((x) => doorRoom({ x, y: 2, w: 6, h: 5 }, 8, "", "#fdda24")),
+    ...cols.map((x) => doorRoom({ x, y: 14, w: 6, h: 5 }, 20, "", "#fdda24")),
+  ].map((b, i) => ({ ...b, n: i + 1, door: { ...b.door, text: `SALA ${i + 1}` } }));
   // Mesas del cowork (de 2 a 6 lugares) y de la sala de estudio: cada una con su propia conversación.
   let n = 0;
-  const cw = (seats: number, x: number, y: number) => teamTable(++n, seats, x, y, "#22d3ee");
+  const cw = ([seats, x, y]: number[]) => teamTable(++n, seats!, x!, y!, "#22d3ee");
   const coworkTables = [
-    cw(6, 8, 30), cw(5, 14, 30), cw(4, 20, 30), cw(3, 25, 30), cw(2, 30, 30), cw(2, 34, 30),
-    cw(4, 9, 36), cw(6, 14, 36), cw(3, 20, 36), cw(5, 25, 36), cw(4, 31, 36),
-    cw(2, 8, 42), cw(3, 12, 42), cw(6, 17, 42), cw(2, 23, 42), cw(4, 27, 42), cw(5, 32, 42),
-  ];
+    [6, 7, 31], [5, 16, 31], [4, 22, 31], [3, 26, 31], [2, 34, 31], [2, 37, 31],
+    [4, 7, 37], [6, 12, 37], [3, 18, 37], [5, 23, 37], [4, 29, 37], [2, 34, 37],
+    [2, 7, 43], [3, 10, 43], [6, 15, 43], [2, 21, 43], [4, 25, 43], [5, 30, 43], [3, 35, 43],
+  ].map(cw);
   let m = 0;
-  const st = (seats: number, x: number, y: number) => {
-    const t = teamTable(100 + ++m, seats, x, y, "#a78bfa");
+  const st = ([seats, x, y]: number[]) => {
+    const t = teamTable(100 + ++m, seats!, x!, y!, "#a78bfa");
     return { ...t, zone: { ...t.zone, id: `estudio-${m}`, label: `Estudio ${m}` } };
   };
-  const studyTables = [st(4, 56, 29), st(2, 61, 29), st(4, 71, 29), st(4, 76, 29), st(2, 81, 29), st(4, 56, 34), st(2, 61, 34), st(4, 66, 34), st(2, 71, 34), st(4, 75, 34), st(4, 80, 34)];
-  const [w1, w2] = pairV(5, 30, "left", "Cowork");
+  const studyTables = [
+    [4, 62, 31], [2, 67, 31], [4, 77, 31], [4, 82, 31], [2, 87, 31], [4, 91, 31],
+    [4, 62, 36], [2, 69, 36], [4, 72, 36], [2, 78, 36], [4, 81, 36], [4, 86, 36], [2, 92, 36],
+  ].map(st);
   return {
     name: "Oficinas",
-    w: 92,
-    h: 66,
+    w: 100,
+    h: 68,
     floors: [
       hall,
-      { x: 42, y: 14, w: 8, h: 5 },
-      { x: 6, y: 19, w: 80, h: 6 }, // pasillo de las salas
+      { x: 48, y: 17, w: 8, h: 4 },
       ...breakouts.flatMap((b) => [b.room, b.passage]),
-      { x: 42, y: 25, w: 8, h: 27 }, // pasillo central
+      { x: 6, y: 9, w: 31, h: 3 }, // pasillo de las salas de arriba
+      { x: 37, y: 9, w: 2, h: 12 },
+      { x: 37, y: 9, w: 3, h: 3 },
+      mentors.room,
+      mentors.passage,
+      baf.room,
+      baf.passage,
+      { x: 6, y: 21, w: 90, h: 6 }, // pasillo principal
+      { x: 48, y: 27, w: 8, h: 27 }, // pasillo central
       lobby,
       cowork,
-      { x: 12, y: 25, w: 4, h: 3 },
-      { x: 28, y: 25, w: 4, h: 3 },
-      { x: 38, y: 33, w: 4, h: 8 },
+      { x: 12, y: 27, w: 4, h: 3 },
+      { x: 30, y: 27, w: 4, h: 3 },
+      { x: 40, y: 35, w: 8, h: 8 },
+      karaoke,
+      { x: 12, y: 50, w: 4, h: 3 },
+      games,
+      { x: 30, y: 50, w: 4, h: 3 },
+      { x: 40, y: 57, w: 4, h: 3 },
       study,
-      { x: 66, y: 25, w: 4, h: 3 },
-      { x: 50, y: 31, w: 4, h: 4 },
+      { x: 72, y: 27, w: 4, h: 3 },
+      { x: 56, y: 33, w: 4, h: 4 },
       cafe,
-      { x: 62, y: 40, w: 4, h: 3 },
-      { x: 50, y: 45, w: 8, h: 4 },
+      { x: 64, y: 42, w: 4, h: 3 },
+      { x: 56, y: 47, w: 4, h: 4 },
       rest,
-      { x: 72, y: 46, w: 2, h: 4 },
+      { x: 74, y: 48, w: 2, h: 4 },
       patio,
-      { x: 54, y: 57, w: 2, h: 4 },
-      { x: 62, y: 53, w: 4, h: 2 },
-      { x: 78, y: 53, w: 3, h: 2 },
-      mentors,
-      { x: 11, y: 48, w: 4, h: 3 },
-      baf,
-      { x: 27, y: 48, w: 4, h: 3 },
-      { x: 36, y: 55, w: 2, h: 3 },
+      { x: 60, y: 59, w: 2, h: 4 },
+      { x: 66, y: 55, w: 4, h: 3 },
+      { x: 84, y: 55, w: 3, h: 3 },
     ],
     areas: [
       { ...hall, floor: "wood" },
       { ...cowork, floor: "tiles" },
       { ...study, floor: "tiles" },
+      { ...karaoke, floor: "deck" },
+      { ...games, floor: "tiles" },
       { ...cafe, floor: "wood" },
       { ...rest, floor: "deck" },
       { ...patio, floor: "grass" },
-      { ...mentors, floor: "wood" },
-      { ...baf, floor: "wood" },
+      { ...mentors.room, floor: "wood" },
+      { ...baf.room, floor: "wood" },
     ],
-    exit: { x: 46, y: 63 },
-    spawn: { x: 46, y: 60 },
-    // La sala de presentaciones tiene la puerta en la pared este de la sala de estudio.
-    main: { x: 86, y: 31, side: "right", roof: { x: 87, y: 29, w: 5, h: 6 }, trail: path([46, 61], [46, 32], [85, 32]) },
-    slots: [
-      { ...w1!, trail: path([43, 61], [43, 38], [7, 38], [7, 31], [6, 31]) },
-      { ...w2!, trail: path([44, 61], [44, 39], [6, 39], [6, 36]) },
-    ],
+    exit: { x: 51, y: 65 },
+    spawn: { x: 51, y: 62 },
+    slots: [],
     zones: [
-      { id: "starmaker", label: "Sala Starmaker", ...hall, color: "#fdda24", seats: 100, room: true, share: true, gather: true },
-      ...breakouts.map((b): Zone => ({ id: `sala-${b.n}`, label: `Sala ${b.n}`, ...b.room, color: "#fdda24", seats: 20, room: true, share: true, breakout: true })),
-      { id: "mentores", label: "Salón de mentores", ...mentors, color: "#f59e0b", seats: 30, room: true },
-      { id: "baf", label: "Salón BAF", ...baf, color: "#22d3ee", seats: 30, room: true },
+      // La sala principal del evento (toma su nombre).
+      { id: "reunion", label: "Sala de reunión", ...hall, color: "#fdda24", seats: 100, room: true, share: true, gather: true },
+      ...breakouts.map((b): Zone => ({ id: `sala-${b.n}`, label: `Sala ${b.n}`, ...b.room, color: "#fdda24", seats: 12, room: true, share: true, breakout: true })),
+      { id: "mentores", label: "Salón de mentores", ...mentors.room, color: "#f59e0b", seats: 30, room: true },
+      { id: "baf", label: "Salón BAF", ...baf.room, color: "#22d3ee", seats: 30, room: true },
+      { id: "karaoke", label: "Karaoke", ...karaoke, color: "#ec4899", seats: 40, room: true, share: true },
+      { id: "juegos", label: "Sala de juegos", ...games, color: "#a78bfa", seats: 30, room: true, share: true },
       ...coworkTables.map((t) => t.zone),
       ...studyTables.map((t) => t.zone),
     ],
     // Solo dos stands: Stellar y BAF, a los lados del lobby.
     stands: [
-      { x: 38, y: 52 },
-      { x: 51, y: 52 },
+      { x: 44, y: 54 },
+      { x: 57, y: 54 },
     ],
     stairs: [],
     decor: [
-      { kind: "neon", x: 33, y: 2, w: 10, text: "✦ STARMAKER STELLAR LATAM", color: "#fdda24" },
-      { kind: "sponsors", x: 44, y: 2, w: 5 },
-      { kind: "neon", x: 50, y: 2, w: 9, text: "MARTES · REUNIÓN", color: "#b7ace8" },
-      { kind: "portal", x: 42, y: 18, w: 8, text: "✦ SALA STARMAKER" },
+      { kind: "neon", x: 41, y: 1, w: 9, text: "✦ $MAIN", color: "#fdda24" },
+      { kind: "sponsors", x: 51, y: 1, w: 4 },
+      { kind: "neon", x: 56, y: 1, w: 7, text: "STARMAKER LATAM", color: "#b7ace8" },
+      { kind: "portal", x: 48, y: 20, w: 8, text: "✦ $MAIN" },
       ...breakouts.map((b) => b.door),
-      ...breakouts.map((b): Decor => ({ kind: "whiteboard", x: b.room.x + 2, y: 9, w: 3 })),
-      { kind: "portal", x: 12, y: 27, w: 4, text: "COWORK" },
-      { kind: "portal", x: 28, y: 27, w: 4, text: "COWORK" },
-      { kind: "window", x: 18, y: 27, w: 3 },
-      { kind: "whiteboard", x: 22, y: 27, w: 3 },
-      { kind: "portal", x: 66, y: 27, w: 4, text: "SALA DE ESTUDIO · SILENCIO" },
-      { kind: "window", x: 58, y: 27, w: 3 },
-      { kind: "window", x: 76, y: 27, w: 3 },
-      { kind: "portal", x: 62, y: 42, w: 4, text: "CAFÉ" },
-      { kind: "portal", x: 11, y: 50, w: 4, text: "🧭 SALÓN DE MENTORES" },
-      { kind: "portal", x: 27, y: 50, w: 4, text: "SALÓN BAF" },
-      { kind: "neon", x: 76, y: 42, w: 4, text: "DESCANSO", color: "#fdda24" },
+      mentors.door,
+      baf.door,
+      { kind: "portal", x: 12, y: 29, w: 4, text: "COWORK" },
+      { kind: "portal", x: 30, y: 29, w: 4, text: "COWORK" },
+      { kind: "window", x: 18, y: 29, w: 3 },
+      { kind: "whiteboard", x: 23, y: 29, w: 3 },
+      { kind: "portal", x: 72, y: 29, w: 4, text: "SALA DE ESTUDIO · SILENCIO" },
+      { kind: "window", x: 64, y: 29, w: 3 },
+      { kind: "window", x: 84, y: 29, w: 3 },
+      { kind: "portal", x: 12, y: 52, w: 4, text: "🎤 KARAOKE" },
+      { kind: "neon", x: 17, y: 52, w: 5, text: "KARAOKE", color: "#ec4899" },
+      { kind: "portal", x: 30, y: 52, w: 4, text: "🎮 SALA DE JUEGOS" },
+      { kind: "portal", x: 64, y: 44, w: 4, text: "CAFÉ" },
+      { kind: "neon", x: 80, y: 44, w: 5, text: "DESCANSO", color: "#fdda24" },
     ],
     furni: [
-      // Sala Starmaker: la pantalla grande, puffs y sillones en semicírculo, y los rincones.
-      { kind: "eventscreen", x: 43, y: 5, w: 6, floating: true },
-      ...[35, 38, 41, 51, 54, 57].map((x, i): Furni => ({ kind: "beanbag", x, y: 9 + (i % 3 === 1 ? 1 : 0), color: i % 2 ? "#fdda24" : "#b7ace8" })),
-      ...[39, 44, 49].map((x, i): Furni => ({ kind: "sofa", x, y: 11, w: 3, color: i === 1 ? "#fdda24" : "#2a2a33", dir: "down" })),
-      { kind: "constellation", x: 32, y: 3 },
-      { kind: "constellation", x: 59, y: 3 },
-      { kind: "rocket", x: 33, y: 12 },
-      { kind: "bigplant", x: 58, y: 12 },
-      // Salas chicas: una mesa con sillas en cada una.
+      // Sala principal: la pantalla grande, puffs y sillones mirando hacia ella, y los rincones.
+      { kind: "eventscreen", x: 49, y: 4, w: 6, floating: true },
+      ...[42, 45, 48, 55, 58, 61].map((x, i): Furni => ({ kind: "beanbag", x, y: 9 + (i % 3 === 1 ? 1 : 0), color: i % 2 ? "#fdda24" : "#b7ace8" })),
+      ...[44, 49, 54].map((x, i): Furni => ({ kind: "sofa", x, y: 12, w: 3, color: i === 1 ? "#fdda24" : "#2a2a33", dir: "down" })),
+      { kind: "constellation", x: 40, y: 2 },
+      { kind: "constellation", x: 63, y: 2 },
+      { kind: "rocket", x: 41, y: 15 },
+      { kind: "bigplant", x: 62, y: 15 },
+      // Salas chiquitas: una mesa con sillas en cada una.
       ...breakouts.flatMap((b): Furni[] => [
-        { kind: "table", x: b.room.x + 2, y: b.room.y + 2, w: 3 },
-        ...[0, 1, 2].flatMap((dx): Furni[] => [
+        { kind: "table", x: b.room.x + 2, y: b.room.y + 2, w: 2 },
+        ...[0, 1].flatMap((dx): Furni[] => [
           { kind: "officechair", x: b.room.x + 2 + dx, y: b.room.y + 1 },
           { kind: "officechair", x: b.room.x + 2 + dx, y: b.room.y + 3 },
         ]),
-        { kind: "plant", x: b.room.x, y: b.room.y + 5 },
+        { kind: "plant", x: b.room.x, y: b.room.y },
       ]),
+      // Mentores y BAF: una mesa grande con café.
+      ...meetingRoom(mentors.room, "#b45309", [{ kind: "bookshelf", x: 66, y: 7 }]),
+      ...meetingRoom(baf.room, "#0e7490", [{ kind: "adboard", x: 89, y: 11, w: 4, label: "/assets/logos/thebafnetwork.svg" }]),
       // Pasillos.
-      ...[30, 37, 44].flatMap((y): Furni[] => [
-        { kind: "constellation", x: 42, y },
-        { kind: "constellation", x: 49, y },
+      ...[20, 34, 66, 80].map((x): Furni => ({ kind: "totem", x, y: 26 })),
+      { kind: "signpost", x: 57, y: 23, label: "↑ $MAIN|← Salas 1 a 8|Mentores · BAF →" },
+      ...[31, 38, 45].flatMap((y): Furni[] => [
+        { kind: "constellation", x: 48, y },
+        { kind: "constellation", x: 55, y },
       ]),
-      { kind: "adboard", x: 43, y: 26, w: 6, label: "/assets/logos/stellar.svg" },
-      ...[20, 36, 56, 74].map((x): Furni => ({ kind: "totem", x, y: 24 })),
-      { kind: "signpost", x: 50, y: 22, label: "↑ Sala Starmaker · Salas 1 a 6|← Cowork · Mentores · BAF|Estudio · Café · Patio →" },
+      { kind: "adboard", x: 49, y: 28, w: 6, label: "/assets/logos/stellar.svg" },
       // Cowork.
       ...coworkTables.flatMap((t) => t.furni),
-      { kind: "printer3d", x: 6, y: 47 },
-      { kind: "charger", x: 37, y: 28 },
-      { kind: "bigplant", x: 37, y: 47 },
-      { kind: "coffeebar", x: 17, y: 28, w: 3 },
+      { kind: "printer3d", x: 6, y: 49 },
+      { kind: "charger", x: 39, y: 30 },
+      { kind: "bigplant", x: 39, y: 49 },
+      { kind: "coffeebar", x: 17, y: 30, w: 3 },
+      // Karaoke: escenario con micrófono, la pantalla con la letra, luces y lugares para mirar.
+      { kind: "eventscreen", x: 10, y: 54, w: 6, floating: true },
+      { kind: "lectern", x: 13, y: 58, color: "#ec4899" },
+      ...[7, 20].flatMap((x): Furni[] => [
+        { kind: "ledpillar", x, y: 54 },
+        { kind: "rack", x, y: 57 },
+      ]),
+      ...lounge(8, 61, "#ec4899"),
+      ...[15, 17, 19].map((x, i): Furni => ({ kind: "beanbag", x, y: 62, color: ["#fdda24", "#ec4899", "#22d3ee"][i] })),
+      // Sala de juegos.
+      ...[24, 25, 26, 36, 37, 38].map((x): Furni => ({ kind: "arcade", x, y: 53 })),
+      { kind: "pingpong", x: 26, y: 57, w: 3 },
+      { kind: "foosball", x: 33, y: 57, w: 2 },
+      { kind: "chess", x: 26, y: 61, w: 2 },
+      { kind: "vrpod", x: 33, y: 61, w: 2 },
+      ...[37, 38].map((x, i): Furni => ({ kind: "beanbag", x, y: 63, color: i ? "#fdda24" : "#a78bfa" })),
       // Sala de estudio.
       ...studyTables.flatMap((t) => t.furni),
-      ...[54, 85].map((x): Furni => ({ kind: "bookshelf", x, y: 28 })),
-      { kind: "lamp", x: 85, y: 39 },
-      // Salones de mentores y de BAF.
-      ...meetingRoom(mentors, "#b45309", [{ kind: "bookshelf", x: 6, y: 55 }]),
-      ...meetingRoom(baf, "#0e7490", [{ kind: "adboard", x: 30, y: 59, w: 4, label: "/assets/logos/thebafnetwork.svg" }]),
+      ...[60, 95].map((x): Furni => ({ kind: "bookshelf", x, y: 30 })),
+      { kind: "lamp", x: 95, y: 41 },
       // Café.
-      { kind: "coffeebar", x: 58, y: 43, w: 4 },
-      { kind: "vending", x: 69, y: 43 },
-      { kind: "cooler", x: 70, y: 43 },
-      ...[59, 64, 68].map((x, i): Furni => ({ kind: "cafetable", x, y: 47 + (i % 2) * 2, w: 2 })),
-      { kind: "bigplant", x: 71, y: 52 },
-      // Descanso: sillones, puffs y juegos.
-      ...lounge(75, 44, "#fdda24"),
-      { kind: "pingpong", x: 75, y: 48, w: 3 },
-      { kind: "foosball", x: 80, y: 48, w: 2 },
-      ...[83, 84, 85].map((x): Furni => ({ kind: "arcade", x, y: 43 })),
-      ...[75, 78, 82].map((x, i): Furni => ({ kind: "beanbag", x, y: 52, color: ["#fdda24", "#b7ace8", "#22d3ee"][i] })),
+      { kind: "coffeebar", x: 60, y: 45, w: 4 },
+      { kind: "vending", x: 71, y: 45 },
+      { kind: "cooler", x: 72, y: 45 },
+      ...[61, 66, 70].map((x, i): Furni => ({ kind: "cafetable", x, y: 49 + (i % 2) * 2, w: 2 })),
+      { kind: "bigplant", x: 73, y: 54 },
+      // Descanso.
+      ...lounge(78, 46, "#fdda24"),
+      ...lounge(87, 46, "#b7ace8"),
+      ...[78, 81, 88, 91].map((x, i): Furni => ({ kind: "beanbag", x, y: 51, color: ["#fdda24", "#b7ace8", "#22d3ee", "#ec4899"][i] })),
+      { kind: "bigplant", x: 95, y: 54 },
       // Patio.
-      ...[56, 63, 70, 85].map((x): Furni => ({ kind: "tree", x, y: 62 })),
-      { kind: "fountain", x: 72, y: 57, w: 2, d: 2 },
-      { kind: "parasol", x: 59, y: 58, w: 2, color: "#fdda24" },
-      { kind: "parasol", x: 80, y: 58, w: 2, color: "#22d3ee" },
-      { kind: "bench", x: 66, y: 61, w: 3 },
-      { kind: "bench", x: 76, y: 61, w: 3 },
-      { kind: "flowerbed", x: 84, y: 56, w: 2 },
+      ...[62, 70, 78, 95].map((x): Furni => ({ kind: "tree", x, y: 65 })),
+      { kind: "fountain", x: 76, y: 59, w: 2, d: 2 },
+      { kind: "parasol", x: 65, y: 60, w: 2, color: "#fdda24" },
+      { kind: "parasol", x: 88, y: 60, w: 2, color: "#22d3ee" },
+      { kind: "bench", x: 72, y: 64, w: 3 },
+      { kind: "bench", x: 83, y: 64, w: 3 },
+      { kind: "flowerbed", x: 93, y: 58, w: 2 },
       // Lobby.
-      { kind: "eventscreen", x: 43, y: 56, w: 6, floating: true },
-      { kind: "signpost", x: 50, y: 59, label: "↑ Sala Starmaker · Cowork · Estudio|← Salón BAF · Mentores|Patio · Café →" },
-      { kind: "bigplant", x: 38, y: 62 },
-      { kind: "bigplant", x: 53, y: 62 },
+      { kind: "eventscreen", x: 49, y: 58, w: 6, floating: true },
+      { kind: "signpost", x: 56, y: 61, label: "↑ $MAIN · Cowork · Estudio|← Karaoke · Juegos|Café · Patio →" },
+      { kind: "bigplant", x: 44, y: 64 },
+      { kind: "bigplant", x: 59, y: 64 },
     ],
     crowd: [
-      ...chat(36, 6),
-      ...chat(55, 6),
-      ...chat(46, 21),
-      ...chat(60, 50),
-      ...chat(77, 50),
-      ...chat(64, 59),
-      ...chat(44, 53),
-      ...chat(30, 22),
+      ...chat(43, 6),
+      ...chat(59, 6),
+      ...chat(30, 23),
+      ...chat(62, 50),
+      ...chat(84, 50),
+      ...chat(68, 61),
+      ...chat(50, 56),
+      ...chat(9, 10),
+      ...chat(14, 59),
+      ...chat(29, 59),
     ],
     directories: [
-      { x: 41, y: 60 },
-      { x: 49, y: 47 },
+      { x: 46, y: 62 },
+      { x: 55, y: 49 },
     ],
   };
 }
@@ -2527,7 +2566,11 @@ function buildLevel(
     doors.push({ side: L.main.side ?? "top", x: L.main.x, y: L.main.y, w: L.main.side ? 2 : 4, id: main.id, label: main.name, color: main.color, theme: main.theme ?? theme, zone: "Auditorio principal", main: true });
     roofs.push({ ...L.main.roof, label: main.name, color: main.color, open: true });
   }
-  const decor = [...L.decor];
+  // Si el plano tiene una sala de reunión sin puerta, esa es la sala principal: lleva su nombre ($MAIN en carteles).
+  const gather = (L.zones ?? []).find((z) => z.gather);
+  const mainName = main?.name ?? "Sala principal";
+  const zones = (L.zones ?? []).map((z) => (z.gather && main ? { ...z, label: main.name } : z));
+  const decor = L.decor.map((d) => (d.text?.includes("$MAIN") ? { ...d, text: d.text.replaceAll("$MAIN", mainName.toUpperCase()) } : d));
   L.slots.forEach((slot, i) => {
     const room = rooms[i];
     roofs.push({ ...slot.roof, label: room?.name ?? "", color: room?.color ?? "", open: Boolean(room) });
@@ -2574,13 +2617,17 @@ function buildLevel(
     style: styleFor(theme),
     floorName: L.name,
     spawn: L.spawn,
-    furni: [...L.furni, ...booths, ...L.directories.map((d): Furni => ({ kind: "directory", x: d.x, y: d.y }))],
+    furni: [
+      ...L.furni.map((f) => (f.label?.includes("$MAIN") ? { ...f, label: f.label.replaceAll("$MAIN", mainName) } : f)),
+      ...booths,
+      ...L.directories.map((d): Furni => ({ kind: "directory", x: d.x, y: d.y })),
+    ],
     decor,
     doors,
     roofs,
     npcs: reps,
     stairs: L.stairs,
-    zones: [...(L.zones ?? []), ...standZones],
+    zones: [...zones, ...standZones],
     closed: L.closed ?? [],
     restricted: [...(L.restricted ?? []), ...standBacks],
     areas: L.areas ?? [],
@@ -2588,6 +2635,7 @@ function buildLevel(
     crowd: L.crowd.map(([x, y, dir, sit], i) => ({ ...attendee(i, x, y, dir), sit })),
     exit: L.exit ? { side: "bottom", x: L.exit.x, y: L.exit.y, w: 2 } : null,
     directories: L.directories,
+    meetingRoom: gather && main ? main.id : undefined,
   });
 }
 

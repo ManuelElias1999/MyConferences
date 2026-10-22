@@ -275,7 +275,7 @@ function EventEditor({
             {theme === "hackathon"
               ? `Un hackathon tiene el auditorio principal y ${maxRoomsFor(theme) - 1} salas de charla: 4 en la planta baja y 4 arriba, cada una lejos de las demás.`
               : theme === "starmaker"
-                ? `Las oficinas Starmaker son de un solo piso: la sala de presentaciones (la primera) y hasta ${maxRoomsFor(theme) - 1} salas más. La reunión se hace en la Sala Starmaker, donde todos hablan y comparten pantalla y el equipo organizador puede repartir en salas al azar; no hace falta cargarla acá.`
+                ? "Las oficinas Starmaker son de un solo piso y tienen una sola sala: la principal (por ejemplo, «Sala Stellar»), que es su sala de reunión, derecho desde la entrada. Ahí todos hablan y comparten pantalla, y el equipo organizador puede repartir a la gente al azar en 8 salas chiquitas. Su agenda es la de la reunión."
                 : `Mínimo ${minRoomsFor(theme) - 1} salas más el auditorio principal, y hasta ${maxRoomsFor(theme) - 1}. Las primeras ${ROOMS_PER_FLOOR} van en la planta baja; las siguientes, en el piso de arriba.`} Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
           </p>
           {rooms.map((r, i) => (
