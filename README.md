@@ -10,9 +10,30 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 - **Para entrar hace falta una cuenta**: no hay invitados. Lo primero que se ve es la pantalla para iniciar sesión o crear la cuenta (correo, contraseña y nombre del personaje).
 - Al crearla llega por correo un **código de 6 números** que hay que escribir para confirmar el correo; sin confirmarlo no se entra a la recepción ni a los eventos. El código vence a los 15 minutos, admite 5 intentos y se puede pedir otro. Así nadie puede usar un correo ajeno para entrar a un evento privado.
-- **Crear eventos no es para todos**: solo pueden las cuentas que habilita la administración. Quien administra ve el botón **Administración**, con todas las cuentas y un interruptor «Puede crear eventos» en cada una; quien recibe el permiso ve aparecer **＋ Crear evento** sin volver a entrar. Quien ya es dueño de un evento lo puede seguir editando.
-- **Tope de personas a la vez por evento**: 50 en las temáticas Stellar, Starmaker y Hackathon; 25 en las demás. Cuando un evento se llena, la recepcionista avisa que no hay lugar. La organización, los ponentes y los sponsors del evento entran igual. Por eso el selector de cupo del hackathon (100 a 500) solo define cuántas salas de equipos tiene el plano.
-- La administración son los correos de `ADMIN_EMAILS` o de `server/data/admins.txt` (uno por línea), que se leen al arrancar el servidor.
+- La administración son los correos de `ADMIN_EMAILS` o de `server/data/admins.txt` (uno por línea), que se leen al arrancar el servidor. Ve el botón **Administración**, con todas las cuentas y el plan de cada una.
+
+### Planes
+
+Todas las cuentas empiezan con el plan **Gratis** (la administración, con **Pro**). Arriba, el botón **Plan …** abre la página de planes con la tabla completa; desde ahí se pide otro plan con «Lo quiero» y la administración lo ve marcado en su panel, donde le asigna el plan cuando paga (todavía no hay cobro en línea). Los límites los aplica el servidor (están en `shared/plans.ts`):
+
+| | Gratis | Inicial | Comunidad | Pro | Evento Empresarial |
+|---|---|---|---|---|---|
+| Precio | US$0 | US$30/mes | US$75/mes | US$200/mes | Desde US$450 por evento |
+| Personas a la vez por evento | 25 | 50 | 100 | 200 | 200 a 1000 |
+| Eventos | 1 de prueba | 2 por mes | 4 por mes | Sin límite | Según contrato |
+| Charlas y meetups | Hasta 12 h | Hasta 3 días | Hasta 3 días | Hasta 3 días | Hasta 3 días |
+| Hackathon | — | Hasta 3 días | Hasta 7 días (máx. 2 por mes) | Hasta 7 días | Hasta 7 días |
+| Espacio permanente | — | — | 1 | 3 | 3 |
+| Temáticas | Tecnológica, minimalista, jardín | Todas menos Starmaker | Todas | Todas | Todas |
+| Evento privado | — | ✔ | ✔ | ✔ | ✔ |
+| Organizadores / mentores | 3 / — | 5 / 3 | 13 / 15 | 25 / sin límite | Sin límite |
+| Sponsors | — | 3 | 10 | Sin límite | Sin límite |
+| Logo propio | — | — | ✔ | ✔ | ✔ |
+
+- Cada evento tiene **fecha de inicio y duración**, o es un **espacio permanente** (siempre abierto, como las oficinas Starmaker). Antes de que abra y después de que cierre, la recepcionista no deja pasar; el equipo del evento sí, para prepararlo.
+- Cada hackathon cuenta como 1 evento del mes; los espacios permanentes no cuentan. Un evento cerrado sigue contando para su mes.
+- Cuando un evento llega a su tope de personas, la recepcionista avisa que está lleno. La organización, los ponentes y los sponsors entran igual. Los eventos de ejemplo usan el tope de Pro.
+- Los eventos creados antes de los planes no tienen fecha: siguen siempre abiertos y no cuentan entre los del mes.
 
 ### Para las empresas
 
@@ -161,10 +182,10 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 
 ## Limitaciones actuales
 
-- El audio y el video van directo entre los navegadores (sin servidor de medios), y por eso los eventos tienen un tope de 25 o 50 personas a la vez. Compartir pantalla en la tarima con muchas personas mirando exige mucho a la computadora de quien presenta. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
+- El audio y el video van directo entre los navegadores (sin servidor de medios), así que hoy funciona bien hasta unas 50 personas por evento. Los topes de 100 y 200 de Comunidad y Pro necesitan un servidor de medios (por ejemplo LiveKit). Compartir pantalla en la tarima con muchas personas mirando exige mucho a la computadora de quien presenta. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
-- El cobro a las empresas todavía no está integrado: quién crea eventos lo decide la administración a mano. El siguiente paso podría ser conectar un medio de pago (por ejemplo Stripe) y habilitar la cuenta al pagar.
+- El cobro todavía no está integrado: el plan lo asigna la administración a mano. El siguiente paso es conectar un medio de pago (por ejemplo Stripe o USDC en Stellar) y activar el plan al pagar. Bajar de plan no cierra los eventos que ya existen.
 - No hay recuperación de contraseña todavía.
 - Cada evento tiene el auditorio y entre 8 y 16 salas. En el piso de arriba, los puestos sin sala muestran un cuadro en el muro.
 - La agenda se genera alrededor de la hora en que arranca el servidor, para que siempre haya algo en vivo durante la demo.

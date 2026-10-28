@@ -7,6 +7,7 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_LOOK, sanitizeLook } from "../../shared/look.ts";
+import { isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
 import type { Account, AdminAccount, Look } from "../../shared/types.ts";
 import { sendCode } from "./mail.ts";
 
@@ -31,8 +32,12 @@ interface StoredAccount {
   verified?: boolean;
   /** Código pendiente para confirmar el correo (guardado como hash). */
   code?: { hash: string; expires: number; tries: number; sentAt: number };
-  /** La administración le habilitó crear eventos. */
-  creator?: boolean;
+  /** Plan asignado por la administración. Sin él: Pro para la administración y Gratis para el resto. */
+  plan?: PlanId;
+  /** Plan que pidió desde la página de planes. */
+  planRequest?: PlanId;
+  /** Eventos con fecha que organizó (no se borran al cerrar el evento: cuentan para el mes). */
+  eventLog?: PlanUsage["log"];
 }
 
 interface Store {
@@ -86,7 +91,8 @@ export function createAccountStore(dataDir: string) {
     company: a.company ?? null,
     verified: a.verified !== false,
     admin: isAdmin(a),
-    canCreateEvents: isAdmin(a) || Boolean(a.creator),
+    plan: a.plan ?? (isAdmin(a) ? "pro" : "free"),
+    planRequest: a.planRequest ?? null,
   });
   const byId = (id: string) => {
     const account = store.accounts.find((a) => a.id === id);
@@ -214,17 +220,47 @@ export function createAccountStore(dataDir: string) {
       return store.accounts
         .map((a) => {
           const acc = toAccount(a);
-          return { id: a.id, email: a.email, name: a.name, company: a.company?.name ?? null, verified: acc.verified, admin: acc.admin, canCreateEvents: acc.canCreateEvents, createdAt: a.createdAt };
+          return { id: a.id, email: a.email, name: a.name, company: a.company?.name ?? null, verified: acc.verified, admin: acc.admin, plan: acc.plan, planRequest: acc.planRequest, createdAt: a.createdAt };
         })
         .sort((x, y) => y.createdAt - x.createdAt);
     },
 
-    /** La administración habilita o quita el permiso de crear eventos. */
-    async setCreator(id: string, creator: boolean) {
+    /** La administración asigna el plan (y con eso responde el pedido, si había). */
+    async setPlan(id: string, plan: unknown) {
+      if (!isPlan(plan)) throw new AccountError("Ese plan no existe");
       const account = byId(id);
-      account.creator = creator;
+      account.plan = plan;
+      delete account.planRequest;
       await persist();
       return toAccount(account);
+    },
+
+    /** Pedido de plan desde la página de planes (null lo cancela). */
+    async requestPlan(id: string, plan: unknown) {
+      const account = byId(id);
+      if (plan === null) delete account.planRequest;
+      else if (isPlan(plan)) account.planRequest = plan;
+      else throw new AccountError("Ese plan no existe");
+      await persist();
+      return toAccount(account);
+    },
+
+    /** La cuenta por su id, o null (para leer el plan del dueño de un evento). */
+    byIdOrNull(id: string): Account | null {
+      const account = store.accounts.find((a) => a.id === id);
+      return account ? toAccount(account) : null;
+    },
+
+    /** Eventos con fecha que ya organizó, para los límites del plan. */
+    eventLog: (id: string) => byId(id).eventLog ?? [],
+
+    /** Registra (o mueve de fecha) un evento con fecha; uno que pasa a permanente deja de contar. */
+    async logEvent(id: string, entry: PlanUsage["log"][number] | { venueId: string; start: null }) {
+      const account = byId(id);
+      const log = (account.eventLog ?? []).filter((e) => e.venueId !== entry.venueId);
+      if (entry.start !== null) log.push(entry as PlanUsage["log"][number]);
+      account.eventLog = log;
+      await persist();
     },
 
     async setCompany(id: string, company: unknown) {

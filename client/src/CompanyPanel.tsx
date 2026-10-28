@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ROOMS_PER_FLOOR, maxRoomsFor, minRoomsFor, venueFloors } from "../../shared/maps.ts";
-import { peopleLimitFor, ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
+import { firstPlanWithTheme, monthUsage, planOf, themeAllowed, type Plan, type PlanUsage } from "../../shared/plans.ts";
+import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import { HACKATHON_CAPACITIES, type Account, type CompanyEvent, type EventInput, type TalkInput } from "../../shared/types.ts";
-import { companyApi, loadToken } from "./lib.ts";
+import { accountApi, companyApi, loadToken } from "./lib.ts";
 import Modal from "./Modal.tsx";
 import { furniDrawables, renderStatic, T } from "./world.ts";
 
@@ -45,6 +46,25 @@ function toLocalInput(ms: number) {
 }
 
 const nextHour = () => Math.ceil(Date.now() / HOUR) * HOUR;
+
+/** Duraciones que se pueden elegir según el plan: horas para charlas, días para hackathons. */
+function durationOptions(plan: Plan, hackathon: boolean) {
+  if (hackathon) return Array.from({ length: plan.hackathonDays }, (_, i) => (i + 1) * 24);
+  return [1, 2, 3, 4, 6, 8, 12, 24, 48, 72].filter((h) => h <= plan.talkHours);
+}
+const durationLabel = (h: number) => (h % 24 === 0 ? `${h / 24} ${h === 24 ? "día" : "días"}` : `${h} ${h === 1 ? "hora" : "horas"}`);
+
+/** Si el error es por el plan, junto al mensaje aparece el botón para ver los planes. */
+const PlanError = ({ text, onPlans }: { text: string; onPlans: () => void }) => (
+  <p className="error">
+    {text}{" "}
+    {text.startsWith("Con el plan") && (
+      <button type="button" className="link small" onClick={onPlans}>
+        Ver planes
+      </button>
+    )}
+  </p>
+);
 
 /** Agenda de una sala: cada charla con título, ponente, inicio y duración. */
 function TalksEditor({ talks, onChange }: { talks: TalkInput[]; onChange: (talks: TalkInput[]) => void }) {
@@ -94,15 +114,19 @@ function TalksEditor({ talks, onChange }: { talks: TalkInput[]; onChange: (talks
 
 function EventEditor({
   initial,
+  plan,
   onSaved,
   onDeleted,
   onVisit,
+  onPlans,
   canVisit,
 }: {
   initial: CompanyEvent | null;
+  plan: Plan;
   onSaved: (ev: CompanyEvent) => void;
   onDeleted: (id: string) => void;
   onVisit: (id: string) => void;
+  onPlans: () => void;
   canVisit: boolean;
 }) {
   const v = initial?.venue;
@@ -110,7 +134,13 @@ function EventEditor({
   const [tagline, setTagline] = useState(v?.tagline ?? "");
   const [theme, setTheme] = useState<ThemeId>(v?.theme ?? "tech");
   const [capacity, setCapacity] = useState(v?.capacity ?? 100);
-  const [isPrivate, setPrivate] = useState(v?.private ?? true);
+  const [isPrivate, setPrivate] = useState(v?.private ?? plan.privateEvents);
+  // Cuándo: con fecha (inicio y duración) o espacio permanente. Los eventos de antes, sin fecha, se muestran como permanentes.
+  const [permanent, setPermanent] = useState(v ? !v.schedule : false);
+  const [start, setStart] = useState(v?.schedule?.start ?? nextHour());
+  const [hours, setHours] = useState(v?.schedule ? Math.round((v.schedule.end - v.schedule.start) / HOUR) : 2);
+  const options = durationOptions(plan, theme === "hackathon");
+  const duration = options.includes(hours) ? hours : (options.filter((h) => h <= hours).at(-1) ?? options[0] ?? 1);
   const [whitelist, setWhitelist] = useState((initial?.whitelist ?? []).join("\n"));
   const [staff, setStaff] = useState((initial?.staff ?? []).join("\n"));
   const [mentors, setMentors] = useState((initial?.mentors ?? []).join("\n"));
@@ -146,6 +176,7 @@ function EventEditor({
       tagline,
       theme,
       capacity: theme === "hackathon" ? capacity : undefined,
+      schedule: permanent ? null : { start, end: start + duration * HOUR },
       private: isPrivate,
       whitelist: whitelist.split(/[\s,;]+/).filter(Boolean),
       staff: staff.split(/[\s,;]+/).filter(Boolean),
@@ -205,25 +236,79 @@ function EventEditor({
 
         <fieldset className="themes">
           <legend>Estilo del lugar</legend>
-          {THEMES.map((t) => (
-            <button key={t.id} type="button" className={`theme-card ${theme === t.id ? "selected" : ""}`} aria-pressed={theme === t.id} onClick={() => {
-                setTheme(t.id);
-                // Si la temática admite menos salas (por ejemplo, las oficinas Starmaker), se quitan las que sobran del final.
-                setRooms((rs) => rs.slice(0, maxRoomsFor(t.id)));
-              }}>
-              <ThemePreview theme={t.id} />
-              <strong>{t.label}</strong>
-              <span>{t.description}</span>
-              <span className="theme-limit">Hasta {peopleLimitFor(t.id)} personas a la vez</span>
-            </button>
-          ))}
+          {THEMES.map((t) => {
+            const allowed = themeAllowed(plan, t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`theme-card ${theme === t.id ? "selected" : ""} ${allowed ? "" : "locked"}`}
+                aria-pressed={theme === t.id}
+                disabled={!allowed && theme !== t.id}
+                onClick={() => {
+                  setTheme(t.id);
+                  // Si la temática admite menos salas (por ejemplo, las oficinas Starmaker), se quitan las que sobran del final.
+                  setRooms((rs) => rs.slice(0, maxRoomsFor(t.id)));
+                  if (t.id === "hackathon") setHours(Math.min(72, plan.hackathonDays * 24));
+                }}
+              >
+                <ThemePreview theme={t.id} />
+                <strong>{t.label}</strong>
+                <span>{t.description}</span>
+                {!allowed && <span className="theme-limit">🔒 Desde el plan {firstPlanWithTheme(t.id).name}</span>}
+              </button>
+            );
+          })}
+        </fieldset>
+
+        <fieldset className="schedule">
+          <legend>Cuándo</legend>
+          <label className="check">
+            <input type="radio" name="when" checked={!permanent} onChange={() => setPermanent(false)} />
+            Con fecha: abre y cierra a una hora
+          </label>
+          <label className={`check ${plan.permanent ? "" : "locked"}`}>
+            <input type="radio" name="when" checked={permanent} disabled={!plan.permanent && !permanent} onChange={() => setPermanent(true)} />
+            Espacio permanente: siempre abierto, como unas oficinas {!plan.permanent && <span className="muted small">🔒 Desde el plan Comunidad</span>}
+          </label>
+          {!permanent && (
+            <div className="form-row">
+              <label>
+                Empieza
+                <input
+                  type="datetime-local"
+                  value={toLocalInput(start)}
+                  onChange={(e) => {
+                    const ms = new Date(e.target.value).getTime();
+                    if (Number.isFinite(ms)) setStart(ms);
+                  }}
+                  required
+                />
+              </label>
+              <label>
+                Dura
+                <select value={duration} onChange={(e) => setHours(Number(e.target.value))}>
+                  {options.map((h) => (
+                    <option key={h} value={h}>
+                      {durationLabel(h)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          <p className="muted small">
+            {permanent
+              ? "Se entra cuando quieras y no cuenta entre los eventos del mes."
+              : `Antes de que abra y después de que cierre, la recepcionista no deja pasar (tu equipo sí, para prepararlo). ${theme === "hackathon" ? `Con tu plan una hackathon dura hasta ${durationLabel(plan.hackathonDays * 24)}.` : `Con tu plan un evento dura hasta ${durationLabel(plan.talkHours)}.`}`}
+          </p>
         </fieldset>
 
         {theme === "hackathon" && (
           <fieldset className="capacity">
             <legend>Participantes del hackathon</legend>
             <p className="muted small">
-              Cada sala de equipos tiene lugar para 100 personas, en mesas de 6, 4 y 2. Según el cupo se habilitan más salas; las demás quedan cerradas. Por ahora entran hasta {peopleLimitFor("hackathon")} personas a la vez.
+              Cada sala de equipos tiene lugar para 100 personas, en mesas de 6, 4 y 2. Según el cupo se habilitan más salas; las demás quedan cerradas. A la vez entran hasta {plan.people} personas, según tu plan.
             </p>
             <div className="capacity-options">
               {HACKATHON_CAPACITIES.map((c) => (
@@ -238,9 +323,9 @@ function EventEditor({
 
         <fieldset className="access">
           <legend>Acceso</legend>
-          <label className="check">
-            <input type="radio" name="access" checked={isPrivate} onChange={() => setPrivate(true)} />
-            Privado: solo entran los correos de la lista
+          <label className={`check ${plan.privateEvents ? "" : "locked"}`}>
+            <input type="radio" name="access" checked={isPrivate} disabled={!plan.privateEvents && !isPrivate} onChange={() => setPrivate(true)} />
+            Privado: solo entran los correos de la lista {!plan.privateEvents && <span className="muted small">🔒 Desde el plan Inicial</span>}
           </label>
           <label className="check">
             <input type="radio" name="access" checked={!isPrivate} onChange={() => setPrivate(false)} />
@@ -261,13 +346,17 @@ function EventEditor({
             encuentra en la sala de mentores. Tú ya eres organizador.
           </p>
           <label>
-            Organizadores <span className="muted small">(correos)</span>
+            Organizadores <span className="muted small">(correos{plan.staff !== null && `, hasta ${plan.staff}`})</span>
             <textarea value={staff} onChange={(e) => setStaff(e.target.value)} rows={2} placeholder="equipo@empresa.com" />
           </label>
-          <label>
-            Mentores <span className="muted small">(correos)</span>
-            <textarea value={mentors} onChange={(e) => setMentors(e.target.value)} rows={2} placeholder="mentora@empresa.com" />
-          </label>
+          {plan.mentors === 0 ? (
+            <p className="muted small">🔒 Los mentores están desde el plan Inicial.</p>
+          ) : (
+            <label>
+              Mentores <span className="muted small">(correos{plan.mentors !== null && `, hasta ${plan.mentors}`})</span>
+              <textarea value={mentors} onChange={(e) => setMentors(e.target.value)} rows={2} placeholder="mentora@empresa.com" />
+            </label>
+          )}
         </fieldset>
 
         <fieldset className="rooms-editor">
@@ -329,7 +418,7 @@ function EventEditor({
           <p className="muted small">Cada sala tiene su código de ponente: compártelo con quien va a presentar.</p>
         </fieldset>
 
-        {error && <p className="error">{error}</p>}
+        {error && <PlanError text={error} onPlans={onPlans} />}
         <div className="modal-actions">
           {v && (
             <button type="button" className="btn ghost danger" onClick={remove}>
@@ -345,8 +434,8 @@ function EventEditor({
 
       {v ? (
         <>
-          <EventLogo event={initial!} onChange={onSaved} />
-          <Sponsors event={initial!} onChange={onSaved} />
+          <EventLogo event={initial!} plan={plan} onChange={onSaved} onPlans={onPlans} />
+          <Sponsors event={initial!} plan={plan} onChange={onSaved} onPlans={onPlans} />
         </>
       ) : (
         <p className="muted small">Después de crear el evento podrás subir su logo y los de tus patrocinadores.</p>
@@ -356,9 +445,21 @@ function EventEditor({
 }
 
 /** Logo del evento: se muestra en la pantalla gigante del lobby. */
-function EventLogo({ event, onChange }: { event: CompanyEvent; onChange: (ev: CompanyEvent) => void }) {
+function EventLogo({ event, plan, onChange, onPlans }: { event: CompanyEvent; plan: Plan; onChange: (ev: CompanyEvent) => void; onPlans: () => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  if (!plan.logo)
+    return (
+      <section className="sponsors-editor">
+        <h3>Logo del evento</h3>
+        <p className="muted small">
+          🔒 En la pantalla gigante del lobby se muestra el nombre del evento. El logo propio está desde el plan Comunidad.{" "}
+          <button type="button" className="link small" onClick={onPlans}>
+            Ver planes
+          </button>
+        </p>
+      </section>
+    );
   return (
     <section className="sponsors-editor">
       <h3>Logo del evento</h3>
@@ -393,7 +494,7 @@ function EventLogo({ event, onChange }: { event: CompanyEvent; onChange: (ev: Co
   );
 }
 
-function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: CompanyEvent) => void }) {
+function Sponsors({ event, plan, onChange, onPlans }: { event: CompanyEvent; plan: Plan; onChange: (ev: CompanyEvent) => void; onPlans: () => void }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [pitch, setPitch] = useState("");
@@ -437,9 +538,25 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
     }
   };
 
+  const max = Math.min(plan.sponsors ?? 12, 12);
+  if (!max)
+    return (
+      <section className="sponsors-editor">
+        <h3>Patrocinadores</h3>
+        <p className="muted small">
+          🔒 Los sponsors, con su stand en el lugar, están desde el plan Inicial (hasta 3).{" "}
+          <button type="button" className="link small" onClick={onPlans}>
+            Ver planes
+          </button>
+        </p>
+      </section>
+    );
+  const full = event.venue.sponsors.length >= max;
   return (
     <section className="sponsors-editor">
-      <h3>Patrocinadores</h3>
+      <h3>
+        Patrocinadores <span className="muted small">({event.venue.sponsors.length} de {max})</span>
+      </h3>
       <p className="muted small">
         Sus logos rotan en las pantallas del lugar y de cada sala. Además, cada patrocinador tiene un <b>stand</b> en el recinto con alguien que cuenta lo que hacen.
       </p>
@@ -456,6 +573,16 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
           ))}
         </ul>
       )}
+      {full ? (
+        <p className="muted small">
+          Llegaste al máximo de sponsors de tu plan.{" "}
+          {plan.sponsors !== null && (
+            <button type="button" className="link small" onClick={onPlans}>
+              Ver planes
+            </button>
+          )}
+        </p>
+      ) : (
       <form className="sponsor-form" onSubmit={add}>
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required placeholder="Nombre (ej. Stellar)" aria-label="Nombre del patrocinador" />
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Sitio web (opcional)" aria-label="Sitio web del patrocinador" />
@@ -478,7 +605,8 @@ function Sponsors({ event, onChange }: { event: CompanyEvent; onChange: (ev: Com
           {busy ? "Subiendo…" : "Agregar logo"}
         </button>
       </form>
-      {error && <p className="error">{error}</p>}
+      )}
+      {error && <PlanError text={error} onPlans={onPlans} />}
     </section>
   );
 }
@@ -488,6 +616,7 @@ export default function CompanyPanel({
   canVisit,
   startNew = false,
   onVisit,
+  onPlans,
   onClose,
 }: {
   account: Account;
@@ -495,8 +624,13 @@ export default function CompanyPanel({
   /** Abrir directo en «Nuevo evento». */
   startNew?: boolean;
   onVisit: (id: string) => void;
+  onPlans: () => void;
   onClose: () => void;
 }) {
+  const plan = planOf(account.plan);
+  const [usage, setUsage] = useState<PlanUsage | null>(null);
+  const refreshUsage = () => void accountApi<PlanUsage>("/plan/usage").then(setUsage, () => {});
+  useEffect(refreshUsage, [account.plan]);
   const [events, setEvents] = useState<CompanyEvent[] | null>(null);
   const [selected, setSelected] = useState<string | "new" | null>(null);
   const [error, setError] = useState("");
@@ -523,6 +657,7 @@ export default function CompanyPanel({
       return [...rest, ev].sort((a, b) => a.venue.name.localeCompare(b.venue.name));
     });
     setSelected(ev.venue.id);
+    refreshUsage();
   };
   const current = events?.find((e) => e.venue.id === selected) ?? null;
   const themeLabel = (id: string) => THEMES.find((t) => t.id === id)?.label;
@@ -533,6 +668,13 @@ export default function CompanyPanel({
         <div>
           <p className="eyebrow">Panel de empresa</p>
           <h1>{account.company?.name}</h1>
+          <p className="plan-line">
+            Plan <b>{plan.name}</b> · hasta {plan.people} personas a la vez
+            {usage && ` · ${usageText(plan, usage)}`}{" "}
+            <button className="link small" onClick={onPlans}>
+              Ver planes
+            </button>
+          </p>
         </div>
         <button className="btn ghost" onClick={onClose}>
           Volver al mundo ✕
@@ -550,7 +692,7 @@ export default function CompanyPanel({
               <span className="event-number">{e.venue.id}</span>
               <strong>{e.venue.name}</strong>
               <span className="muted small">
-                {themeLabel(e.venue.theme)} · {e.venue.rooms.length} {e.venue.rooms.length === 1 ? "sala" : "salas"} · {e.venue.private ? "Privado" : "Abierto"}
+                {themeLabel(e.venue.theme)} · {e.venue.schedule ? formatWhen(e.venue.schedule.start) : "Siempre abierto"} · {e.venue.private ? "Privado" : "Abierto"}
               </span>
             </button>
           ))}
@@ -559,10 +701,13 @@ export default function CompanyPanel({
           <EventEditor
             key={selected}
             initial={selected === "new" ? null : current}
+            plan={plan}
+            onPlans={onPlans}
             onSaved={upsert}
             onDeleted={(id) => {
               setEvents((list) => (list ?? []).filter((e) => e.venue.id !== id));
               setSelected("new");
+              refreshUsage();
             }}
             onVisit={onVisit}
             canVisit={canVisit}
@@ -571,6 +716,17 @@ export default function CompanyPanel({
       </div>
     </div>
   );
+}
+
+const formatWhen = (ms: number) => new Date(ms).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+/** «1 de 2 eventos este mes», «Evento de prueba usado». */
+function usageText(plan: Plan, usage: PlanUsage) {
+  if (plan.lifetimeEvents !== undefined) return usage.log.length >= plan.lifetimeEvents ? "evento de prueba usado" : "1 evento de prueba disponible";
+  const parts: string[] = [];
+  if (plan.eventsPerMonth !== null) parts.push(`${monthUsage(usage, Date.now()).events} de ${plan.eventsPerMonth} eventos este mes`);
+  if (plan.permanent) parts.push(`${usage.permanent} de ${plan.permanent} ${plan.permanent === 1 ? "espacio permanente" : "espacios permanentes"}`);
+  return parts.join(" · ");
 }
 
 /** Convierte una cuenta personal en cuenta de empresa para poder organizar eventos. */

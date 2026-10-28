@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { planOf } from "../../shared/plans.ts";
 import type { Account, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
 import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
 import AdminPanel from "./AdminPanel.tsx";
+import Plans from "./Plans.tsx";
 import Gate from "./Gate.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
@@ -29,6 +31,7 @@ export default function App() {
   const [connected, setConnected] = useState(socket.connected);
   const [fading, setFading] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
   const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -154,7 +157,7 @@ export default function App() {
       });
     };
     helloRef.current = hello;
-    // La administración cambió algo de tu cuenta (por ejemplo, te habilitó crear eventos).
+    // La administración cambió algo de tu cuenta (por ejemplo, te asignó otro plan).
     const onAccount = (acc: Account) => setAccount(acc);
     socket.on("accountUpdated", onAccount);
     const onConnect = () => {
@@ -295,9 +298,9 @@ export default function App() {
     if (token) signInWith(token);
   };
 
-  /** «Crear evento»: solo con permiso; si la cuenta no tiene nombre de organización, primero lo pide. */
+  /** «Crear evento»: si la cuenta no tiene nombre de organización, primero lo pide. Los límites dependen del plan. */
   const startCreateEvent = () => {
-    if (!account?.canCreateEvents) return;
+    if (!account) return;
     setPanelNew(true);
     if (account.company) return setPanelOpen(true);
     setUpgrading(true);
@@ -367,7 +370,12 @@ export default function App() {
             {me.name}
             {me.speakerFor && me.speakerFor === room?.id && <small className="badge">Ponente</small>}
           </span>
-          {account?.canCreateEvents && (
+          {account && (
+            <button className="btn ghost sm" onClick={() => setPlansOpen(true)} title="Ver los planes">
+              Plan {planOf(account.plan).name}
+            </button>
+          )}
+          {account && (
             <button className="btn primary sm" onClick={startCreateEvent}>
               ＋ Crear evento
             </button>
@@ -458,6 +466,7 @@ export default function App() {
           account={account}
           canVisit={place.kind === "reception"}
           startNew={panelNew}
+          onPlans={() => setPlansOpen(true)}
           onClose={() => setPanelOpen(false)}
           onVisit={(id) => {
             setPanelOpen(false);
@@ -486,6 +495,7 @@ export default function App() {
         />
       )}
       {adminOpen && account?.admin && <AdminPanel onClose={() => setAdminOpen(false)} />}
+      {plansOpen && account && <Plans account={account} onChange={setAccount} onClose={() => setPlansOpen(false)} />}
       {editor && account && (
         <AvatarEditor
           account={account}

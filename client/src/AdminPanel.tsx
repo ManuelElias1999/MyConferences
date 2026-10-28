@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { PLANS, planOf, type PlanId } from "../../shared/plans.ts";
 import type { AdminAccount } from "../../shared/types.ts";
 import { accountApi } from "./lib.ts";
 import Modal from "./Modal.tsx";
 
-/** Administración: todas las cuentas y quién puede crear eventos. */
+/** Administración: todas las cuentas y el plan de cada una. */
 export default function AdminPanel({ onClose }: { onClose: () => void }) {
   const [list, setList] = useState<AdminAccount[] | null>(null);
   const [query, setQuery] = useState("");
@@ -16,11 +17,11 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
       .catch((err: Error) => setError(err.message));
   }, []);
 
-  const toggle = async (a: AdminAccount) => {
+  const setPlan = async (a: AdminAccount, plan: PlanId) => {
     setBusy(a.id);
     setError("");
     try {
-      const updated = await accountApi<AdminAccount>(`/admin/accounts/${a.id}`, { body: { canCreateEvents: !a.canCreateEvents } });
+      const updated = await accountApi<AdminAccount>(`/admin/accounts/${a.id}`, { body: { plan } });
       setList((l) => l?.map((x) => (x.id === a.id ? updated : x)) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cambiar");
@@ -31,12 +32,14 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
 
   const q = query.trim().toLowerCase();
   const shown = (list ?? []).filter((a) => !q || a.email.includes(q) || a.name.toLowerCase().includes(q) || a.company?.toLowerCase().includes(q));
-  const creators = (list ?? []).filter((a) => a.canCreateEvents).length;
+  const requests = (list ?? []).filter((a) => a.planRequest).length;
+  const perPlan = PLANS.map((p) => ({ p, n: (list ?? []).filter((a) => a.plan === p.id).length })).filter((x) => x.n);
 
   return (
     <Modal title="Administración" onClose={onClose}>
       <p className="muted small">
-        Para entrar, todos necesitan una cuenta con el correo confirmado. Crear eventos solo pueden las cuentas que habilites aquí (y la administración).
+        Para entrar, todos necesitan una cuenta con el correo confirmado. Cada cuenta empieza con el plan Gratis; aquí le asignas otro cuando pague. Los pedidos
+        de la página de planes aparecen marcados.
       </p>
       <input className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nombre, correo u organización" aria-label="Buscar cuentas" />
       {error && <p className="error">{error}</p>}
@@ -44,28 +47,32 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
       {list && (
         <>
           <p className="muted small">
-            {list.length} {list.length === 1 ? "cuenta" : "cuentas"} · {creators} pueden crear eventos
+            {list.length} {list.length === 1 ? "cuenta" : "cuentas"} · {perPlan.map(({ p, n }) => `${n} ${p.name}`).join(" · ")}
+            {requests > 0 && ` · ${requests} ${requests === 1 ? "pedido" : "pedidos"} de plan`}
           </p>
           <ul className="admin-list">
             {shown.map((a) => (
               <li key={a.id}>
                 <div>
                   <p>
-                    <b>{a.name}</b> {a.admin && <span className="badge">Administración</span>} {!a.verified && <span className="badge warn">Sin confirmar</span>}
+                    <b>{a.name}</b> {a.admin && <span className="badge">Administración</span>} {!a.verified && <span className="badge warn">Sin confirmar</span>}{" "}
+                    {a.planRequest && <span className="badge warn">Pidió {planOf(a.planRequest).name}</span>}
                   </p>
                   <p className="muted small">
                     {a.email}
                     {a.company && ` · ${a.company}`}
                   </p>
                 </div>
-                {a.admin ? (
-                  <span className="muted small">Siempre puede crear eventos</span>
-                ) : (
-                  <label className="check">
-                    <input type="checkbox" checked={a.canCreateEvents} disabled={busy === a.id || !a.verified} onChange={() => void toggle(a)} />
-                    Puede crear eventos
-                  </label>
-                )}
+                <label className="admin-plan">
+                  Plan
+                  <select value={a.plan} disabled={busy === a.id || !a.verified} onChange={(e) => void setPlan(a, e.target.value as PlanId)}>
+                    {PLANS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </li>
             ))}
             {shown.length === 0 && <li className="muted small">No hay cuentas que coincidan.</li>}

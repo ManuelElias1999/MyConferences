@@ -13,13 +13,6 @@ export const THEMES: { id: ThemeId; label: string; description: string; color: s
   { id: "starmaker", label: "Starmaker (oficinas)", description: "Oficinas de una comunidad en un solo piso: la sala de reunión (todos hablan y comparten pantalla, con salas al azar), cowork, sala de estudio, mentores, BAF, café, descanso y patio.", color: "#fdda24" },
 ];
 
-/**
- * Cuántas personas puede haber a la vez en un evento (MVP: el audio y el video van directo
- * entre los navegadores, así que se ponen topes bajos). Stellar, Starmaker y hackathon, 50;
- * las demás temáticas, 25.
- */
-export const peopleLimitFor = (theme: ThemeId) => (theme === "stellar" || theme === "starmaker" || theme === "hackathon" ? 50 : 25);
-
 export const isTheme = (value: unknown): value is ThemeId => THEMES.some((t) => t.id === value);
 
 /** Colores que se pueden elegir para la sala (puerta, placa y detalles). */

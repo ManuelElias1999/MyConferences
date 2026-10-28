@@ -26,7 +26,8 @@ import {
   type Tile,
   type Zone,
 } from "../../shared/maps.ts";
-import { EMOTES, isTheme, peopleLimitFor, ROOM_COLORS } from "../../shared/themes.ts";
+import { planOf, planProblem, type PlanUsage } from "../../shared/plans.ts";
+import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   CallInfo,
   CallMedia,
@@ -231,7 +232,41 @@ app.post("/api/verify/resend", async (req, res) => {
   }
 });
 
-// Administración: ver las cuentas y decidir quién puede crear eventos.
+/** Quien esté conectado con esa cuenta ve el cambio sin volver a entrar. */
+function pushAccount(updated: Account) {
+  for (const conn of connections.values())
+    if (conn.account?.id === updated.id) {
+      conn.account = updated;
+      io.to(conn.user.id).emit("accountUpdated", updated);
+    }
+}
+
+// Pedir un plan desde la página de planes: la administración lo ve en su panel y lo asigna.
+app.post("/api/plan/request", express.json({ limit: "2kb" }), async (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  try {
+    const updated = await accounts.requestPlan(account.id, (req.body ?? {}).plan ?? null);
+    if (updated.planRequest) console.log(`[planes] ${updated.email} pidió el plan ${planOf(updated.planRequest).name}`);
+    pushAccount(updated);
+    res.json({ account: updated });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo enviar el pedido" });
+  }
+});
+
+/** Lo que ya usó una cuenta de su plan: eventos con fecha y espacios permanentes. */
+const usageOf = (accountId: string): PlanUsage => ({
+  log: accounts.eventLog(accountId),
+  permanent: companyEvents.list().filter((e) => e.ownerId === accountId && e.venue.schedule === null).length,
+});
+app.get("/api/plan/usage", (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  res.json(usageOf(account.id));
+});
+
+// Administración: ver las cuentas y asignarles un plan.
 const adminFrom = (req: express.Request, res: express.Response) => {
   const account = accountFrom(req, res);
   if (account && !account.admin) {
@@ -247,13 +282,8 @@ app.get("/api/admin/accounts", (req, res) => {
 app.post("/api/admin/accounts/:id", express.json({ limit: "2kb" }), async (req, res) => {
   if (!adminFrom(req, res)) return;
   try {
-    const updated = await accounts.setCreator(req.params.id, Boolean((req.body ?? {}).canCreateEvents));
-    // Quien esté conectado con esa cuenta ve el cambio sin volver a entrar.
-    for (const conn of connections.values())
-      if (conn.account?.id === updated.id) {
-        conn.account = updated;
-        io.to(conn.user.id).emit("accountUpdated", updated);
-      }
+    const updated = await accounts.setPlan(req.params.id, (req.body ?? {}).plan);
+    pushAccount(updated);
     res.json(accounts.list().find((a) => a.id === req.params.id));
   } catch (err) {
     res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo cambiar" });
@@ -395,7 +425,18 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     talks.push(...roomTalks);
     codes[id] = previous?.speakerCodes[id] ?? randomBytes(3).toString("hex").toUpperCase();
   }
+  // Con fecha (abre y cierra) o espacio permanente (null).
+  const rawSchedule = body.schedule as { start?: unknown; end?: unknown } | null | undefined;
+  let schedule: { start: number; end: number } | null = null;
+  if (rawSchedule) {
+    const start = Number(rawSchedule.start);
+    const end = Number(rawSchedule.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return { error: "Revisa cuándo empieza y termina el evento" };
+    if (end < Date.now() && !previous) return { error: "El evento tiene que terminar en el futuro" };
+    schedule = { start, end };
+  }
   return {
+    schedule,
     name,
     tagline: clean(body.tagline, 120),
     theme: body.theme,
@@ -438,11 +479,26 @@ function evictVenue(venueId: string, reason: string) {
 
 const json = express.json({ limit: "200kb" });
 
+/** Revisa el evento contra el plan del dueño; responde el motivo si no entra. */
+function fitsPlan(account: Account, input: { theme: Venue["theme"]; private: boolean; staff: string[]; mentors: string[]; schedule: Venue["schedule"] }, previous: StoredEvent | null, res: express.Response) {
+  const problem = planProblem(
+    planOf(account.plan),
+    usageOf(account.id),
+    { theme: input.theme, private: input.private, staff: input.staff.length, mentors: input.mentors.length, schedule: input.schedule ?? null, wasPermanent: previous?.venue.schedule === null },
+    previous?.venue.id ?? null,
+  );
+  if (problem) res.status(403).json({ error: problem, plan: true });
+  return !problem;
+}
+
+/** Anota el evento en la cuenta para contar los del mes (los permanentes no cuentan). */
+const logEvent = (ownerId: string, venue: Venue) =>
+  accounts.logEvent(ownerId, venue.schedule ? { venueId: venue.id, start: venue.schedule.start, hackathon: venue.theme === "hackathon" } : { venueId: venue.id, start: null });
+
 /** Convierte una cuenta de persona en cuenta de empresa para poder crear eventos. */
 app.post("/api/company/upgrade", json, async (req, res) => {
   const account = accounts.verify(String(req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
   if (!account) return res.status(401).json({ error: "Inicia sesión de nuevo" });
-  if (!account.canCreateEvents) return res.status(403).json({ error: "Tu cuenta todavía no puede crear eventos: pídeselo a la administración" });
   try {
     const updated = await accounts.setCompany(account.id, (req.body ?? {}).company);
     for (const conn of connections.values()) if (conn.account?.id === updated.id) conn.account = updated;
@@ -461,10 +517,9 @@ app.get("/api/company/events", (req, res) => {
 app.post("/api/company/events", json, async (req, res) => {
   const account = companyFrom(req, res);
   if (!account) return;
-  // Crear eventos nuevos lo habilita la administración; los propios se pueden seguir editando.
-  if (!account.canCreateEvents) return res.status(403).json({ error: "Tu cuenta todavía no puede crear eventos: pídeselo a la administración" });
   const input = readEventInput(req.body ?? {}, null);
   if ("error" in input) return res.status(400).json({ error: input.error });
+  if (!fitsPlan(account, input, null, res)) return;
   const venue: Venue = {
     id: newEventNumber(),
     name: input.name,
@@ -472,6 +527,7 @@ app.post("/api/company/events", json, async (req, res) => {
     private: input.private,
     theme: input.theme,
     capacity: input.capacity,
+    schedule: input.schedule,
     organizer: account.company!.name,
     logoUrl: null,
     rooms: input.rooms,
@@ -481,6 +537,7 @@ app.post("/api/company/events", json, async (req, res) => {
   const entry: StoredEvent = { ownerId: account.id, venue, whitelist: input.whitelist, speakerCodes: input.codes, createdAt: Date.now(), staff: input.staff, mentors: input.mentors };
   setRoles(venue.id, input.staff, input.mentors);
   await companyEvents.save(entry);
+  await logEvent(account.id, venue);
   applyVenue(venue, venue.private ? new Set(input.whitelist) : null, input.codes, account.id);
   res.json(toCompanyEvent(entry));
 });
@@ -491,6 +548,7 @@ app.put("/api/company/events/:id", json, async (req, res) => {
   const { entry } = owned;
   const input = readEventInput(req.body ?? {}, entry);
   if ("error" in input) return res.status(400).json({ error: input.error });
+  if (!fitsPlan(owned.account, input, entry, res)) return;
   // No se borra una sala con gente adentro.
   const removed = entry.venue.rooms.filter((r) => !input.rooms.some((n) => n.id === r.id));
   const busy = removed.find((r) => [...connections.values()].some((c) => c.user.venueId === entry.venue.id && c.user.roomId === r.id));
@@ -502,6 +560,7 @@ app.put("/api/company/events/:id", json, async (req, res) => {
     private: input.private,
     theme: input.theme,
     capacity: input.capacity,
+    schedule: input.schedule,
     rooms: input.rooms,
     talks: input.talks,
   };
@@ -511,6 +570,7 @@ app.put("/api/company/events/:id", json, async (req, res) => {
   setRoles(entry.venue.id, input.staff, input.mentors);
   entry.speakerCodes = input.codes;
   await companyEvents.save(entry);
+  await logEvent(entry.ownerId, entry.venue);
   applyVenue(entry.venue, entry.venue.private ? new Set(input.whitelist) : null, input.codes, entry.ownerId);
   io.to(venueChannel(entry.venue.id)).emit("venueUpdated", entry.venue);
   res.json(toCompanyEvent(entry));
@@ -541,7 +601,10 @@ app.post("/api/company/events/:id/sponsors", express.raw({ type: Object.keys(IMA
   const type = IMAGE_TYPES[String(req.header("content-type")).split(";")[0]!];
   const body = req.body;
   if (!type || !Buffer.isBuffer(body) || !type.magic(body)) return res.status(400).json({ error: "El logo debe ser una imagen PNG, JPG o WebP" });
-  if (entry.venue.sponsors.length >= 12) return res.status(400).json({ error: "Puedes tener hasta 12 patrocinadores" });
+  const plan = planOf(owned.account.plan);
+  const maxSponsors = Math.min(plan.sponsors ?? 12, 12);
+  if (!maxSponsors) return res.status(403).json({ error: `Con el plan ${plan.name} no hay sponsors: están desde el plan Inicial (hasta 3).`, plan: true });
+  if (entry.venue.sponsors.length >= maxSponsors) return res.status(403).json({ error: `Con el plan ${plan.name} puedes tener hasta ${maxSponsors} sponsors.`, plan: true });
   const name = clean(decodeURIComponent(String(req.header("x-sponsor-name") ?? "")), 60);
   if (!name) return res.status(400).json({ error: "Escribe el nombre del patrocinador" });
   const fileName = `${entry.venue.id}-${randomUUID()}.${type.ext}`;
@@ -572,6 +635,8 @@ app.post("/api/company/events/:id/logo", express.raw({ type: Object.keys(IMAGE_T
   const owned = ownedEvent(req, res);
   if (!owned) return;
   const { entry } = owned;
+  const plan = planOf(owned.account.plan);
+  if (!plan.logo) return res.status(403).json({ error: `Con el plan ${plan.name} se muestra el nombre del evento. El logo propio está desde el plan Comunidad.`, plan: true });
   const type = IMAGE_TYPES[String(req.header("content-type")).split(";")[0]!];
   const body = req.body;
   if (!type || !Buffer.isBuffer(body) || !type.magic(body)) return res.status(400).json({ error: "El logo debe ser una imagen PNG, JPG o WebP" });
@@ -630,6 +695,17 @@ function sceneMapFor(u: User): SceneMap {
   if (!state) return RECEPTION;
   if (u.roomId) return interiorOf(state.venue, u.roomId);
   return state.floors[u.floor] ?? state.floors[0]!;
+}
+
+/** «2 días y 3 horas», «45 minutos»: cuánto falta para que abra un evento. */
+function untilText(ms: number) {
+  const minutes = Math.ceil(ms / 60_000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  if (days) return hours ? `${plural(days, "día", "días")} y ${plural(hours, "hora", "horas")}` : plural(days, "día", "días");
+  if (hours) return plural(hours, "hora", "horas");
+  return plural(minutes, "minuto", "minutos");
 }
 
 const guestName = () => `Invitado ${Math.floor(1000 + Math.random() * 9000)}`;
@@ -933,8 +1009,15 @@ io.on("connection", (socket) => {
         return ack({ ok: false, error: `Lo siento, ${conn.account.email} no está en la lista de invitados del evento ${id}.` });
       }
     }
-    // Tope de personas a la vez; el equipo del evento (organización, ponentes, sponsors) entra igual.
-    const limit = peopleLimitFor(state.venue.theme);
+    // Fuera de su horario no se entra; la organización sí, para prepararlo.
+    const schedule = state.venue.schedule;
+    if (schedule && !roleInfo) {
+      const now = Date.now();
+      if (now < schedule.start) return ack({ ok: false, error: `El evento ${id} todavía no abrió: abre en ${untilText(schedule.start - now)}.` });
+      if (now > schedule.end) return ack({ ok: false, error: `El evento ${id} ya terminó. ¡Gracias por venir!` });
+    }
+    // Tope de personas a la vez según el plan del dueño (los de ejemplo, como Pro); el equipo del evento entra igual.
+    const limit = planOf(state.ownerId ? (accounts.byIdOrNull(state.ownerId)?.plan ?? "free") : "pro").people;
     if (!roleInfo && usersIn(id).length >= limit) {
       return ack({ ok: false, error: `El evento ${id} está lleno: ya hay ${limit} personas, que es el máximo. Prueba de nuevo en un rato.` });
     }

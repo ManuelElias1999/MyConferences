@@ -2170,3 +2170,95 @@ textarea {
   background: #fde68a;
   color: #78350f;
 }
+
+/* Planes. */
+.plans-scroll {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.plans-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.plans-table th,
+.plans-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.plans-table thead th {
+  vertical-align: bottom;
+}
+.plans-table thead th > * {
+  display: block;
+  margin-top: 4px;
+}
+.plans-table thead th > .btn,
+.plans-table thead th > .badge {
+  display: inline-block;
+}
+.plans-table tbody th {
+  font-weight: 600;
+  color: var(--muted);
+  width: 22%;
+}
+.plans-table .current {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.plans-section th {
+  padding-top: 16px;
+  color: var(--text) !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.74rem;
+}
+.plan-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.plan-pitch {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.plans-table.compact {
+  min-width: 480px;
+}
+.plans-subtitle {
+  margin: 18px 0 0;
+}
+.plan-pending {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: #fef3c7;
+  color: #78350f;
+}
+.plan-line {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.theme-card.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.check.locked {
+  color: var(--muted);
+}
+.admin-plan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.company-head .plan-line {
+  color: rgb(255 255 255 / 0.75);
+}
+.company-head .plan-line .link {
+  color: #fff;
+}

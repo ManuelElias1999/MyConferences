@@ -1,5 +1,6 @@
 // Tipos compartidos entre el servidor y el cliente.
 
+import type { PlanId } from "./plans.ts";
 import type { ThemeId } from "./themes.ts";
 
 export type HairStyle = "short" | "long" | "spiky" | "bun" | "cap" | "bald";
@@ -24,10 +25,12 @@ export interface Account {
   company: { name: string } | null;
   /** Confirmó su correo con el código que le llegó: recién entonces puede entrar. */
   verified: boolean;
-  /** Administra la plataforma: decide quién puede crear eventos. */
+  /** Administra la plataforma: asigna los planes. */
   admin: boolean;
-  /** Puede crear eventos (lo habilita la administración). */
-  canCreateEvents: boolean;
+  /** Plan de la cuenta: qué eventos puede organizar (ver shared/plans.ts). */
+  plan: PlanId;
+  /** Plan que pidió desde la página de planes, mientras la administración no responde. */
+  planRequest: PlanId | null;
 }
 
 /** Una cuenta vista desde la administración. */
@@ -38,7 +41,8 @@ export interface AdminAccount {
   company: string | null;
   verified: boolean;
   admin: boolean;
-  canCreateEvents: boolean;
+  plan: PlanId;
+  planRequest: PlanId | null;
   createdAt: number;
 }
 
@@ -97,6 +101,8 @@ export interface Venue extends VenueSummary {
   sponsors: Sponsor[];
   /** Hackathon: cuántos participantes espera (100 a 500). Cada 100 se habilita una sala de equipos. */
   capacity?: number;
+  /** Cuándo está abierto (timestamps en ms). null o sin definir: siempre abierto (espacio permanente). */
+  schedule?: { start: number; end: number } | null;
 }
 
 /** Cupos que se pueden elegir para un hackathon. */
@@ -121,6 +127,8 @@ export interface EventInput {
   whitelist: string[];
   /** Solo en hackathons: participantes esperados (100 a 500). */
   capacity?: number;
+  /** Cuándo abre y cierra; null para un espacio permanente (siempre abierto). */
+  schedule: { start: number; end: number } | null;
   /** Correos del equipo organizador (entran a su sala) y de los mentores. */
   staff?: string[];
   mentors?: string[];
