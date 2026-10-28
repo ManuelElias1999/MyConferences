@@ -26,7 +26,7 @@ import {
   type Tile,
   type Zone,
 } from "../../shared/maps.ts";
-import { EMOTES, isTheme, ROOM_COLORS } from "../../shared/themes.ts";
+import { EMOTES, isTheme, peopleLimitFor, ROOM_COLORS } from "../../shared/themes.ts";
 import type {
   CallInfo,
   CallMedia,
@@ -932,6 +932,11 @@ io.on("connection", (socket) => {
       if (!state.whitelist.has(conn.account.email)) {
         return ack({ ok: false, error: `Lo siento, ${conn.account.email} no está en la lista de invitados del evento ${id}.` });
       }
+    }
+    // Tope de personas a la vez; el equipo del evento (organización, ponentes, sponsors) entra igual.
+    const limit = peopleLimitFor(state.venue.theme);
+    if (!roleInfo && usersIn(id).length >= limit) {
+      return ack({ ok: false, error: `El evento ${id} está lleno: ya hay ${limit} personas, que es el máximo. Prueba de nuevo en un rato.` });
     }
 
     socket.leave("reception");

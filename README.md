@@ -11,6 +11,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 - **Para entrar hace falta una cuenta**: no hay invitados. Lo primero que se ve es la pantalla para iniciar sesión o crear la cuenta (correo, contraseña y nombre del personaje).
 - Al crearla llega por correo un **código de 6 números** que hay que escribir para confirmar el correo; sin confirmarlo no se entra a la recepción ni a los eventos. El código vence a los 15 minutos, admite 5 intentos y se puede pedir otro. Así nadie puede usar un correo ajeno para entrar a un evento privado.
 - **Crear eventos no es para todos**: solo pueden las cuentas que habilita la administración. Quien administra ve el botón **Administración**, con todas las cuentas y un interruptor «Puede crear eventos» en cada una; quien recibe el permiso ve aparecer **＋ Crear evento** sin volver a entrar. Quien ya es dueño de un evento lo puede seguir editando.
+- **Tope de personas a la vez por evento**: 50 en las temáticas Stellar, Starmaker y Hackathon; 25 en las demás. Cuando un evento se llena, la recepcionista avisa que no hay lugar. La organización, los ponentes y los sponsors del evento entran igual. Por eso el selector de cupo del hackathon (100 a 500) solo define cuántas salas de equipos tiene el plano.
 - La administración son los correos de `ADMIN_EMAILS` o de `server/data/admins.txt` (uno por línea), que se leen al arrancar el servidor.
 
 ### Para las empresas
@@ -160,7 +161,7 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 
 ## Limitaciones actuales
 
-- La transmisión en vivo va directo del ponente a cada asistente. Funciona bien con decenas de personas por sala. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
+- El audio y el video van directo entre los navegadores (sin servidor de medios), y por eso los eventos tienen un tope de 25 o 50 personas a la vez. Compartir pantalla en la tarima con muchas personas mirando exige mucho a la computadora de quien presenta. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
 - El cobro a las empresas todavía no está integrado: quién crea eventos lo decide la administración a mano. El siguiente paso podría ser conectar un medio de pago (por ejemplo Stripe) y habilitar la cuenta al pagar.

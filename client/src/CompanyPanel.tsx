@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ROOMS_PER_FLOOR, maxRoomsFor, minRoomsFor, venueFloors } from "../../shared/maps.ts";
-import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
+import { peopleLimitFor, ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import { HACKATHON_CAPACITIES, type Account, type CompanyEvent, type EventInput, type TalkInput } from "../../shared/types.ts";
 import { companyApi, loadToken } from "./lib.ts";
 import Modal from "./Modal.tsx";
@@ -214,6 +214,7 @@ function EventEditor({
               <ThemePreview theme={t.id} />
               <strong>{t.label}</strong>
               <span>{t.description}</span>
+              <span className="theme-limit">Hasta {peopleLimitFor(t.id)} personas a la vez</span>
             </button>
           ))}
         </fieldset>
@@ -222,7 +223,7 @@ function EventEditor({
           <fieldset className="capacity">
             <legend>Participantes del hackathon</legend>
             <p className="muted small">
-              Cada sala de equipos tiene lugar para 100 personas, en mesas de 6, 4 y 2. Según el cupo se habilitan más salas; las demás quedan cerradas.
+              Cada sala de equipos tiene lugar para 100 personas, en mesas de 6, 4 y 2. Según el cupo se habilitan más salas; las demás quedan cerradas. Por ahora entran hasta {peopleLimitFor("hackathon")} personas a la vez.
             </p>
             <div className="capacity-options">
               {HACKATHON_CAPACITIES.map((c) => (
