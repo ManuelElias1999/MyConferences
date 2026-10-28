@@ -18,14 +18,12 @@ export default function Reception({
   users,
   venues,
   onRequestVenue,
-  onLogin,
 }: {
   me: User;
   users: Map<string, User>;
   venues: VenueSummary[];
   /** Devuelve el nombre del salón si la recepcionista acepta, o lanza el motivo del rechazo. */
   onRequestVenue: (number: string) => Promise<string>;
-  onLogin: () => void;
 }) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [number, setNumber] = useState("");
@@ -97,7 +95,6 @@ export default function Reception({
                     ))}
                   </p>
                 )}
-                {!me.registered && <p className="npc-hint">Los eventos privados revisan tu correo: inicia sesión antes de pedirlos.</p>}
               </>
             )}
             {dialog.step === "checking" && <p>Déjame revisar la lista…</p>}
@@ -105,11 +102,6 @@ export default function Reception({
               <>
                 <p>{dialog.text}</p>
                 <div className="npc-actions">
-                  {dialog.needsLogin && (
-                    <button className="btn primary sm" onClick={onLogin}>
-                      Iniciar sesión
-                    </button>
-                  )}
                   <button className="btn sm" onClick={() => setDialog({ step: "ask" })}>
                     Probar otro número
                   </button>

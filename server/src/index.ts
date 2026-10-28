@@ -203,6 +203,63 @@ const authRoute = (handler: (body: Record<string, unknown>) => Promise<unknown>)
 app.post("/api/register", ...authRoute((body) => accounts.register(body)));
 app.post("/api/login", ...authRoute((body) => accounts.login(body)));
 
+/** La cuenta del encabezado Authorization, o null (y responde 401). */
+function accountFrom(req: express.Request, res: express.Response): Account | null {
+  const account = accounts.verify(String(req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
+  if (!account) res.status(401).json({ error: "Inicia sesión de nuevo" });
+  return account;
+}
+
+// Confirmar el correo con el código que llegó, o pedir uno nuevo.
+app.post("/api/verify", express.json({ limit: "2kb" }), async (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  try {
+    res.json({ account: await accounts.verifyCode(account.id, (req.body ?? {}).code) });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo confirmar" });
+  }
+});
+app.post("/api/verify/resend", async (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  try {
+    await accounts.resendCode(account.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo enviar el código" });
+  }
+});
+
+// Administración: ver las cuentas y decidir quién puede crear eventos.
+const adminFrom = (req: express.Request, res: express.Response) => {
+  const account = accountFrom(req, res);
+  if (account && !account.admin) {
+    res.status(403).json({ error: "Solo la administración puede ver esto" });
+    return null;
+  }
+  return account;
+};
+app.get("/api/admin/accounts", (req, res) => {
+  if (!adminFrom(req, res)) return;
+  res.json(accounts.list());
+});
+app.post("/api/admin/accounts/:id", express.json({ limit: "2kb" }), async (req, res) => {
+  if (!adminFrom(req, res)) return;
+  try {
+    const updated = await accounts.setCreator(req.params.id, Boolean((req.body ?? {}).canCreateEvents));
+    // Quien esté conectado con esa cuenta ve el cambio sin volver a entrar.
+    for (const conn of connections.values())
+      if (conn.account?.id === updated.id) {
+        conn.account = updated;
+        io.to(conn.user.id).emit("accountUpdated", updated);
+      }
+    res.json(accounts.list().find((a) => a.id === req.params.id));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo cambiar" });
+  }
+});
+
 app.use("/uploads", express.static(uploadsDir, { maxAge: "1h" }));
 
 app.post(
@@ -385,6 +442,7 @@ const json = express.json({ limit: "200kb" });
 app.post("/api/company/upgrade", json, async (req, res) => {
   const account = accounts.verify(String(req.header("authorization") ?? "").replace(/^Bearer\s+/i, ""));
   if (!account) return res.status(401).json({ error: "Inicia sesión de nuevo" });
+  if (!account.canCreateEvents) return res.status(403).json({ error: "Tu cuenta todavía no puede crear eventos: pídeselo a la administración" });
   try {
     const updated = await accounts.setCompany(account.id, (req.body ?? {}).company);
     for (const conn of connections.values()) if (conn.account?.id === updated.id) conn.account = updated;
@@ -403,6 +461,8 @@ app.get("/api/company/events", (req, res) => {
 app.post("/api/company/events", json, async (req, res) => {
   const account = companyFrom(req, res);
   if (!account) return;
+  // Crear eventos nuevos lo habilita la administración; los propios se pueden seguir editando.
+  if (!account.canCreateEvents) return res.status(403).json({ error: "Tu cuenta todavía no puede crear eventos: pídeselo a la administración" });
   const input = readEventInput(req.body ?? {}, null);
   if ("error" in input) return res.status(400).json({ error: input.error });
   const venue: Venue = {
@@ -560,8 +620,9 @@ const sceneChannel = (u: User) =>
   !u.venueId ? "reception" : u.roomId ? roomChannel(u.venueId, u.roomId) : hallChannel(u.venueId, u.floor);
 const presenceChannel = (u: User) => (u.venueId ? venueChannel(u.venueId) : "reception");
 
+/** Solo se ve a quienes entraron con una cuenta confirmada. */
 const usersIn = (venueId: string | null) =>
-  [...connections.values()].map((c) => c.user).filter((u) => u.venueId === venueId);
+  [...connections.values()].filter((c) => c.account?.verified).map((c) => c.user).filter((u) => u.venueId === venueId);
 
 function sceneMapFor(u: User): SceneMap {
   if (!u.venueId) return RECEPTION;
@@ -765,7 +826,10 @@ io.on("connection", (socket) => {
 
   socket.on("hello", (req, ack) => {
     const venuesList = [...venues.values()].filter((v) => !v.venue.private).map(({ venue: { id, name, tagline } }) => ({ id, name, tagline }));
-    if (conn) return ack({ ok: true, data: { user: conn.user, account: conn.account, users: usersIn(conn.user.venueId), venues: venuesList } });
+    if (conn) {
+      const ready = Boolean(conn.account?.verified);
+      return ack({ ok: true, data: { user: conn.user, account: conn.account, users: ready ? usersIn(conn.user.venueId) : [], venues: ready ? venuesList : [] } });
+    }
     const account = accounts.verify(req?.token);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
     const user: User = {
@@ -785,9 +849,12 @@ io.on("connection", (socket) => {
     };
     conn = { user, account };
     connections.set(socket.id, conn);
-    socket.join("reception");
-    socket.to("reception").emit("userJoined", user);
-    ack({ ok: true, data: { user, account, users: usersIn(null), venues: venuesList } });
+    // Sin una cuenta confirmada no se entra a la recepción: primero hay que iniciar sesión y confirmar el correo.
+    if (account?.verified) {
+      socket.join("reception");
+      socket.to("reception").emit("userJoined", user);
+    }
+    ack({ ok: true, data: { user, account, users: account?.verified ? usersIn(null) : [], venues: account?.verified ? venuesList : [] } });
   });
 
   socket.on("setAccount", (token, ack) => {
@@ -795,8 +862,18 @@ io.on("connection", (socket) => {
     if (conn.user.venueId) return ack({ ok: false, error: "Vuelve a recepción para cambiar de cuenta" });
     const account = token ? accounts.verify(token) : null;
     if (token && !account) return ack({ ok: false, error: "Tu sesión expiró. Inicia sesión de nuevo" });
+    const wasIn = Boolean(conn.account?.verified);
     applyAccount(account);
-    io.to("reception").emit("userUpdated", conn.user);
+    const isIn = Boolean(account?.verified);
+    // Al confirmar la cuenta se entra a la recepción; al cerrar sesión se sale.
+    if (isIn && !wasIn) {
+      socket.join("reception");
+      socket.to("reception").emit("userJoined", conn.user);
+    } else if (!isIn && wasIn) {
+      leaveCall(conn.user.id);
+      socket.leave("reception");
+      io.to("reception").emit("userLeft", conn.user.id);
+    } else if (isIn) io.to("reception").emit("userUpdated", conn.user);
     ack({ ok: true, data: { user: conn.user, account } });
   });
 
@@ -813,7 +890,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("move", (pos) => {
-    if (!conn) return;
+    if (!conn?.account?.verified) return;
     const u = conn.user;
     const map = sceneMapFor(u);
     const x = Number(pos?.x);
@@ -828,7 +905,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("say", (text) => {
-    if (!conn || conn.user.roomId) return;
+    if (!conn?.account?.verified || conn.user.roomId) return;
     const msg = clean(text, 120);
     const now = Date.now();
     if (!msg || now - lastSaid < 600) return;
@@ -840,6 +917,7 @@ io.on("connection", (socket) => {
 
   socket.on("requestVenue", (number, ack) => {
     if (!conn) return ack({ ok: false, error: "Primero entra" });
+    if (!conn.account?.verified) return ack({ ok: false, error: "Inicia sesión y confirma tu correo para entrar a un evento" });
     const u = conn.user;
     if (u.venueId) return ack({ ok: false, error: "Ya estás dentro de un salón" });
     const id = clean(number, 10).replace(/\D/g, "");
@@ -946,7 +1024,7 @@ io.on("connection", (socket) => {
 
 
   socket.on("emote", (emoji) => {
-    if (!conn || !EMOTES.includes(emoji)) return;
+    if (!conn?.account?.verified || !EMOTES.includes(emoji)) return;
     const now = Date.now();
     if (now - lastSaid < 400) return;
     lastSaid = now;
@@ -1193,7 +1271,7 @@ io.on("connection", (socket) => {
     for (const call of calls.values()) if (call.invited.delete(u.id) && call.members.size < 2 && call.invited.size === 0) endCall(call);
     leaveCurrentRoom();
     connections.delete(socket.id);
-    io.to(presenceChannel(u)).emit("userLeft", u.id);
+    if (conn.account?.verified) io.to(presenceChannel(u)).emit("userLeft", u.id);
   });
 });
 

@@ -7,17 +7,32 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_LOOK, sanitizeLook } from "../../shared/look.ts";
-import type { Account, Look } from "../../shared/types.ts";
+import type { Account, AdminAccount, Look } from "../../shared/types.ts";
+import { sendCode } from "./mail.ts";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
 const TOKEN_DAYS = 30;
 const MAX_FAILURES = 5;
 const LOCK_MS = 5 * 60_000;
+const CODE_MS = 15 * 60_000;
+const CODE_TRIES = 5;
+const RESEND_MS = 30_000;
 
-interface StoredAccount extends Account {
+interface StoredAccount {
+  id: string;
+  email: string;
+  name: string;
+  look: Look;
+  company: { name: string } | null;
   passwordHash: string;
   createdAt: number;
+  /** false hasta confirmar el correo. Las cuentas de antes de existir la confirmación no lo tienen y valen como confirmadas. */
+  verified?: boolean;
+  /** Código pendiente para confirmar el correo (guardado como hash). */
+  code?: { hash: string; expires: number; tries: number; sentAt: number };
+  /** La administración le habilitó crear eventos. */
+  creator?: boolean;
 }
 
 interface Store {
@@ -26,6 +41,16 @@ interface Store {
 }
 
 export class AccountError extends Error {}
+
+/**
+ * Cuentas de administración: los correos de ADMIN_EMAILS (separados por coma) y los de
+ * data/admins.txt (uno por línea). Se leen al arrancar el servidor.
+ */
+function loadAdmins(dataDir: string) {
+  const file = path.join(dataDir, "admins.txt");
+  const fromFile = existsSync(file) ? readFileSync(file, "utf8").split(/\r?\n/) : [];
+  return new Set([...(process.env.ADMIN_EMAILS ?? "").split(","), ...fromFile].map((e) => e.trim().toLowerCase()).filter((e) => e && !e.startsWith("#")));
+}
 
 export function createAccountStore(dataDir: string) {
   mkdirSync(dataDir, { recursive: true });
@@ -49,8 +74,33 @@ export function createAccountStore(dataDir: string) {
 
   const failures = new Map<string, { count: number; until: number }>();
 
+  const admins = loadAdmins(dataDir);
+  if (!admins.size) console.log("[cuentas] No hay administración: agrega correos en ADMIN_EMAILS o en data/admins.txt para poder habilitar a quién crea eventos.");
   const byEmail = (email: string) => store.accounts.find((a) => a.email === email);
-  const toAccount = ({ id, email, name, look, company }: StoredAccount): Account => ({ id, email, name, look, company: company ?? null });
+  const isAdmin = (a: StoredAccount) => admins.has(a.email);
+  const toAccount = (a: StoredAccount): Account => ({
+    id: a.id,
+    email: a.email,
+    name: a.name,
+    look: a.look,
+    company: a.company ?? null,
+    verified: a.verified !== false,
+    admin: isAdmin(a),
+    canCreateEvents: isAdmin(a) || Boolean(a.creator),
+  });
+  const byId = (id: string) => {
+    const account = store.accounts.find((a) => a.id === id);
+    if (!account) throw new AccountError("La cuenta ya no existe");
+    return account;
+  };
+
+  /** Genera un código de 6 dígitos, guarda su hash y lo manda por correo. */
+  async function issueCode(account: StoredAccount) {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    account.code = { hash: sign(`code:${account.id}:${code}`), expires: Date.now() + CODE_MS, tries: 0, sentAt: Date.now() };
+    await persist();
+    await sendCode(account.email, account.name, code);
+  }
 
   const sign = (payload: string) => createHmac("sha256", secret).update(payload).digest("base64url");
 
@@ -93,9 +143,12 @@ export function createAccountStore(dataDir: string) {
         company: company ? { name: company } : null,
         passwordHash: await hash(password),
         createdAt: Date.now(),
+        verified: false,
       };
       store.accounts.push(account);
       await persist();
+      // Para entrar hay que confirmar el correo con el código que le llega.
+      await issueCode(account);
       return { account: toAccount(account), token: issueToken(account.id) };
     },
 
@@ -125,6 +178,53 @@ export function createAccountStore(dataDir: string) {
       if (Number(exp) < Date.now()) return null;
       const account = store.accounts.find((a) => a.id === id);
       return account ? toAccount(account) : null;
+    },
+
+    /** Confirma el correo con el código. */
+    async verifyCode(id: string, raw: unknown) {
+      const account = byId(id);
+      if (account.verified !== false) return toAccount(account);
+      const code = typeof raw === "string" ? raw.replace(/\D/g, "") : "";
+      const pending = account.code;
+      if (!pending || pending.expires < Date.now()) throw new AccountError("El código venció. Pide uno nuevo");
+      if (pending.tries >= CODE_TRIES) throw new AccountError("Demasiados intentos. Pide un código nuevo");
+      const given = Buffer.from(sign(`code:${account.id}:${code}`));
+      const expected = Buffer.from(pending.hash);
+      if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+        pending.tries++;
+        await persist();
+        throw new AccountError("El código no es correcto");
+      }
+      account.verified = true;
+      delete account.code;
+      await persist();
+      return toAccount(account);
+    },
+
+    /** Manda un código nuevo (como mucho uno cada 30 segundos). */
+    async resendCode(id: string) {
+      const account = byId(id);
+      if (account.verified !== false) return;
+      if (account.code && Date.now() - account.code.sentAt < RESEND_MS) throw new AccountError("Espera unos segundos antes de pedir otro código");
+      await issueCode(account);
+    },
+
+    /** Todas las cuentas, para la administración. */
+    list(): AdminAccount[] {
+      return store.accounts
+        .map((a) => {
+          const acc = toAccount(a);
+          return { id: a.id, email: a.email, name: a.name, company: a.company?.name ?? null, verified: acc.verified, admin: acc.admin, canCreateEvents: acc.canCreateEvents, createdAt: a.createdAt };
+        })
+        .sort((x, y) => y.createdAt - x.createdAt);
+    },
+
+    /** La administración habilita o quita el permiso de crear eventos. */
+    async setCreator(id: string, creator: boolean) {
+      const account = byId(id);
+      account.creator = creator;
+      await persist();
+      return toAccount(account);
     },
 
     async setCompany(id: string, company: unknown) {

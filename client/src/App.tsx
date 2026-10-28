@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
 import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
-import AuthDialog from "./AuthDialog.tsx";
+import AdminPanel from "./AdminPanel.tsx";
+import Gate from "./Gate.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
 import { usePrivateCall } from "./call.ts";
@@ -27,14 +28,12 @@ export default function App() {
   const [place, setPlace] = useState<Place>({ kind: "reception" });
   const [connected, setConnected] = useState(socket.connected);
   const [fading, setFading] = useState(false);
-  const [auth, setAuth] = useState<"login" | "register" | "company" | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [panelNew, setPanelNew] = useState(false);
-  /** Al registrarse desde «Crear evento», se abre el panel apenas termina. */
-  const openPanelAfterAuth = useRef(false);
   const [notice, setNotice] = useState("");
   const call = usePrivateCall(me?.id ?? null);
   // En una sala con tarima, la pantalla que comparte quien está arriba se ve en la pantalla grande del plano.
@@ -132,6 +131,8 @@ export default function App() {
 
   // ----- Conexión -----
 
+  // Pide al servidor el estado de la recepción (también después de iniciar sesión o confirmar el correo).
+  const helloRef = useRef<() => void>(() => {});
   useEffect(() => {
     const hello = () => {
       const token = loadToken();
@@ -152,6 +153,10 @@ export default function App() {
         });
       });
     };
+    helloRef.current = hello;
+    // La administración cambió algo de tu cuenta (por ejemplo, te habilitó crear eventos).
+    const onAccount = (acc: Account) => setAccount(acc);
+    socket.on("accountUpdated", onAccount);
     const onConnect = () => {
       setConnected(true);
       hello();
@@ -204,6 +209,7 @@ export default function App() {
       socket.off("moved", onMoved);
       socket.off("venueUpdated", onVenue);
       socket.off("evicted", onEvicted);
+      socket.off("accountUpdated", onAccount);
     };
   }, [enterRoom]);
 
@@ -262,27 +268,39 @@ export default function App() {
 
   // ----- Cuenta -----
 
-  const onAuthDone = ({ token }: { token: string }, created: boolean) => {
+  /** Quien acaba de crear su cuenta elige su personaje apenas confirma el correo. */
+  const justRegistered = useRef(false);
+
+  /** Avisa al servidor con qué cuenta estás; si está confirmada, entras a la recepción. */
+  const signInWith = (token: string) => {
     saveToken(token);
     socket.emit("setAccount", token, (res) => {
       if (!res.ok) return;
       setMe(res.data.user);
       setAccount(res.data.account);
-      setAuth(null);
-      if (openPanelAfterAuth.current && res.data.account?.company) {
-        openPanelAfterAuth.current = false;
-        setPanelOpen(true);
-      } else if (created) setEditor({ welcome: true });
+      if (!res.data.account?.verified) return;
+      helloRef.current();
+      if (justRegistered.current) {
+        justRegistered.current = false;
+        setEditor({ welcome: true });
+      }
     });
   };
+  const onAuthDone = ({ token }: { token: string }, created: boolean) => {
+    if (created) justRegistered.current = true;
+    signInWith(token);
+  };
+  const onVerified = () => {
+    const token = loadToken();
+    if (token) signInWith(token);
+  };
 
-  /** «Crear evento»: según la cuenta, registra una empresa, convierte la cuenta o abre el panel. */
+  /** «Crear evento»: solo con permiso; si la cuenta no tiene nombre de organización, primero lo pide. */
   const startCreateEvent = () => {
+    if (!account?.canCreateEvents) return;
     setPanelNew(true);
-    if (account?.company) return setPanelOpen(true);
-    if (account) return setUpgrading(true);
-    openPanelAfterAuth.current = true;
-    setAuth("company");
+    if (account.company) return setPanelOpen(true);
+    setUpgrading(true);
   };
 
   const logout = () => {
@@ -293,6 +311,11 @@ export default function App() {
       setAccount(null);
     });
   };
+
+  // Sin una cuenta con el correo confirmado no se entra: primero la puerta de entrada.
+  if (me && (!account || !account.verified)) {
+    return <Gate account={account} onAuthDone={onAuthDone} onVerified={onVerified} onLogout={logout} />;
+  }
 
   if (!me) {
     return (
@@ -342,12 +365,13 @@ export default function App() {
           <AvatarCanvas look={me.look} size={34} head />
           <span className="me-name">
             {me.name}
-            {!account && <small className="badge">Invitado</small>}
             {me.speakerFor && me.speakerFor === room?.id && <small className="badge">Ponente</small>}
           </span>
-          <button className="btn primary sm" onClick={startCreateEvent}>
-            ＋ Crear evento
-          </button>
+          {account?.canCreateEvents && (
+            <button className="btn primary sm" onClick={startCreateEvent}>
+              ＋ Crear evento
+            </button>
+          )}
           {account?.company && (
             <button
               className="btn sm"
@@ -359,33 +383,28 @@ export default function App() {
               Mis eventos
             </button>
           )}
+          {account?.admin && (
+            <button className="btn sm" onClick={() => setAdminOpen(true)}>
+              Administración
+            </button>
+          )}
           {account && (
             <button className="btn sm" onClick={() => setEditor({ welcome: false })}>
               Mi personaje
             </button>
           )}
-          {place.kind === "reception" &&
-            (account ? (
-              <button className="btn ghost sm" onClick={logout}>
-                Cerrar sesión
-              </button>
-            ) : (
-              <>
-                <button className="btn ghost sm" onClick={() => setAuth("login")}>
-                  Iniciar sesión
-                </button>
-                <button className="btn primary sm" onClick={() => setAuth("register")}>
-                  Crear cuenta
-                </button>
-              </>
-            ))}
+          {place.kind === "reception" && account && (
+            <button className="btn ghost sm" onClick={logout}>
+              Cerrar sesión
+            </button>
+          )}
         </div>
       </header>
 
       {!connected && <div className="banner">Conexión perdida. Reconectando…</div>}
 
       {place.kind === "reception" && (
-        <Reception me={me} users={usersRef.current} venues={venues} onRequestVenue={requestVenue} onLogin={() => setAuth("login")} />
+        <Reception me={me} users={usersRef.current} venues={venues} onRequestVenue={requestVenue} />
       )}
       {place.kind === "hall" && (
         <Hall
@@ -466,16 +485,7 @@ export default function App() {
           }}
         />
       )}
-      {auth && (
-        <AuthDialog
-          initialMode={auth}
-          onDone={onAuthDone}
-          onClose={() => {
-            openPanelAfterAuth.current = false;
-            setAuth(null);
-          }}
-        />
-      )}
+      {adminOpen && account?.admin && <AdminPanel onClose={() => setAdminOpen(false)} />}
       {editor && account && (
         <AvatarEditor
           account={account}

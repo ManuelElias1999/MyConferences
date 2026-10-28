@@ -2098,3 +2098,70 @@ textarea {
 .meeting-staff .btn {
   margin-top: 0;
 }
+
+/* Entrada: iniciar sesión, crear la cuenta y confirmar el correo. */
+.gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: radial-gradient(circle at 20% 10%, rgba(255, 92, 57, 0.12), transparent 40%), radial-gradient(circle at 80% 90%, rgba(47, 107, 255, 0.12), transparent 40%), #f4f1ea;
+}
+.gate-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(22, 22, 29, 0.12);
+}
+.gate-brand {
+  margin-bottom: 18px;
+  font-size: 20px;
+}
+.gate-title {
+  margin: 0;
+  font-size: 22px;
+}
+.gate-links {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.code-input {
+  font-size: 24px;
+  letter-spacing: 8px;
+  text-align: center;
+}
+
+/* Administración. */
+.admin-search {
+  width: 100%;
+  margin: 8px 0;
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(22, 22, 29, 0.2);
+}
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 60vh;
+  overflow: auto;
+}
+.admin-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(22, 22, 29, 0.08);
+}
+.admin-list p {
+  margin: 0;
+}
+.badge.warn {
+  background: #fde68a;
+  color: #78350f;
+}

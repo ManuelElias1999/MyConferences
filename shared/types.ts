@@ -20,8 +20,26 @@ export interface Account {
   email: string;
   name: string;
   look: Look;
-  /** Si es una cuenta de empresa, puede organizar eventos. */
+  /** Nombre de la empresa u organización con la que firma sus eventos. */
   company: { name: string } | null;
+  /** Confirmó su correo con el código que le llegó: recién entonces puede entrar. */
+  verified: boolean;
+  /** Administra la plataforma: decide quién puede crear eventos. */
+  admin: boolean;
+  /** Puede crear eventos (lo habilita la administración). */
+  canCreateEvents: boolean;
+}
+
+/** Una cuenta vista desde la administración. */
+export interface AdminAccount {
+  id: string;
+  email: string;
+  name: string;
+  company: string | null;
+  verified: boolean;
+  admin: boolean;
+  canCreateEvents: boolean;
+  createdAt: number;
 }
 
 export interface Room {
@@ -300,6 +318,8 @@ export interface ServerToClientEvents {
   callSignal: (from: string, signal: CallSignal) => void;
   /** Aviso sobre las charlas (por ejemplo, una mesa llena). */
   callNotice: (text: string) => void;
+  /** Cambió algo de tu cuenta (por ejemplo, la administración te habilitó crear eventos). */
+  accountUpdated: (account: Account) => void;
   /** El servidor te movió a otro lugar del plano (por ejemplo, al repartir en salas). */
   teleport: (pos: { x: number; y: number }) => void;
 }

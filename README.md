@@ -6,9 +6,16 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 ## Cómo funciona
 
+### Cuentas
+
+- **Para entrar hace falta una cuenta**: no hay invitados. Lo primero que se ve es la pantalla para iniciar sesión o crear la cuenta (correo, contraseña y nombre del personaje).
+- Al crearla llega por correo un **código de 6 números** que hay que escribir para confirmar el correo; sin confirmarlo no se entra a la recepción ni a los eventos. El código vence a los 15 minutos, admite 5 intentos y se puede pedir otro. Así nadie puede usar un correo ajeno para entrar a un evento privado.
+- **Crear eventos no es para todos**: solo pueden las cuentas que habilita la administración. Quien administra ve el botón **Administración**, con todas las cuentas y un interruptor «Puede crear eventos» en cada una; quien recibe el permiso ve aparecer **＋ Crear evento** sin volver a entrar. Quien ya es dueño de un evento lo puede seguir editando.
+- La administración son los correos de `ADMIN_EMAILS` o de `server/data/admins.txt` (uno por línea), que se leen al arrancar el servidor.
+
 ### Para las empresas
 
-- El botón **＋ Crear evento** está siempre arriba. Si no tienes cuenta, te registra como empresa. Si tienes una cuenta personal, la convierte en cuenta de empresa. Luego abre el panel en «Nuevo evento».
+- Con permiso para crear eventos, el botón **＋ Crear evento** aparece arriba. La primera vez pide el nombre de la organización con la que se firman los eventos; luego abre el panel en «Nuevo evento».
 - En el panel (**Mis eventos**) se configura cada evento:
   - nombre y descripción;
   - **temática** del recinto: tecnológica, minimalista, rústica, medieval, jardín, **Stellar** o **Hackathon**, con vista previa del recinto completo;
@@ -87,7 +94,9 @@ npm run dev
 
 Abre http://localhost:5173. Al arrancar, el servidor muestra en la terminal las salas, cuántos invitados tiene cada una privada y el **código de ponente** de cada sala.
 
-Para probar con varias personas, abre la app en otra ventana o en modo incógnito.
+Para probar con varias personas, abre la app en otra ventana o en modo incógnito. Sin `SMTP_URL`, el código para confirmar cada cuenta nueva se muestra en la terminal del servidor (`[correo] Código para ana@ejemplo.com: 123456`).
+
+Para administrar, agrega tu correo a `server/data/admins.txt` (uno por línea) o arranca con `ADMIN_EMAILS=tu@correo.com npm run dev`.
 
 ### Listas de invitados de los eventos de ejemplo
 
@@ -123,6 +132,9 @@ Variables de entorno:
 | `EVENT_NAME` | Nombre del evento de ejemplo 101. |
 | `VENUE_WHITELISTS` | Correos invitados a los eventos de ejemplo privados (ver arriba). |
 | `SPEAKER_CODES` | Códigos fijos de ponente, por ejemplo `101/stellar:ABC123,202/soroban:XYZ789`. Las salas sin código fijo reciben uno aleatorio al arrancar. |
+| `ADMIN_EMAILS` | Correos de administración, separados por coma (además de los de `server/data/admins.txt`). Pueden habilitar a quién crea eventos. |
+| `SMTP_URL` | Servidor de correo para mandar los códigos de confirmación, por ejemplo `smtps://usuario:clave@smtp.ejemplo.com:465`. Sin él, los códigos se muestran en la terminal. |
+| `MAIL_FROM` | Remitente de esos correos (por defecto `MyConferences <no-reply@myconferences.app>`). |
 | `SESSION_SECRET` | Clave para firmar las sesiones. Si no se define, se genera una y se guarda en `server/data/accounts.json`. |
 | `DATA_DIR` | Carpeta de las cuentas, los eventos de las empresas y las listas de invitados (por defecto `server/data`). |
 
@@ -151,6 +163,7 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 - La transmisión en vivo va directo del ponente a cada asistente. Funciona bien con decenas de personas por sala. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
-- El cobro a las empresas todavía no está integrado: cualquiera puede crear una cuenta de empresa. El siguiente paso es conectar un medio de pago (por ejemplo Stripe) y activar la cuenta al pagar.
+- El cobro a las empresas todavía no está integrado: quién crea eventos lo decide la administración a mano. El siguiente paso podría ser conectar un medio de pago (por ejemplo Stripe) y habilitar la cuenta al pagar.
+- No hay recuperación de contraseña todavía.
 - Cada evento tiene el auditorio y entre 8 y 16 salas. En el piso de arriba, los puestos sin sala muestran un cuadro en el muro.
 - La agenda se genera alrededor de la hora en que arranca el servidor, para que siempre haya algo en vivo durante la demo.

@@ -33,6 +33,19 @@ export async function authRequest(kind: "login" | "register", body: Record<strin
   return data as { account: Account; token: string };
 }
 
+/** Pedido a la API con la sesión guardada (confirmar el correo, administración). */
+export async function accountApi<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const token = loadToken();
+  const res = await fetch(`/api${path}`, {
+    method: init.method ?? (init.body === undefined ? "GET" : "POST"),
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? "No se pudo conectar con el servidor");
+  return data as T;
+}
+
 export const formatTime = (ts: number) =>
   new Date(ts).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 
