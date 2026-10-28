@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PLANS, planOf, type PlanId } from "../../shared/plans.ts";
+import { COMMUNITIES, PLANS, planOf, type PlanId } from "../../shared/plans.ts";
 import type { AdminAccount } from "../../shared/types.ts";
 import { accountApi } from "./lib.ts";
 import Modal from "./Modal.tsx";
@@ -17,11 +17,11 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
       .catch((err: Error) => setError(err.message));
   }, []);
 
-  const setPlan = async (a: AdminAccount, plan: PlanId) => {
+  const change = async (a: AdminAccount, body: { plan?: PlanId; communities?: string[] }) => {
     setBusy(a.id);
     setError("");
     try {
-      const updated = await accountApi<AdminAccount>(`/admin/accounts/${a.id}`, { body: { plan } });
+      const updated = await accountApi<AdminAccount>(`/admin/accounts/${a.id}`, { body });
       setList((l) => l?.map((x) => (x.id === a.id ? updated : x)) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cambiar");
@@ -63,9 +63,23 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
                     {a.company && ` · ${a.company}`}
                   </p>
                 </div>
+                <div className="admin-controls">
+                {COMMUNITIES.map((c) => (
+                  <label key={c.id} className="check" title={`Puede usar las temáticas exclusivas de ${c.name}`}>
+                    <input
+                      type="checkbox"
+                      checked={a.communities.includes(c.id)}
+                      disabled={busy === a.id || !a.verified || a.admin}
+                      onChange={(e) =>
+                        void change(a, { communities: e.target.checked ? [...a.communities, c.id] : a.communities.filter((x) => x !== c.id) })
+                      }
+                    />
+                    Comunidad {c.name}
+                  </label>
+                ))}
                 <label className="admin-plan">
                   Plan
-                  <select value={a.plan} disabled={busy === a.id || !a.verified} onChange={(e) => void setPlan(a, e.target.value as PlanId)}>
+                  <select value={a.plan} disabled={busy === a.id || !a.verified} onChange={(e) => void change(a, { plan: e.target.value as PlanId })}>
                     {PLANS.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -73,6 +87,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
                     ))}
                   </select>
                 </label>
+                </div>
               </li>
             ))}
             {shown.length === 0 && <li className="muted small">No hay cuentas que coincidan.</li>}

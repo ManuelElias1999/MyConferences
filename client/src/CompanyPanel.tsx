@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ROOMS_PER_FLOOR, maxRoomsFor, minRoomsFor, venueFloors } from "../../shared/maps.ts";
-import { firstPlanWithTheme, monthUsage, planOf, themeAllowed, type Plan, type PlanUsage } from "../../shared/plans.ts";
+import { monthUsage, planOf, themeLock, type Plan, type PlanUsage } from "../../shared/plans.ts";
 import { ROOM_COLORS, THEMES, type ThemeId } from "../../shared/themes.ts";
 import { HACKATHON_CAPACITIES, type Account, type CompanyEvent, type EventInput, type TalkInput } from "../../shared/types.ts";
 import { accountApi, companyApi, loadToken } from "./lib.ts";
@@ -66,47 +66,97 @@ const PlanError = ({ text, onPlans }: { text: string; onPlans: () => void }) => 
   </p>
 );
 
-/** Agenda de una sala: cada charla con título, ponente, inicio y duración. */
-function TalksEditor({ talks, onChange }: { talks: TalkInput[]; onChange: (talks: TalkInput[]) => void }) {
+const dayOf = (ms: number) => toLocalInput(ms).slice(0, 10);
+const timeOf = (ms: number) => toLocalInput(ms).slice(11);
+/** «2026-10-06» + «18:30» en hora local → timestamp. */
+const at = (day: string, time: string) => new Date(`${day}T${time}`).getTime();
+
+/** Agenda de una sala: cada charla con su nombre, ponente, día y de qué hora a qué hora. */
+function TalksEditor({
+  room,
+  talks,
+  window,
+  onChange,
+}: {
+  room: string;
+  talks: TalkInput[];
+  /** Horario del evento (null si es permanente): las charlas tienen que caer adentro. */
+  window: { start: number; end: number } | null;
+  onChange: (talks: TalkInput[]) => void;
+}) {
   const set = (i: number, patch: Partial<TalkInput>) => onChange(talks.map((t, j) => (j === i ? { ...t, ...patch } : t)));
   return (
     <div className="talks-editor">
-      {talks.map((t, i) => (
-        <div key={i} className="talk-row">
-          <input value={t.title} onChange={(e) => set(i, { title: e.target.value })} maxLength={100} placeholder="Título de la charla" aria-label="Título de la charla" required />
-          <input value={t.speaker} onChange={(e) => set(i, { speaker: e.target.value })} maxLength={60} placeholder="Ponente" aria-label="Ponente" />
-          <input
-            type="datetime-local"
-            value={toLocalInput(t.start)}
-            onChange={(e) => {
-              const start = new Date(e.target.value).getTime();
-              if (Number.isFinite(start)) set(i, { start, end: start + (t.end - t.start) });
-            }}
-            aria-label="Inicio"
-            required
-          />
-          <select value={Math.round((t.end - t.start) / 60_000)} onChange={(e) => set(i, { end: t.start + Number(e.target.value) * 60_000 })} aria-label="Duración">
-            {[15, 20, 30, 45, 60, 90, 120, 180].map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn ghost sm" onClick={() => onChange(talks.filter((_, j) => j !== i))} aria-label="Quitar charla">
-            ✕
-          </button>
+      <p className="talks-title">Agenda de {room || "esta sala"}</p>
+      {talks.length > 0 && (
+        <div className="talk-row talk-head" aria-hidden>
+          <span>Charla</span>
+          <span>Ponente</span>
+          <span>Día</span>
+          <span>Desde</span>
+          <span>Hasta</span>
+          <span />
         </div>
-      ))}
+      )}
+      {talks.map((t, i) => {
+        const problem =
+          t.end <= t.start
+            ? "Termina antes de empezar: revisa las horas."
+            : window && (t.start < window.start || t.end > window.end)
+              ? "Queda fuera del horario del evento (en «Cuándo»)."
+              : "";
+        return (
+          <div key={i} className={`talk-row ${problem ? "invalid" : ""}`}>
+            <input value={t.title} onChange={(e) => set(i, { title: e.target.value })} maxLength={100} placeholder="Nombre de la charla" aria-label="Nombre de la charla" required />
+            <input value={t.speaker} onChange={(e) => set(i, { speaker: e.target.value })} maxLength={60} placeholder="Quién la da" aria-label="Ponente" />
+            <input
+              type="date"
+              value={dayOf(t.start)}
+              onChange={(e) => {
+                const start = at(e.target.value, timeOf(t.start));
+                if (Number.isFinite(start)) set(i, { start, end: start + (t.end - t.start) });
+              }}
+              aria-label="Día"
+              required
+            />
+            <input
+              type="time"
+              value={timeOf(t.start)}
+              onChange={(e) => {
+                const start = at(dayOf(t.start), e.target.value);
+                if (Number.isFinite(start)) set(i, { start, end: t.end > start ? t.end : start + 45 * 60_000 });
+              }}
+              aria-label="Desde"
+              required
+            />
+            <input
+              type="time"
+              value={timeOf(t.end)}
+              onChange={(e) => {
+                const end = at(dayOf(t.start), e.target.value);
+                if (Number.isFinite(end)) set(i, { end });
+              }}
+              aria-label="Hasta"
+              required
+            />
+            <button type="button" className="btn ghost sm" onClick={() => onChange(talks.filter((_, j) => j !== i))} aria-label="Quitar charla" title="Quitar charla">
+              ✕
+            </button>
+            {problem && <p className="error small talk-problem">{problem}</p>}
+          </div>
+        );
+      })}
+      {talks.length === 0 && <p className="muted small">Todavía no hay charlas en esta sala.</p>}
       <button
         type="button"
-        className="link small"
+        className="btn sm"
         onClick={() => {
           const last = talks[talks.length - 1];
-          const start = last ? last.end + 15 * 60_000 : nextHour();
+          const start = last ? last.end + 15 * 60_000 : (window?.start ?? nextHour());
           onChange([...talks, { title: "", speaker: "", start, end: start + 45 * 60_000 }]);
         }}
       >
-        ＋ Agregar charla
+        ＋ Agregar charla en {room || "esta sala"}
       </button>
     </div>
   );
@@ -115,6 +165,7 @@ function TalksEditor({ talks, onChange }: { talks: TalkInput[]; onChange: (talks
 function EventEditor({
   initial,
   plan,
+  communities,
   onSaved,
   onDeleted,
   onVisit,
@@ -123,6 +174,8 @@ function EventEditor({
 }: {
   initial: CompanyEvent | null;
   plan: Plan;
+  /** Comunidades de la cuenta: habilitan sus temáticas exclusivas. */
+  communities: string[];
   onSaved: (ev: CompanyEvent) => void;
   onDeleted: (id: string) => void;
   onVisit: (id: string) => void;
@@ -161,7 +214,6 @@ function EventEditor({
           ...Array.from({ length: ROOMS_PER_FLOOR }, (_, i) => ({ ...blankRoom(i + 1), name: `Sala ${i + 1}` })),
         ],
   );
-  const [openAgenda, setOpenAgenda] = useState<number | null>(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -237,7 +289,8 @@ function EventEditor({
         <fieldset className="themes">
           <legend>Estilo del lugar</legend>
           {THEMES.map((t) => {
-            const allowed = themeAllowed(plan, t.id);
+            const lock = themeLock(plan, communities, t.id);
+            const allowed = !lock;
             return (
               <button
                 key={t.id}
@@ -252,10 +305,12 @@ function EventEditor({
                   if (t.id === "hackathon") setHours(Math.min(72, plan.hackathonDays * 24));
                 }}
               >
-                <ThemePreview theme={t.id} />
+                <span className="theme-thumb">
+                  <ThemePreview theme={t.id} />
+                  {lock && <span className="lock-ribbon">🔒 {lock}</span>}
+                </span>
                 <strong>{t.label}</strong>
                 <span>{t.description}</span>
-                {!allowed && <span className="theme-limit">🔒 Desde el plan {firstPlanWithTheme(t.id).name}</span>}
               </button>
             );
           })}
@@ -269,7 +324,7 @@ function EventEditor({
           </label>
           <label className={`check ${plan.permanent ? "" : "locked"}`}>
             <input type="radio" name="when" checked={permanent} disabled={!plan.permanent && !permanent} onChange={() => setPermanent(true)} />
-            Espacio permanente: siempre abierto, como unas oficinas {!plan.permanent && <span className="muted small">🔒 Desde el plan Comunidad</span>}
+            Espacio permanente: siempre abierto, como unas oficinas {!plan.permanent && <span className="lock-pill">🔒 Desde el plan Comunidad</span>}
           </label>
           {!permanent && (
             <div className="form-row">
@@ -325,7 +380,7 @@ function EventEditor({
           <legend>Acceso</legend>
           <label className={`check ${plan.privateEvents ? "" : "locked"}`}>
             <input type="radio" name="access" checked={isPrivate} disabled={!plan.privateEvents && !isPrivate} onChange={() => setPrivate(true)} />
-            Privado: solo entran los correos de la lista {!plan.privateEvents && <span className="muted small">🔒 Desde el plan Inicial</span>}
+            Privado: solo entran los correos de la lista {!plan.privateEvents && <span className="lock-pill">🔒 Desde el plan Inicial</span>}
           </label>
           <label className="check">
             <input type="radio" name="access" checked={!isPrivate} onChange={() => setPrivate(false)} />
@@ -350,7 +405,12 @@ function EventEditor({
             <textarea value={staff} onChange={(e) => setStaff(e.target.value)} rows={2} placeholder="equipo@empresa.com" />
           </label>
           {plan.mentors === 0 ? (
-            <p className="muted small">🔒 Los mentores están desde el plan Inicial.</p>
+            <p className="locked-box">
+              <span className="lock-pill">🔒 Desde el plan Inicial</span> Mentores: personas a las que la gente puede ir a consultar.{" "}
+              <button type="button" className="link small" onClick={onPlans}>
+                Ver planes
+              </button>
+            </p>
           ) : (
             <label>
               Mentores <span className="muted small">(correos{plan.mentors !== null && `, hasta ${plan.mentors}`})</span>
@@ -366,7 +426,7 @@ function EventEditor({
               ? `Un hackathon tiene el auditorio principal y ${maxRoomsFor(theme) - 1} salas de charla: 4 en la planta baja y 4 arriba, cada una lejos de las demás.`
               : theme === "starmaker"
                 ? "Las oficinas Starmaker son de un solo piso y tienen una sola sala: la principal (por ejemplo, «Sala Stellar»), que es su sala de reunión, derecho desde la entrada. Ahí todos hablan y comparten pantalla, y el equipo organizador puede repartir a la gente al azar en 8 salas chiquitas. Su agenda es la de la reunión."
-                : `Mínimo ${minRoomsFor(theme) - 1} salas más el auditorio principal, y hasta ${maxRoomsFor(theme) - 1}. Las primeras ${ROOMS_PER_FLOOR} van en la planta baja; las siguientes, en el piso de arriba.`} Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala Stellar).
+                : `Mínimo ${minRoomsFor(theme) - 1} salas más el auditorio principal, y hasta ${maxRoomsFor(theme) - 1}. Las primeras ${ROOMS_PER_FLOOR} van en la planta baja; las siguientes, en el piso de arriba.`} Cada sala tiene una forma distinta: aula, teatro en abanico, anfiteatro en U o sala ancha, y puede tener su propia temática (por ejemplo, una sala medieval).
           </p>
           {rooms.map((r, i) => (
             <div key={r.id ?? `new-${i}`} className={`room-block ${i === 0 ? "main" : ""}`} style={{ "--room": r.color } as React.CSSProperties}>
@@ -384,27 +444,28 @@ function EventEditor({
                 </select>
                 <select value={r.theme ?? ""} onChange={(e) => setRoom(i, { theme: (e.target.value || null) as ThemeId | null })} aria-label="Temática de la sala" title="Temática de la sala">
                   <option value="">Temática del evento</option>
-                  {THEMES.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
+                  {THEMES.map((t) => {
+                    const lock = themeLock(plan, communities, t.id);
+                    return (
+                      <option key={t.id} value={t.id} disabled={!!lock && r.theme !== t.id}>
+                        {t.label}
+                        {lock ? ` 🔒 (${lock.toLowerCase()})` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 {r.id && initial?.speakerCodes[r.id] && (
                   <span className="code-chip" title="Código de ponente">
                     🎤 {initial.speakerCodes[r.id]}
                   </span>
                 )}
-                <button type="button" className="btn ghost sm" onClick={() => setOpenAgenda(openAgenda === i ? null : i)} aria-expanded={openAgenda === i}>
-                  Agenda ({r.talks.length})
-                </button>
                 {i > 0 && rooms.length > minRoomsFor(theme) && (
                   <button type="button" className="btn ghost sm" onClick={() => setRooms((rs) => rs.filter((_, j) => j !== i))} aria-label="Quitar sala">
                     ✕
                   </button>
                 )}
               </div>
-              {openAgenda === i && <TalksEditor talks={r.talks} onChange={(talks) => setRoom(i, { talks })} />}
+              <TalksEditor room={r.name} talks={r.talks} window={permanent ? null : { start, end: start + duration * HOUR }} onChange={(talks) => setRoom(i, { talks })} />
             </div>
           ))}
           {rooms.length > maxRoomsFor(theme) && (
@@ -452,8 +513,8 @@ function EventLogo({ event, plan, onChange, onPlans }: { event: CompanyEvent; pl
     return (
       <section className="sponsors-editor">
         <h3>Logo del evento</h3>
-        <p className="muted small">
-          🔒 En la pantalla gigante del lobby se muestra el nombre del evento. El logo propio está desde el plan Comunidad.{" "}
+        <p className="locked-box">
+          <span className="lock-pill">🔒 Desde el plan Comunidad</span> Por ahora, en la pantalla gigante del lobby se muestra el nombre del evento.{" "}
           <button type="button" className="link small" onClick={onPlans}>
             Ver planes
           </button>
@@ -543,8 +604,8 @@ function Sponsors({ event, plan, onChange, onPlans }: { event: CompanyEvent; pla
     return (
       <section className="sponsors-editor">
         <h3>Patrocinadores</h3>
-        <p className="muted small">
-          🔒 Los sponsors, con su stand en el lugar, están desde el plan Inicial (hasta 3).{" "}
+        <p className="locked-box">
+          <span className="lock-pill">🔒 Desde el plan Inicial</span> Sponsors con su logo en las pantallas y un stand en el lugar (hasta 3).{" "}
           <button type="button" className="link small" onClick={onPlans}>
             Ver planes
           </button>
@@ -702,6 +763,7 @@ export default function CompanyPanel({
             key={selected}
             initial={selected === "new" ? null : current}
             plan={plan}
+            communities={account.communities}
             onPlans={onPlans}
             onSaved={upsert}
             onDeleted={(id) => {

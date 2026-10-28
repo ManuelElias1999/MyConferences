@@ -282,7 +282,10 @@ app.get("/api/admin/accounts", (req, res) => {
 app.post("/api/admin/accounts/:id", express.json({ limit: "2kb" }), async (req, res) => {
   if (!adminFrom(req, res)) return;
   try {
-    const updated = await accounts.setPlan(req.params.id, (req.body ?? {}).plan);
+    const body = req.body ?? {};
+    let updated = body.plan !== undefined ? await accounts.setPlan(req.params.id, body.plan) : null;
+    if (body.communities !== undefined) updated = await accounts.setCommunities(req.params.id, body.communities);
+    if (!updated) return res.status(400).json({ error: "No hay nada que cambiar" });
     pushAccount(updated);
     res.json(accounts.list().find((a) => a.id === req.params.id));
   } catch (err) {
@@ -434,6 +437,9 @@ function readEventInput(body: Record<string, unknown>, previous: StoredEvent | n
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return { error: "Revisa cuándo empieza y termina el evento" };
     if (end < Date.now() && !previous) return { error: "El evento tiene que terminar en el futuro" };
     schedule = { start, end };
+    // Las charlas tienen que caer dentro del horario del evento.
+    const outside = talks.find((t) => t.start < start || t.end > end);
+    if (outside) return { error: `La charla «${outside.title}» queda fuera del horario del evento. Revisa su hora o cuándo abre y cierra el evento.` };
   }
   return {
     schedule,
@@ -480,11 +486,11 @@ function evictVenue(venueId: string, reason: string) {
 const json = express.json({ limit: "200kb" });
 
 /** Revisa el evento contra el plan del dueño; responde el motivo si no entra. */
-function fitsPlan(account: Account, input: { theme: Venue["theme"]; private: boolean; staff: string[]; mentors: string[]; schedule: Venue["schedule"] }, previous: StoredEvent | null, res: express.Response) {
+function fitsPlan(account: Account, input: { theme: Venue["theme"]; rooms: Room[]; private: boolean; staff: string[]; mentors: string[]; schedule: Venue["schedule"] }, previous: StoredEvent | null, res: express.Response) {
   const problem = planProblem(
     planOf(account.plan),
     usageOf(account.id),
-    { theme: input.theme, private: input.private, staff: input.staff.length, mentors: input.mentors.length, schedule: input.schedule ?? null, wasPermanent: previous?.venue.schedule === null },
+    { theme: input.theme, roomThemes: input.rooms.flatMap((r) => (r.theme ? [r.theme] : [])), communities: account.communities, private: input.private, staff: input.staff.length, mentors: input.mentors.length, schedule: input.schedule ?? null, wasPermanent: previous?.venue.schedule === null },
     previous?.venue.id ?? null,
   );
   if (problem) res.status(403).json({ error: problem, plan: true });

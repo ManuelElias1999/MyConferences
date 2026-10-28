@@ -24,12 +24,15 @@ Todas las cuentas empiezan con el plan **Gratis** (la administración, con **Pro
 | Charlas y meetups | Hasta 12 h | Hasta 3 días | Hasta 3 días | Hasta 3 días | Hasta 3 días |
 | Hackathon | — | Hasta 3 días | Hasta 7 días (máx. 2 por mes) | Hasta 7 días | Hasta 7 días |
 | Espacio permanente | — | — | 1 | 3 | 3 |
-| Temáticas | Tecnológica, minimalista, jardín | Todas menos Starmaker | Todas | Todas | Todas |
+| Temáticas | Tecnológica, minimalista, jardín | Todas | Todas | Todas | Todas |
 | Evento privado | — | ✔ | ✔ | ✔ | ✔ |
 | Organizadores / mentores | 3 / — | 5 / 3 | 13 / 15 | 25 / sin límite | Sin límite |
 | Sponsors | — | 3 | 10 | Sin límite | Sin límite |
 | Logo propio | — | — | ✔ | ✔ | ✔ |
 
+- Las temáticas **Stellar** y **Starmaker (oficinas)** son exclusivas de la comunidad Stellar, sea cual sea el plan: en Administración se marca qué cuentas son de la comunidad («Comunidad Stellar»). La administración las puede usar siempre.
+- En el panel, lo que el plan no incluye se ve en gris, punteado y con un candado que dice desde qué plan está (o «Exclusiva de la comunidad Stellar»).
+- La agenda de cada sala se arma ahí mismo: cada charla con su nombre, quién la da, el día y de qué hora a qué hora. Si termina antes de empezar o queda fuera del horario del evento, se avisa en la misma fila (y el servidor no la acepta).
 - Cada evento tiene **fecha de inicio y duración**, o es un **espacio permanente** (siempre abierto, como las oficinas Starmaker). Antes de que abra y después de que cierre, la recepcionista no deja pasar; el equipo del evento sí, para prepararlo.
 - Cada hackathon cuenta como 1 evento del mes; los espacios permanentes no cuentan. Un evento cerrado sigue contando para su mes.
 - Cuando un evento llega a su tope de personas, la recepcionista avisa que está lleno. La organización, los ponentes y los sponsors entran igual. Los eventos de ejemplo usan el tope de Pro.

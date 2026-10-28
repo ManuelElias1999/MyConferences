@@ -155,6 +155,22 @@ export const ENTERPRISE_PRICES = [
   { people: 1000, price: 1500 },
 ];
 
+/**
+ * Temáticas exclusivas de una comunidad: solo las usan las cuentas de esa comunidad (las
+ * marca la administración), sea cual sea su plan.
+ */
+export const COMMUNITIES = [{ id: "stellar", name: "Stellar" }];
+export const EXCLUSIVE_THEMES: Partial<Record<ThemeId, string>> = { stellar: "stellar", starmaker: "stellar" };
+const communityName = (id: string) => COMMUNITIES.find((c) => c.id === id)?.name ?? id;
+
+/** Por qué una cuenta no puede usar una temática («Exclusiva de la comunidad Stellar», «Desde el plan Inicial»), o null. */
+export function themeLock(plan: Plan, communities: string[], theme: ThemeId): string | null {
+  const community = EXCLUSIVE_THEMES[theme];
+  if (community && !communities.includes(community)) return `Exclusiva de la comunidad ${communityName(community)}`;
+  if (!themeAllowed(plan, theme)) return `Desde el plan ${firstPlanWithTheme(theme).name}`;
+  return null;
+}
+
 export const isPlan = (value: unknown): value is PlanId => PLANS.some((p) => p.id === value);
 export const planOf = (id: PlanId | null | undefined): Plan => PLANS.find((p) => p.id === id) ?? PLANS[0]!;
 export const themeAllowed = (plan: Plan, theme: ThemeId) => !plan.themes || plan.themes.includes(theme);
@@ -191,11 +207,15 @@ const dur = (h: number) => (h % 24 === 0 ? `${h / 24} ${h === 24 ? "día" : "dí
 export function planProblem(
   plan: Plan,
   usage: PlanUsage,
-  ev: { theme: ThemeId; private: boolean; staff: number; mentors: number; schedule: { start: number; end: number } | null; wasPermanent: boolean },
+  ev: { theme: ThemeId; roomThemes: ThemeId[]; communities: string[]; private: boolean; staff: number; mentors: number; schedule: { start: number; end: number } | null; wasPermanent: boolean },
   editing: string | null,
 ): string | null {
   const upgrade = `Con el plan ${plan.name}`;
-  if (!themeAllowed(plan, ev.theme)) return `${upgrade} no puedes usar esta temática: está desde el plan ${firstPlanWithTheme(ev.theme).name}.`;
+  for (const theme of [ev.theme, ...ev.roomThemes]) {
+    const community = EXCLUSIVE_THEMES[theme];
+    if (community && !ev.communities.includes(community)) return `La temática ${theme === "starmaker" ? "Starmaker" : "Stellar"} es exclusiva de la comunidad ${communityName(community)}.`;
+    if (!themeAllowed(plan, theme)) return `${upgrade} no puedes usar esta temática: está desde el plan ${firstPlanWithTheme(theme).name}.`;
+  }
   if (ev.private && !plan.privateEvents) return `${upgrade} los eventos son abiertos. Los privados, con lista de correos, están desde el plan Inicial.`;
   if (plan.staff !== null && ev.staff > plan.staff) return `${upgrade} puedes sumar hasta ${plan.staff} organizadores.`;
   if (plan.mentors !== null && ev.mentors > plan.mentors)

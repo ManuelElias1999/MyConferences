@@ -31,6 +31,8 @@ export interface Account {
   plan: PlanId;
   /** Plan que pidió desde la página de planes, mientras la administración no responde. */
   planRequest: PlanId | null;
+  /** Comunidades a las que pertenece: le habilitan sus temáticas exclusivas (por ejemplo, Stellar). */
+  communities: string[];
 }
 
 /** Una cuenta vista desde la administración. */
@@ -43,6 +45,7 @@ export interface AdminAccount {
   admin: boolean;
   plan: PlanId;
   planRequest: PlanId | null;
+  communities: string[];
   createdAt: number;
 }
 

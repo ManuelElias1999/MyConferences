@@ -7,7 +7,7 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_LOOK, sanitizeLook } from "../../shared/look.ts";
-import { isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
+import { COMMUNITIES, isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
 import type { Account, AdminAccount, Look } from "../../shared/types.ts";
 import { sendCode } from "./mail.ts";
 
@@ -36,6 +36,8 @@ interface StoredAccount {
   plan?: PlanId;
   /** Plan que pidió desde la página de planes. */
   planRequest?: PlanId;
+  /** Comunidades a las que la sumó la administración (habilitan sus temáticas exclusivas). */
+  communities?: string[];
   /** Eventos con fecha que organizó (no se borran al cerrar el evento: cuentan para el mes). */
   eventLog?: PlanUsage["log"];
 }
@@ -93,6 +95,8 @@ export function createAccountStore(dataDir: string) {
     admin: isAdmin(a),
     plan: a.plan ?? (isAdmin(a) ? "pro" : "free"),
     planRequest: a.planRequest ?? null,
+    // La administración puede usar todas las temáticas.
+    communities: isAdmin(a) ? COMMUNITIES.map((c) => c.id) : (a.communities ?? []),
   });
   const byId = (id: string) => {
     const account = store.accounts.find((a) => a.id === id);
@@ -220,7 +224,7 @@ export function createAccountStore(dataDir: string) {
       return store.accounts
         .map((a) => {
           const acc = toAccount(a);
-          return { id: a.id, email: a.email, name: a.name, company: a.company?.name ?? null, verified: acc.verified, admin: acc.admin, plan: acc.plan, planRequest: acc.planRequest, createdAt: a.createdAt };
+          return { id: a.id, email: a.email, name: a.name, company: a.company?.name ?? null, verified: acc.verified, admin: acc.admin, plan: acc.plan, planRequest: acc.planRequest, communities: acc.communities, createdAt: a.createdAt };
         })
         .sort((x, y) => y.createdAt - x.createdAt);
     },
@@ -231,6 +235,14 @@ export function createAccountStore(dataDir: string) {
       const account = byId(id);
       account.plan = plan;
       delete account.planRequest;
+      await persist();
+      return toAccount(account);
+    },
+
+    /** La administración suma o saca a la cuenta de las comunidades. */
+    async setCommunities(id: string, list: unknown) {
+      const account = byId(id);
+      account.communities = (Array.isArray(list) ? list : []).filter((c): c is string => COMMUNITIES.some((x) => x.id === c));
       await persist();
       return toAccount(account);
     },

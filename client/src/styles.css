@@ -1177,11 +1177,6 @@ kbd {
   line-height: 1.35;
 }
 
-.theme-card .theme-limit {
-  color: var(--text);
-  font-weight: 700;
-}
-
 .theme-preview {
   width: 100%;
   border-radius: 3px;
@@ -1579,8 +1574,36 @@ textarea {
 
 .talk-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 190px 96px auto;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) 160px 132px 132px 32px;
   gap: 6px;
+  align-items: center;
+}
+
+.talks-title {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.talk-head span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.talk-row.invalid input[type="time"] {
+  border-color: var(--danger);
+}
+
+.talk-problem {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.talks-editor > .btn {
+  justify-self: start;
 }
 
 .room-row {
@@ -1594,7 +1617,7 @@ textarea {
 }
 
 .room-row select {
-  width: 120px;
+  width: 150px;
   font-weight: 700;
 }
 
@@ -1842,6 +1865,10 @@ textarea {
   .talk-row,
   .directory li {
     grid-template-columns: 1fr;
+  }
+
+  .talk-head {
+    display: none;
   }
 
   .minimap {
@@ -2243,12 +2270,73 @@ textarea {
   font-size: 0.85rem;
   color: var(--muted);
 }
+/* Lo que el plan (o la comunidad) no incluye: gris, punteado y con su candado. */
+.theme-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+}
 .theme-card.locked {
-  opacity: 0.55;
+  border-style: dashed;
+  background: var(--surface-2);
   cursor: not-allowed;
+}
+.theme-card.locked .theme-preview {
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+.theme-card.locked strong,
+.theme-card.locked span {
+  color: var(--muted);
+}
+.theme-card.locked .lock-ribbon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 92%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.lock-pill {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.locked-box {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.locked-box .lock-pill {
+  margin: 0 6px 0 0;
 }
 .check.locked {
   color: var(--muted);
+}
+.admin-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .admin-plan {
   display: flex;

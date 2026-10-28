@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ENTERPRISE_PRICES, PLANS, type Plan, type PlanId } from "../../shared/plans.ts";
+import { ENTERPRISE_PRICES, EXCLUSIVE_THEMES, PLANS, type Plan, type PlanId } from "../../shared/plans.ts";
 import { THEMES } from "../../shared/themes.ts";
 import type { Account } from "../../shared/types.ts";
 import { accountApi } from "./lib.ts";
@@ -9,11 +9,12 @@ const usd = (n: number) => `US$${n.toLocaleString("es-AR", { minimumFractionDigi
 const limit = (n: number | null, none = "—") => (n === null ? "Sin límite" : n === 0 ? none : String(n));
 const hours = (h: number) => (h % 24 === 0 ? `Hasta ${h / 24} ${h === 24 ? "día" : "días"}` : `Hasta ${h} horas`);
 
+/** Las temáticas de cada plan, sin contar las exclusivas de una comunidad (van en su propia fila). */
 function themesText(p: Plan) {
-  if (!p.themes) return "Todas";
-  const missing = THEMES.filter((t) => !p.themes!.includes(t.id));
-  if (missing.length === 1) return `Todas menos ${missing[0]!.label}`;
-  return p.themes.map((id) => THEMES.find((t) => t.id === id)!.label).join(", ");
+  const open = THEMES.filter((t) => !EXCLUSIVE_THEMES[t.id]);
+  const included = open.filter((t) => !p.themes || p.themes.includes(t.id));
+  if (included.length === open.length) return "Todas";
+  return included.map((t) => t.label).join(", ");
 }
 
 /** Filas de la tabla, por sección. */
@@ -42,6 +43,7 @@ const SECTIONS: { title: string; rows: [string, (p: Plan) => string][] }[] = [
     title: "Lugar y mapa",
     rows: [
       ["Temáticas", themesText],
+      ["Temáticas Stellar y Starmaker (oficinas)", () => "Solo la comunidad Stellar"],
       ["Logo propio en el lobby y las pantallas", (p) => (p.logo ? "✔" : "—")],
       ["Mapa diseñado a medida", (p) => p.customMap],
     ],
