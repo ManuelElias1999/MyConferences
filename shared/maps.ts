@@ -101,7 +101,11 @@ export type FurniKind =
   /** Escalones para subir a una tarima. */
   | "steps"
   | "rug"
-  | "carpet";
+  | "carpet"
+  /** Puesto de atención de la recepción: mostrador corto con la franja de color de su puesto. */
+  | "servicedesk"
+  /** Cartel colgante sobre un puesto de la recepción: título y bajada (`label`, separados por «|»). */
+  | "desksign";
 
 export interface Furni {
   kind: FurniKind;
@@ -267,6 +271,14 @@ export interface Npc {
   sponsor?: number;
   /** Está sentado (trabajando en un escritorio, en una reunión o en un sofá). */
   sit?: boolean;
+  /** Puesto de la recepción que atiende: entrar a un evento, organizar eventos o ayuda. */
+  desk?: "entry" | "organizers" | "help";
+  /** Nombre del puesto, para el aviso «hablar con Lucía (entradas)». */
+  role?: string;
+  /** Color de su puesto: el del marcador sobre su cabeza. */
+  color?: string;
+  /** Lo que dice de vez en cuando si estás cerca. */
+  lines?: string[];
 }
 
 export interface Seat extends Tile {
@@ -342,7 +354,7 @@ export interface Roof {
 }
 
 /** Lo que está a ras del piso: alfombras, sillas (para sentarse) y caminos de luz. */
-const FLAT: FurniKind[] = ["rug", "carpet", "chair", "officechair", "neonpath", "stanchion"];
+const FLAT: FurniKind[] = ["rug", "carpet", "chair", "officechair", "neonpath", "stanchion", "desksign"];
 
 export const vertical = (s: Span) => s.side === "left" || s.side === "right";
 
@@ -491,15 +503,53 @@ export const RECEPTIONIST_ID = "npc-recepcion";
  * frente, dos filas ordenadas con postes. Alrededor, con aire: escritorios,
  * sala de reuniones vidriada, sala de estar y café.
  */
+/** Los tres puestos de la recepción, de izquierda a derecha, y quién atiende cada uno. */
+export const RECEPTION_DESKS = [
+  {
+    desk: "organizers" as const,
+    x: 9,
+    color: "#f59e0b",
+    rug: "#f8d9a4",
+    sign: "ORGANIZADORES|Crea tu evento",
+    name: "Mateo",
+    role: "Organizadores",
+    look: { ...RECEPTIONIST_LOOK, hair: "short" as const, hairColor: HAIR_COLORS[0]!, skin: SKINS[2]!, shirt: "#f59e0b" },
+    lines: ["¿Organizas algo? Te ayudo a armar tu evento.", "Hackathons, charlas, meetups… ¡acá se crean!"],
+  },
+  {
+    desk: "entry" as const,
+    x: 16,
+    color: "#22d3ee",
+    rug: "#b4ecf5",
+    sign: "ENTRADAS|Entra a tu evento",
+    name: "Lucía",
+    role: "Entradas",
+    look: RECEPTIONIST_LOOK,
+    lines: ["¡Hola! ¿Tienes el número de tu evento?", "Pasa por acá para entrar a tu evento."],
+  },
+  {
+    desk: "help" as const,
+    x: 23,
+    color: "#34d399",
+    rug: "#b9efd6",
+    sign: "AYUDA|¿Cómo funciona?",
+    name: "Sofía",
+    role: "Ayuda",
+    look: { ...RECEPTIONIST_LOOK, hair: "bun" as const, hairColor: HAIR_COLORS[3]!, skin: SKINS[4]!, shirt: "#34d399" },
+    lines: ["¿Primera vez por acá? Te cuento cómo funciona.", "¿Dudas con el micrófono o la cámara? Pregúntame."],
+  },
+];
+
 export function receptionMap(): SceneMap {
   const w = 36;
   const h = 22;
   const sit = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker", sit: true });
   const stand = (i: number, x: number, y: number, dir: Dir): Npc => ({ ...attendee(i, x, y, dir), id: `cowork-${i}`, name: "Coworker" });
-  // Desde cualquier baldosa de la tarima de madera (el rectángulo de la recepción) se puede hablar con la recepcionista.
+  // Desde cualquier baldosa de la tarima de madera, delante de los puestos, se habla con quien atiende el más cercano.
+  // Detrás de los mostradores está el lugar de quienes atienden: las plantas cierran los costados.
   const platform = { x: 7, y: 3, w: 22, h: 11 };
   const front: Tile[] = [];
-  for (let y = platform.y; y < platform.y + platform.h; y++) for (let x = platform.x; x < platform.x + platform.w; x++) front.push({ x, y });
+  for (let y = 8; y < platform.y + platform.h; y++) for (let x = platform.x; x < platform.x + platform.w; x++) front.push({ x, y });
   return finish(
     {
       ...empty,
@@ -507,26 +557,20 @@ export function receptionMap(): SceneMap {
       h,
       tiles: enclosure(w, h),
       style: "cowork",
-      spawn: { x: 17, y: 17 },
+      spawn: { x: 18, y: 17 },
       // La recepción va sobre una tarima de madera que ocupa todo el fondo, de columna a columna.
       areas: [{ ...platform, floor: "wood" }],
       furni: [
-        // El gran mostrador, con dos recepcionistas detrás, columnas de luz y plantas a los lados.
-        { kind: "frontdesk", x: 10, y: 6, w: 16 },
+        // Tres puestos, cada uno con su cartel colgante, su color y su fila (alfombra entre cordones).
+        ...RECEPTION_DESKS.flatMap((d) => [
+          { kind: "desksign" as const, x: d.x, y: 4, w: 5, color: d.color, label: d.sign },
+          { kind: "servicedesk" as const, x: d.x, y: 7, w: 5, color: d.color },
+          { kind: "rug" as const, x: d.x + 1, y: 9, w: 3, d: 4, color: d.rug },
+        ]),
+        ...[7, 8, 14, 15, 21, 22, 28].map((x) => ({ kind: "bigplant" as const, x, y: 7 })),
+        ...[8, 14, 22, 28].map((x) => ({ kind: "stanchion" as const, x, y: 10, d: 3 })),
         { kind: "ledpillar", x: 7, y: 3 },
         { kind: "ledpillar", x: 28, y: 3 },
-        { kind: "bigplant", x: 10, y: 3 },
-        { kind: "bigplant", x: 25, y: 3 },
-        { kind: "bigplant", x: 17, y: 3 },
-        { kind: "kiosk", x: 8, y: 7 },
-        { kind: "kiosk", x: 27, y: 7 },
-        // Fila ordenada frente al mostrador.
-        { kind: "stanchion", x: 12, y: 10, d: 3 },
-        { kind: "stanchion", x: 16, y: 10, d: 3 },
-        { kind: "stanchion", x: 19, y: 10, d: 3 },
-        { kind: "stanchion", x: 23, y: 10, d: 3 },
-        { kind: "ledpillar", x: 7, y: 12 },
-        { kind: "ledpillar", x: 28, y: 12 },
         // Escritorios a la izquierda.
         { kind: "workdesk", x: 1, y: 4, w: 3 },
         { kind: "workdesk", x: 1, y: 8, w: 3 },
@@ -552,9 +596,8 @@ export function receptionMap(): SceneMap {
       ],
       decor: [
         { kind: "window", x: 1, y: 2, w: 3 },
-        { kind: "sponsors", x: 8, y: 2, w: 5 },
-        { kind: "neon", x: 13, y: 2, w: 10, text: "RECEPCIÓN", color: "#22d3ee" },
-        { kind: "sponsors", x: 23, y: 2, w: 5 },
+        { kind: "sponsors", x: 4, y: 2, w: 3 },
+        { kind: "neon", x: 13, y: 2, w: 10, text: "RECEPCIÓN", color: "#ffffff" },
         { kind: "whiteboard", x: 31, y: 2, w: 3 },
         { kind: "entrance", x: 17, y: h - 1, w: 2 },
       ],
@@ -570,18 +613,19 @@ export function receptionMap(): SceneMap {
         stand(9, 29, 17, "right"),
         stand(10, 30, 17, "left"),
       ],
-      npcs: [
-        { id: RECEPTIONIST_ID, name: "Recepcionista", look: RECEPTIONIST_LOOK, x: 14, y: 5, dir: "down", talkFrom: front },
-        {
-          id: `${RECEPTIONIST_ID}-2`,
-          name: "Recepcionista",
-          look: { ...RECEPTIONIST_LOOK, hair: "short", hairColor: HAIR_COLORS[3]!, skin: SKINS[4]!, shirt: "#2f6bff" },
-          x: 21,
-          y: 5,
-          dir: "down",
-          talkFrom: front,
-        },
-      ],
+      npcs: RECEPTION_DESKS.map((d, i) => ({
+        id: i === 1 ? RECEPTIONIST_ID : `${RECEPTIONIST_ID}-${d.desk}`,
+        name: d.name,
+        role: d.role,
+        desk: d.desk,
+        color: d.color,
+        lines: d.lines,
+        look: d.look,
+        x: d.x + 2,
+        y: 6,
+        dir: "down" as const,
+        talkFrom: front,
+      })),
       desk: front,
     },
     true,

@@ -540,9 +540,10 @@ kbd {
   transform: translateX(-50%);
   display: flex;
   gap: 14px;
-  width: min(580px, calc(100% - 32px));
+  width: min(660px, calc(100% - 32px));
   padding: 16px 18px;
   border-radius: 3px;
+  border-top: 5px solid var(--desk, var(--accent));
   background: var(--surface);
   box-shadow: var(--shadow), 0 0 0 1px var(--border);
   animation: pop 0.18s ease-out;
@@ -555,10 +556,6 @@ kbd {
   }
 }
 
-.npc-portrait {
-  flex: none;
-}
-
 .npc-body {
   display: grid;
   gap: 8px;
@@ -567,8 +564,149 @@ kbd {
 }
 
 .npc-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+/* El puesto de la recepción, con su color. */
+.desk-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--desk, var(--accent));
+  color: #16161d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.npc-portrait {
+  flex: none;
+  padding: 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--desk, var(--accent)) 22%, var(--surface));
+  align-self: flex-start;
+}
+
+.desk-plan {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 0.88rem;
+}
+
+/* Entradas: tarjetas de los eventos con su estado. */
+.venue-cards {
+  display: grid;
+  gap: 6px;
+  max-height: 228px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.venue-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.venue-card:hover:not(:disabled) {
+  border-color: var(--desk, var(--accent));
+  background: color-mix(in srgb, var(--desk, var(--accent)) 8%, var(--surface));
+}
+
+.venue-card:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.venue-number {
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--navy);
+  color: #fff;
+  font: 700 0.9rem ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.venue-info {
+  display: grid;
+  min-width: 0;
+}
+
+.venue-info > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.venue-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tone-open .status-dot {
+  background: #16a34a;
+}
+
+.tone-soon .status-dot {
+  background: #f59e0b;
+}
+
+.tone-full .status-dot {
+  background: var(--danger);
+}
+
+/* Ayuda: preguntas frecuentes. */
+.faq {
+  display: grid;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.faq details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+
+.faq summary {
   font-weight: 700;
-  color: var(--accent);
+  cursor: pointer;
+}
+
+.faq details[open] summary {
+  color: color-mix(in srgb, var(--desk, var(--accent)) 60%, var(--text));
+}
+
+.faq p {
+  margin: 6px 0 2px;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .npc-form {

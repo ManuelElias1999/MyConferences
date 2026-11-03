@@ -467,10 +467,12 @@ export default function Scene(props: SceneProps) {
         const who = nearby[Math.floor(Math.random() * nearby.length)];
         if (who) bubbles.current.set(who.id, { text: CHATTER[Math.floor(Math.random() * CHATTER.length)]!, at: t - (BUBBLE_MS - CHATTER_MS) });
         // Los de los stands invitan a acercarse.
-        const rep = map.npcs.filter((n) => n.sponsor !== undefined && Math.hypot(n.x - my.current.x, n.y - my.current.y) < 9);
+        // Quienes atienden un stand o un puesto de la recepción dicen algo si estás cerca.
+        const rep = map.npcs.filter((n) => (n.sponsor !== undefined || n.lines?.length) && Math.hypot(n.x - my.current.x, n.y - my.current.y) < 9);
         const pitcher = rep[Math.floor(Math.random() * rep.length)];
         if (pitcher && Math.random() < 0.5) {
-          const line = PITCH_LINES[Math.floor(Math.random() * PITCH_LINES.length)]!.replace("{}", pitcher.name);
+          const lines = pitcher.lines ?? PITCH_LINES;
+          const line = lines[Math.floor(Math.random() * lines.length)]!.replace("{}", pitcher.name);
           bubbles.current.set(pitcher.id, { text: line, at: t - (BUBBLE_MS - CHATTER_MS) });
         }
         nextChatter = t + 3500 + Math.random() * 3500;
@@ -478,7 +480,12 @@ export default function Scene(props: SceneProps) {
 
       const npc = p.onNpc ? nearbyNpc() : null;
       const directory = p.onDirectory ? nearbyDirectory() : null;
-      const nextPrompt = npc ? (npc.sponsor !== undefined ? `hablar con el stand de ${npc.name}` : `hablar con la ${npc.name.toLowerCase()}`) : directory ? "ver cómo llegar a cada sala" : null;
+      const nextPrompt = npc
+        ? npc.sponsor !== undefined
+          ? `hablar con el stand de ${npc.name}`
+          : npc.role
+            ? `hablar con ${npc.name} (${npc.role.toLowerCase()})`
+            : `hablar con la ${npc.name.toLowerCase()}` : directory ? "ver cómo llegar a cada sala" : null;
       if (nextPrompt !== lastPrompt) {
         lastPrompt = nextPrompt;
         setPrompt(nextPrompt);
@@ -577,8 +584,8 @@ export default function Scene(props: SceneProps) {
       }
       // Marcadores sobre lo que se puede usar: la recepcionista y los directorios.
       const markers = [
-        ...map.npcs.filter((n) => !p.hideNpcs?.has(n.id)).map((n) => ({ x: n.x, y: n.y, h: avatarHeight(false) + 26, text: "!" })),
-        ...map.directories.map((d) => ({ ...d, h: 66, text: "?" })),
+        ...map.npcs.filter((n) => !p.hideNpcs?.has(n.id)).map((n) => ({ x: n.x, y: n.y, h: avatarHeight(false) + 26, text: "!", color: n.color })),
+        ...map.directories.map((d) => ({ ...d, h: 66, text: "?", color: undefined })),
       ];
       for (const m of markers) {
         const f = feet(m.x, m.y);
@@ -586,9 +593,9 @@ export default function Scene(props: SceneProps) {
         const y = f.y - m.h + bob;
         ctx.fillStyle = "#16161d";
         ctx.fillRect(f.x - 9, y - 9, 18, 18);
-        ctx.fillStyle = "#ff5c39";
+        ctx.fillStyle = m.color ?? "#ff5c39";
         ctx.fillRect(f.x - 7, y - 7, 14, 14);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = m.color ? "#16161d" : "#ffffff";
         ctx.font = "700 11px 'Space Grotesk', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(m.text, f.x, y + 4);

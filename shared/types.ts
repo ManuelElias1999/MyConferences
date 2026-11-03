@@ -90,6 +90,18 @@ export interface VenueSummary {
   tagline: string;
 }
 
+/** Un evento tal como lo muestra la recepción en Entradas: si está abierto, cuánta gente hay y si es tuyo. */
+export interface VenueCard extends VenueSummary {
+  theme: ThemeId;
+  private: boolean;
+  people: number;
+  /** Tope de personas a la vez (según el plan de quien lo organiza). */
+  limit: number;
+  schedule: { start: number; end: number } | null;
+  /** Lo organizas tú o eres parte de su equipo. */
+  mine: boolean;
+}
+
 /** Un evento (se elige por su número en recepción): su lugar, salas, agenda y patrocinadores. */
 export interface Venue extends VenueSummary {
   private: boolean;

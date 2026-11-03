@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { planOf } from "../../shared/plans.ts";
-import type { Account, RoomSnapshot, User, Venue, VenueSummary } from "../../shared/types.ts";
+import type { Account, RoomSnapshot, User, Venue } from "../../shared/types.ts";
 import Agenda from "./Agenda.tsx";
 import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
 import AdminPanel from "./AdminPanel.tsx";
@@ -26,7 +26,6 @@ const FADE_MS = 350;
 export default function App() {
   const [me, setMe] = useState<User | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [venues, setVenues] = useState<VenueSummary[]>([]);
   const [place, setPlace] = useState<Place>({ kind: "reception" });
   const [connected, setConnected] = useState(socket.connected);
   const [fading, setFading] = useState(false);
@@ -144,7 +143,6 @@ export default function App() {
         if (token && !res.data.account) saveToken(null);
         setMe(res.data.user);
         setAccount(res.data.account);
-        setVenues(res.data.venues);
         replaceUsers(res.data.users);
         // Tras una reconexión el servidor no recuerda dónde estábamos: volvemos solos.
         const prev = placeRef.current;
@@ -412,7 +410,18 @@ export default function App() {
       {!connected && <div className="banner">Conexión perdida. Reconectando…</div>}
 
       {place.kind === "reception" && (
-        <Reception me={me} users={usersRef.current} venues={venues} onRequestVenue={requestVenue} />
+        <Reception
+          me={me}
+          users={usersRef.current}
+          account={account!}
+          onRequestVenue={requestVenue}
+          onCreateEvent={startCreateEvent}
+          onMyEvents={() => {
+            setPanelNew(false);
+            setPanelOpen(true);
+          }}
+          onPlans={() => setPlansOpen(true)}
+        />
       )}
       {place.kind === "hall" && (
         <Hall

@@ -43,6 +43,7 @@ import type {
   Stage,
   User,
   Venue,
+  VenueCard,
 } from "../../shared/types.ts";
 import { HACKATHON_CAPACITIES } from "../../shared/types.ts";
 import { AccountError, createAccountStore } from "./accounts.ts";
@@ -291,6 +292,20 @@ app.post("/api/admin/accounts/:id", express.json({ limit: "2kb" }), async (req, 
   } catch (err) {
     res.status(400).json({ error: err instanceof AccountError ? err.message : "No se pudo cambiar" });
   }
+});
+
+// Eventos para la recepción (Entradas): los abiertos al público y los privados en los que estás invitado o eres del equipo.
+app.get("/api/venues", (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  const cards: VenueCard[] = [];
+  for (const state of venues.values()) {
+    const mine = Boolean(roleIn(state, account));
+    if (state.venue.private && !mine && !state.whitelist?.has(account.email)) continue;
+    const { id, name, tagline, theme } = state.venue;
+    cards.push({ id, name, tagline, theme, private: state.venue.private, people: usersIn(id).length, limit: peopleLimit(state), schedule: state.venue.schedule ?? null, mine });
+  }
+  res.json(cards);
 });
 
 app.use("/uploads", express.static(uploadsDir, { maxAge: "1h" }));
@@ -703,6 +718,9 @@ function sceneMapFor(u: User): SceneMap {
   return state.floors[u.floor] ?? state.floors[0]!;
 }
 
+/** Personas a la vez que admite un evento: las del plan de quien lo organiza (los de ejemplo, como Pro). */
+const peopleLimit = (state: VenueState) => planOf(state.ownerId ? (accounts.byIdOrNull(state.ownerId)?.plan ?? "free") : "pro").people;
+
 /** «2 días y 3 horas», «45 minutos»: cuánto falta para que abra un evento. */
 function untilText(ms: number) {
   const minutes = Math.ceil(ms / 60_000);
@@ -1022,8 +1040,8 @@ io.on("connection", (socket) => {
       if (now < schedule.start) return ack({ ok: false, error: `El evento ${id} todavía no abrió: abre en ${untilText(schedule.start - now)}.` });
       if (now > schedule.end) return ack({ ok: false, error: `El evento ${id} ya terminó. ¡Gracias por venir!` });
     }
-    // Tope de personas a la vez según el plan del dueño (los de ejemplo, como Pro); el equipo del evento entra igual.
-    const limit = planOf(state.ownerId ? (accounts.byIdOrNull(state.ownerId)?.plan ?? "free") : "pro").people;
+    // Tope de personas a la vez según el plan del dueño; el equipo del evento entra igual.
+    const limit = peopleLimit(state);
     if (!roleInfo && usersIn(id).length >= limit) {
       return ack({ ok: false, error: `El evento ${id} está lleno: ya hay ${limit} personas, que es el máximo. Prueba de nuevo en un rato.` });
     }

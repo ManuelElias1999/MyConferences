@@ -2230,6 +2230,76 @@ export function furniDrawables(map: SceneMap, media?: () => Media): Drawable[] {
           }
         });
         break;
+      case "servicedesk": {
+        // Puesto de la recepción: cubierta clara, frente grafito con la franja de color del puesto,
+        // un monitor y una campanita a los costados (para que no tapen a quien atiende).
+        const color = f.color ?? "#22d3ee";
+        add(y + 1, (ctx, t) => {
+          const dw = w * T;
+          const top = py - 2;
+          const glow = 0.55 + 0.45 * Math.sin(t / 650 + x);
+          ctx.fillStyle = hexA(color, 0.1 + glow * 0.08);
+          ctx.fillRect(px, py + 40, dw, 10);
+          shadowUnder(ctx, px + dw / 2, py + 42, dw / 2);
+          box(ctx, px + 2, top, dw - 4, 12, 30, "#262b36", "#f1e4cc");
+          ctx.fillStyle = "#c8a46a";
+          ctx.fillRect(px + 2, top + 10, dw - 4, 2);
+          ctx.fillStyle = hexA(color, 0.35 + glow * 0.35);
+          ctx.fillRect(px + 8, top + 30, dw - 16, 5);
+          ctx.fillStyle = color;
+          ctx.fillRect(px + 8, top + 35, dw - 16, 1);
+          // Logo de la casa en el frente.
+          const lx = px + dw / 2 - 8;
+          for (const [dx, dy, c] of [
+            [0, 0, "#ff5c39"],
+            [8, 0, "#fbbf24"],
+            [0, 8, "#2f6bff"],
+            [8, 8, "#ffffff"],
+          ] as const) {
+            ctx.fillStyle = c;
+            ctx.fillRect(lx + dx, top + 15 + dy, 7, 7);
+          }
+          // Monitor de costado y campanita.
+          frame(ctx, px + 10, top - 13, 22, 14, "#1f2433");
+          ctx.fillStyle = hexA(color, 0.85);
+          ctx.fillRect(px + 12, top - 11, 18, 10);
+          ctx.fillStyle = "#3a3f4d";
+          ctx.fillRect(px + 19, top + 1, 4, 2);
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillRect(px + dw - 26, top + 2, 9, 5);
+          ctx.fillRect(px + dw - 22, top - 1, 2, 3);
+        });
+        break;
+      }
+      case "desksign": {
+        // Cartel colgante sobre un puesto: título en su color y una bajada.
+        const color = f.color ?? "#22d3ee";
+        const [title = "", subtitle = ""] = (f.label ?? "").split("|");
+        add(y + 0.5, (ctx, t) => {
+          const dw = w * T;
+          const sx = px + 10;
+          const sw = dw - 20;
+          const sy = py - 34;
+          const glow = 0.6 + 0.4 * Math.sin(t / 800 + x);
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillRect(sx + 14, sy - 14, 2, 14);
+          ctx.fillRect(sx + sw - 16, sy - 14, 2, 14);
+          ctx.fillStyle = hexA(color, 0.18 * glow);
+          ctx.fillRect(sx - 4, sy - 4, sw + 8, 50);
+          frame(ctx, sx, sy, sw, 42, "#16161d");
+          ctx.fillStyle = color;
+          ctx.fillRect(sx + 2, sy + 2, sw - 4, 4);
+          ctx.textAlign = "center";
+          ctx.font = `800 13px ${FONT}`;
+          ctx.fillStyle = color;
+          ctx.fillText(title, sx + sw / 2, sy + 22);
+          ctx.font = `600 9px ${FONT}`;
+          ctx.fillStyle = "#e2e8f0";
+          ctx.fillText(subtitle, sx + sw / 2, sy + 35);
+          ctx.textAlign = "left";
+        });
+        break;
+      }
       case "stanchion":
         // Dos postes cromados unidos por un cordón rojo, para ordenar la fila.
         add(y + d, (ctx) => {
