@@ -11,6 +11,7 @@ function Voice({ stream, volume = 1 }: { stream: MediaStream; volume?: number })
     const el = ref.current!;
     el.srcObject = stream;
     void el.play().catch(() => {});
+    return () => { el.srcObject = null; };
   }, [stream]);
   useEffect(() => {
     ref.current!.volume = volume;
@@ -22,7 +23,8 @@ function Voice({ stream, volume = 1 }: { stream: MediaStream; volume?: number })
 export function UserCard({ user, call, onClose }: { user: User; call: PrivateCall; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const alreadyIn = call.call?.members.some((m) => m.id === user.id) ?? false;
+  const privateCall = call.call && !call.call.proximity && !call.call.zone;
+  const alreadyIn = Boolean(privateCall && call.call?.members.some((m) => m.id === user.id));
   const start = async () => {
     setBusy(true);
     setError("");
@@ -52,7 +54,7 @@ export function UserCard({ user, call, onClose }: { user: User; call: PrivateCal
           Cancelar
         </button>
         <button className="btn primary" onClick={start} disabled={busy || alreadyIn}>
-          {alreadyIn ? "Ya está en tu charla" : call.call ? "🎙 Sumar a la charla" : "🎙 Invitar a charla privada"}
+          {alreadyIn ? "Ya está en tu charla" : privateCall ? "🎙 Sumar a la charla" : "🎙 Invitar a charla privada"}
         </button>
       </div>
     </Modal>
@@ -80,8 +82,9 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const current = call.call;
-  const memberIds = new Set(current?.members.map((m) => m.id));
-  const candidates = people.filter((u) => u.id !== me.id && !memberIds.has(u.id));
+  const proximity = Boolean(current?.proximity);
+  const memberIds = new Set(proximity ? [] : current?.members.map((m) => m.id));
+  const candidates = people.filter((u) => u.id !== me.id && !u.roomId && !memberIds.has(u.id));
   const zone = current?.zone ?? null;
 
   useEffect(() => {
@@ -150,15 +153,15 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
       )}
 
       {current && (
-        <section className={`call-panel ${tiles.length ? "with-video" : ""}`} aria-label={zone ? `Conversación de ${zone}` : "Charla privada"}>
+        <section className={`call-panel ${tiles.length ? "with-video" : ""}`} aria-label={proximity ? "Voz de proximidad" : zone ? `Conversación de ${zone}` : "Charla privada"}>
           <header>
-            <h3>{zone ? `🧑‍💻 ${zone}` : "🎧 Charla privada"}</h3>
+            <h3>{proximity ? "Voz de proximidad" : zone ? `🧑‍💻 ${zone}` : "🎧 Charla privada"}</h3>
             <span className="muted small">
               {current.members.length} {current.members.length === 1 ? "persona" : "personas"}
             </span>
           </header>
           <p className="small call-lead">
-            {zone
+            {proximity ? "Acércate a otras personas con la voz de proximidad activada para conversar." : zone
               ? current.members.length < 2
                 ? "Estás aquí. Quien entre a este espacio se suma a la conversación."
                 : "Solo se escucha y se ve a quienes están en este espacio."
@@ -214,9 +217,9 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
             <button className={`btn sm ${call.micOn ? "" : "primary"}`} onClick={() => call.setMicOn(!call.micOn)}>
               {call.micOn ? "🎙 Silenciar" : "🔇 Activar micrófono"}
             </button>
-            <button className={`btn sm ${call.camera ? "primary" : ""}`} onClick={() => void call.toggleCamera()}>
+            {!proximity && <button className={`btn sm ${call.camera ? "primary" : ""}`} onClick={() => void call.toggleCamera()}>
               {call.camera ? "📷 Apagar cámara" : "📷 Cámara"}
-            </button>
+            </button>}
             {/* En una sala de reunión se charla: no hay nada que presentar. */}
             {!current.meeting && presenter && (
               <button className={`btn sm ${call.screen ? "primary" : ""}`} onClick={() => void call.toggleScreen()}>
@@ -225,11 +228,11 @@ export default function CallPanel({ me, call, people }: { me: User; call: Privat
             )}
             {!zone && (
               <button className="btn sm" onClick={() => setAdding((a) => !a)}>
-                ＋ Añadir
+                {proximity ? "Crear charla privada" : "＋ Añadir"}
               </button>
             )}
             <button className="btn sm danger" onClick={call.leave}>
-              {zone ? "Salir de la conversación" : "Salir"}
+              {proximity ? "Desactivar proximidad" : zone ? "Salir de la conversación" : "Salir"}
             </button>
           </div>
           {[...call.remotes].map(([id, r]) => {

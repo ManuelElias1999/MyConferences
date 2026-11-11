@@ -246,6 +246,7 @@ export type RtcSignal =
 export interface CallInfo {
   id: string;
   members: User[];
+  proximity?: Record<string, string>;
   /** Nombre de la mesa de equipo si es la conversación de una mesa (hackathon). */
   zone: string | null;
   /** Es una sala de reunión (mentores, organizadores): se charla, no se presenta. */
@@ -309,8 +310,9 @@ export interface ClientToServerEvents {
   callInvite: (userId: string, ack: Ack<null>) => void;
   callRespond: (callId: string, accept: boolean, ack: Ack<CallInfo | null>) => void;
   callLeave: () => void;
-  callSignal: (to: string, signal: CallSignal) => void;
-  callMedia: (media: CallMedia) => void;
+  callSignal: (to: string, scope: string, signal: CallSignal) => void;
+  hallVoice: (enabled: boolean) => void;
+  callMedia: (callId: string, media: CallMedia) => void;
   /** Equipo organizador: reparte al azar a quienes están en la sala de reunión entre `count` salas chicas. */
   breakout: (count: number, ack: Ack<{ moved: number; rooms: number }>) => void;
   /** Equipo organizador: trae de vuelta a la sala de reunión a todos los que están en las salas chicas. */
@@ -338,7 +340,7 @@ export interface ServerToClientEvents {
   callDeclined: (data: { name: string }) => void;
   /** La invitación ya no vale (la charla terminó). */
   callCancelled: (callId: string) => void;
-  callSignal: (from: string, signal: CallSignal) => void;
+  callSignal: (from: string, scope: string, signal: CallSignal) => void;
   /** Aviso sobre las charlas (por ejemplo, una mesa llena). */
   callNotice: (text: string) => void;
   /** Cambió algo de tu cuenta (por ejemplo, la administración te habilitó crear eventos). */

@@ -38,6 +38,10 @@ export default function App() {
   const [panelNew, setPanelNew] = useState(false);
   const [notice, setNotice] = useState("");
   const call = usePrivateCall(me?.id ?? null);
+  const { changeHallVoice } = call;
+  useEffect(() => {
+    if (place.kind === "reception") changeHallVoice(false);
+  }, [place.kind, changeHallVoice]);
   // En una sala con tarima, la pantalla que comparte quien está arriba se ve en la pantalla grande del plano.
   const stageScreen = (() => {
     const c = call.call;
@@ -356,6 +360,11 @@ export default function App() {
                   Agenda
                 </button>
               )}
+              {place.kind === "hall" && (
+                <button className="btn ghost sm" aria-pressed={call.hallVoice} onClick={() => call.changeHallVoice(!call.hallVoice)}>
+                  {call.hallVoice ? "Desactivar voz de proximidad" : "Activar voz de proximidad"}
+                </button>
+              )}
               <button className="btn ghost sm" onClick={leaveVenue}>
                 Volver a recepción
               </button>
@@ -484,7 +493,7 @@ export default function App() {
         />
       )}
       {venue && <CallPanel me={me} call={call} people={people} />}
-      {card && venue && card.venueId === venue.id && <UserCard user={card} call={call} onClose={() => setCardUser(null)} />}
+      {card && venue && !room && !card.roomId && card.venueId === venue.id && <UserCard user={card} call={call} onClose={() => setCardUser(null)} />}
       {notice && (
         <div className="toast" role="status">
           {notice}

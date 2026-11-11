@@ -1,10 +1,10 @@
-// Charlas por micrófono, cámara y pantalla: las privadas (por invitación) y
-// las de las mesas de equipo. Cada integrante abre una conexión WebRTC con
+// Voz de proximidad en el pasillo y charlas con micrófono, cámara y pantalla
+// en mesas de equipo o por invitación. Cada integrante abre una conexión WebRTC con
 // cada uno de los demás; el servidor solo pasa las señales, así que nadie
 // fuera de la charla puede escucharla ni verla.
 //
-// Cada conexión tiene siempre tres canales en el mismo orden: voz, cámara y
-// pantalla. Prender o apagar la cámara solo cambia lo que va por su canal,
+// Las charlas con video tienen tres canales en el mismo orden: voz, cámara
+// y pantalla. Prender o apagar la cámara solo cambia lo que va por su canal,
 // sin volver a negociar la conexión.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -43,6 +43,8 @@ type Slot = 0 | 1 | 2; // voz, cámara, pantalla
 
 interface Peer {
   pc: RTCPeerConnection;
+  scope: string;
+  candidates: RTCIceCandidateInit[];
   run: (task: () => Promise<unknown>) => void;
   /** Los tres canales, en orden; null hasta que la conexión se arma. */
   slots: RTCRtpTransceiver[] | null;
@@ -57,6 +59,8 @@ export interface Remote {
 
 export function usePrivateCall(meId: string | null) {
   const [call, setCall] = useState<CallInfo | null>(null);
+  const activeCall = useRef<CallInfo | null>(null);
+  const [hallVoice, setHallVoice] = useState(false);
   const [invites, setInvites] = useState<CallInvite[]>([]);
   const [remotes, setRemotes] = useState<Map<string, Remote>>(new Map());
   const [micOn, setMicOn] = useState(true);
@@ -69,29 +73,13 @@ export function usePrivateCall(meId: string | null) {
   const tracks = useRef<(MediaStreamTrack | null)[]>([null, null, null]);
   const micOnRef = useRef(micOn);
   micOnRef.current = micOn;
+  const callId = call?.id;
   const inCall = call !== null;
 
   useEffect(() => {
-    const onUpdated = (info: CallInfo | null) => setCall(info);
-    const onInvited = (inv: CallInvite) => setInvites((list) => [...list.filter((i) => i.callId !== inv.callId), inv]);
-    const onCancelled = (callId: string) => setInvites((list) => list.filter((i) => i.callId !== callId));
-    const onDeclined = ({ name }: { name: string }) => setNotice(`${name} no puede charlar ahora`);
-    const onNotice = (text: string) => setNotice(text);
-    socket.on("callUpdated", onUpdated);
-    socket.on("callInvited", onInvited);
-    socket.on("callCancelled", onCancelled);
-    socket.on("callDeclined", onDeclined);
-    socket.on("callNotice", onNotice);
-    return () => {
-      socket.off("callUpdated", onUpdated);
-      socket.off("callInvited", onInvited);
-      socket.off("callCancelled", onCancelled);
-      socket.off("callDeclined", onDeclined);
-      socket.off("callNotice", onNotice);
-    };
-  }, []);
-
-  useEffect(() => setDeafened(inCall), [inCall]);
+    setDeafened(inCall && !call?.proximity);
+    return () => setDeafened(false);
+  }, [inCall, Boolean(call?.proximity)]);
 
   /** Pone una pista en un canal de todas las conexiones. */
   const sendOn = useCallback((slot: Slot, track: MediaStreamTrack | null) => {
@@ -101,36 +89,34 @@ export function usePrivateCall(meId: string | null) {
 
   /** Micrófono: se pide una sola vez por charla (aunque llegue antes una oferta que la lista de integrantes). */
   const ensureLocal = useCallback(() => {
-    local.current ??= navigator.mediaDevices
-      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+    if (local.current) return local.current;
+    const pending = Promise.resolve()
+      .then(() => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }))
       .then((s) => {
+        if (local.current !== pending) {
+          s.getTracks().forEach((track) => track.stop());
+          return null;
+        }
         const track = s.getAudioTracks()[0] ?? null;
         if (track) track.enabled = micOnRef.current;
         sendOn(0, track);
         return s;
       })
       .catch(() => {
-        setMicError("No pudimos usar tu micrófono: igual escuchas a los demás.");
+        if (local.current === pending) setMicError("No pudimos usar tu micrófono: igual escuchas a los demás.");
         return null;
       });
-    return local.current;
+    local.current = pending;
+    return pending;
   }, [sendOn]);
 
-  // Al salir de la charla se suelta todo: micrófono, cámara y pantalla.
-  useEffect(() => {
-    if (!inCall) return;
-    setMicError("");
-    void ensureLocal();
-    return () => {
-      const pending = local.current;
-      local.current = null;
-      void pending?.then((s) => s?.getTracks().forEach((t) => t.stop()));
-      for (const t of tracks.current) t?.stop();
-      tracks.current = [null, null, null];
-      setCamera(null);
-      setScreen(null);
-    };
-  }, [inCall, ensureLocal]);
+  const releaseMedia = useCallback(() => {
+    local.current = null;
+    for (const track of tracks.current) track?.stop();
+    tracks.current = [null, null, null];
+  }, []);
+
+  useEffect(() => releaseMedia, [releaseMedia]);
 
   useEffect(() => {
     void local.current?.then((s) => s?.getAudioTracks().forEach((t) => (t.enabled = micOn)));
@@ -138,8 +124,8 @@ export function usePrivateCall(meId: string | null) {
 
   // Avisa a la charla si tienes la cámara o la pantalla prendida.
   useEffect(() => {
-    if (inCall) socket.emit("callMedia", { cam: Boolean(camera), screen: Boolean(screen) });
-  }, [inCall, camera, screen]);
+    if (callId && callId !== "hall" && activeCall.current?.id === callId) socket.emit("callMedia", callId, { cam: Boolean(camera), screen: Boolean(screen) });
+  }, [callId, camera, screen]);
 
   const setRemote = useCallback((id: string, slot: Slot, track: MediaStreamTrack) => {
     setRemotes((m) => {
@@ -152,99 +138,134 @@ export function usePrivateCall(meId: string | null) {
     });
   }, []);
 
-  /** Conecta los canales con lo que estoy mandando ahora. */
-  const attach = useCallback(
-    async (peer: Peer) => {
-      await ensureLocal();
-      peer.slots!.forEach((t, i) => {
-        t.direction = "sendrecv";
-        void t.sender.replaceTrack(tracks.current[i] ?? null).catch(() => {});
-      });
-    },
-    [ensureLocal],
-  );
-
-  const peerFor = useCallback(
-    (id: string): Peer => {
-      let peer = peers.current.get(id);
-      if (peer) return peer;
-      const pc = new RTCPeerConnection(ICE);
-      peer = { pc, run: serial(), slots: null };
-      peers.current.set(id, peer);
-      pc.onicecandidate = (e) => {
-        if (e.candidate) socket.emit("callSignal", id, { kind: "ice", candidate: e.candidate.toJSON() });
-      };
-      pc.ontrack = (e) => {
-        const slot = pc.getTransceivers().indexOf(e.transceiver);
-        if (slot >= 0 && slot <= 2) setRemote(id, slot as Slot, e.track);
-      };
-      return peer;
-    },
-    [setRemote],
-  );
-
   const dropPeer = useCallback((id: string) => {
     peers.current.get(id)?.pc.close();
     peers.current.delete(id);
-    setRemotes((m) => {
-      if (!m.has(id)) return m;
-      const next = new Map(m);
+    setRemotes((current) => {
+      if (!current.has(id)) return current;
+      const next = new Map(current);
       next.delete(id);
       return next;
     });
   }, []);
 
-  // Una conexión con cada integrante; la arma quien tenga el id menor para no cruzar ofertas.
-  const memberKey = call?.members.map((m) => m.id).join(",") ?? "";
-  useEffect(() => {
-    if (!meId) return;
-    const others = memberKey ? memberKey.split(",").filter((id) => id !== meId) : [];
-    for (const id of [...peers.current.keys()]) if (!others.includes(id)) dropPeer(id);
-    for (const id of others) {
-      if (peers.current.has(id)) continue;
-      const peer = peerFor(id);
-      if (meId < id) {
-        peer.run(async () => {
-          peer.slots = [peer.pc.addTransceiver("audio"), peer.pc.addTransceiver("video"), peer.pc.addTransceiver("video")];
-          await attach(peer);
-          const offer = await peer.pc.createOffer();
-          await peer.pc.setLocalDescription(offer);
-          socket.emit("callSignal", id, { kind: "offer", sdp: offer.sdp ?? "" });
-        });
-      }
+  const scopeFor = (info: CallInfo | null, id: string) =>
+    info?.proximity ? info.proximity[id] : info?.members.some((member) => member.id === id) ? info.id : undefined;
+
+  const updateCall = useCallback((info: CallInfo | null) => {
+    if (activeCall.current?.id !== info?.id) {
+      releaseMedia();
+      setCamera(null);
+      setScreen(null);
+      setMicError("");
+      if (info) void ensureLocal();
     }
-  }, [memberKey, meId, peerFor, dropPeer, attach]);
+    activeCall.current = info;
+    for (const [id, peer] of peers.current) if (scopeFor(info, id) !== peer.scope) dropPeer(id);
+    setCall(info);
+  }, [dropPeer, ensureLocal, releaseMedia]);
 
   useEffect(() => {
-    const onSignal = (from: string, sig: CallSignal) => {
-      const peer = peerFor(from);
+    const onUpdated = (info: CallInfo | null) => updateCall(info);
+    const onInvited = (inv: CallInvite) => setInvites((list) => [...list.filter((i) => i.callId !== inv.callId), inv]);
+    const onCancelled = (callId: string) => setInvites((list) => list.filter((i) => i.callId !== callId));
+    const onDeclined = ({ name }: { name: string }) => setNotice(`${name} no puede charlar ahora`);
+    const onNotice = (text: string) => setNotice(text);
+    const onDisconnect = () => {
+      updateCall(null);
+      setInvites([]);
+      setHallVoice(false);
+    };
+    socket.on("disconnect", onDisconnect);
+    socket.on("callUpdated", onUpdated);
+    socket.on("callInvited", onInvited);
+    socket.on("callCancelled", onCancelled);
+    socket.on("callDeclined", onDeclined);
+    socket.on("callNotice", onNotice);
+    return () => {
+      socket.off("disconnect", onDisconnect);
+      socket.off("callUpdated", onUpdated);
+      socket.off("callInvited", onInvited);
+      socket.off("callCancelled", onCancelled);
+      socket.off("callDeclined", onDeclined);
+      socket.off("callNotice", onNotice);
+    };
+  }, [updateCall]);
+
+  const peerFor = useCallback((id: string, scope: string): Peer => {
+    const existing = peers.current.get(id);
+    if (existing?.scope === scope) return existing;
+    if (existing) dropPeer(id);
+    const pc = new RTCPeerConnection(ICE);
+    const peer: Peer = { pc, scope, run: serial(), slots: null, candidates: [] };
+    peers.current.set(id, peer);
+    pc.onicecandidate = (event) => {
+      if (event.candidate && peers.current.get(id) === peer) {
+        socket.emit("callSignal", id, scope, { kind: "ice", candidate: event.candidate.toJSON() });
+      }
+    };
+    pc.ontrack = (event) => {
+      const slot = pc.getTransceivers().indexOf(event.transceiver);
+      if (peers.current.get(id) === peer && slot >= 0 && slot <= 2) setRemote(id, slot as Slot, event.track);
+    };
+    return peer;
+  }, [dropPeer, setRemote]);
+
+  const attach = (peer: Peer) => {
+    peer.slots?.forEach((channel, index) => {
+      channel.direction = "sendrecv";
+      void channel.sender.replaceTrack(tracks.current[index] ?? null).catch(() => {});
+    });
+  };
+
+  const memberKey = JSON.stringify(call?.members.filter((member) => member.id !== meId)
+    .map((member) => [member.id, scopeFor(call, member.id)]) ?? []);
+  useEffect(() => {
+    if (!meId) return;
+    for (const [id, scope] of JSON.parse(memberKey) as [string, string][]) {
+      if (meId >= id || peers.current.has(id) || scopeFor(activeCall.current, id) !== scope) continue;
+      const peer = peerFor(id, scope);
       peer.run(async () => {
-        if (sig.kind === "offer") {
-          await peer.pc.setRemoteDescription({ type: "offer", sdp: sig.sdp });
-          peer.slots = peer.pc.getTransceivers().slice(0, 3);
-          await attach(peer);
+        peer.slots = [peer.pc.addTransceiver("audio")];
+        if (scope === activeCall.current?.id) {
+          peer.slots.push(peer.pc.addTransceiver("video"), peer.pc.addTransceiver("video"));
+        }
+        attach(peer);
+        const offer = await peer.pc.createOffer();
+        await peer.pc.setLocalDescription(offer);
+        if (peers.current.get(id) === peer) socket.emit("callSignal", id, scope, { kind: "offer", sdp: offer.sdp ?? "" });
+      });
+    }
+  }, [memberKey, meId, peerFor]);
+
+  useEffect(() => {
+    const onSignal = (from: string, scope: string, signal: CallSignal) => {
+      if (scopeFor(activeCall.current, from) !== scope) return;
+      const peer = peerFor(from, scope);
+      peer.run(async () => {
+        if (peers.current.get(from) !== peer) return;
+        if (signal.kind === "ice") {
+          if (!peer.pc.remoteDescription) peer.candidates.push(signal.candidate);
+          else await peer.pc.addIceCandidate(signal.candidate);
+          return;
+        }
+        await peer.pc.setRemoteDescription({ type: signal.kind, sdp: signal.sdp });
+        for (const candidate of peer.candidates.splice(0)) await peer.pc.addIceCandidate(candidate).catch(() => {});
+        if (signal.kind === "offer") {
+          peer.slots = peer.pc.getTransceivers().slice(0, activeCall.current?.proximity ? 1 : 3);
+          attach(peer);
           const answer = await peer.pc.createAnswer();
           await peer.pc.setLocalDescription(answer);
-          socket.emit("callSignal", from, { kind: "answer", sdp: answer.sdp ?? "" });
-        } else if (sig.kind === "answer") {
-          await peer.pc.setRemoteDescription({ type: "answer", sdp: sig.sdp });
-        } else if (sig.kind === "ice") {
-          await peer.pc.addIceCandidate(sig.candidate);
+          if (peers.current.get(from) === peer) socket.emit("callSignal", from, scope, { kind: "answer", sdp: answer.sdp ?? "" });
         }
       });
     };
     socket.on("callSignal", onSignal);
     return () => {
       socket.off("callSignal", onSignal);
+      for (const id of peers.current.keys()) dropPeer(id);
     };
-  }, [peerFor, attach]);
-
-  // Al salir de la charla se cierran todas las conexiones.
-  useEffect(() => {
-    if (inCall) return;
-    for (const id of [...peers.current.keys()]) dropPeer(id);
-    setMicOn(true);
-  }, [inCall, dropPeer]);
+  }, [peerFor, dropPeer]);
 
   const toggleCamera = useCallback(async () => {
     if (camera) {
@@ -253,8 +274,13 @@ export function usePrivateCall(meId: string | null) {
       setCamera(null);
       return;
     }
+    const scope = activeCall.current?.id;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 } });
+      if (scope !== activeCall.current?.id) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       sendOn(1, stream.getVideoTracks()[0] ?? null);
       setCamera(stream);
     } catch {
@@ -269,8 +295,13 @@ export function usePrivateCall(meId: string | null) {
       setScreen(null);
       return;
     }
+    const scope = activeCall.current?.id;
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      if (scope !== activeCall.current?.id) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       const track = stream.getVideoTracks()[0] ?? null;
       // Si se deja de compartir desde el navegador, también se apaga aquí.
       if (track)
@@ -297,17 +328,27 @@ export function usePrivateCall(meId: string | null) {
     setInvites((list) => list.filter((i) => i.callId !== callId));
     socket.emit("callRespond", callId, accept, (res) => {
       if (!res.ok) setNotice(res.error);
-      else if (res.data) setCall(res.data);
     });
   }, []);
 
-  const leave = useCallback(() => {
-    socket.emit("callLeave");
-    setCall(null);
-  }, []);
+  const changeHallVoice = useCallback((enabled: boolean) => {
+    setHallVoice(enabled);
+    if (!enabled && activeCall.current?.proximity) updateCall(null);
+    if (socket.connected) socket.emit("hallVoice", enabled);
+  }, [updateCall]);
+
+  const leave = () => {
+    if (activeCall.current?.proximity) changeHallVoice(false);
+    else {
+      socket.emit("callLeave");
+      updateCall(null);
+    }
+  };
 
   return {
     call,
+    hallVoice,
+    changeHallVoice,
     invites,
     remotes,
     micOn,
