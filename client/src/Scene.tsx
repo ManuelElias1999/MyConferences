@@ -569,7 +569,7 @@ export default function Scene(props: SceneProps) {
       for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir, c.sit);
       // 🎧: está en una charla privada.
       // ⭐ organizador, 🧭 mentor, 🎧 en una charla privada.
-      const tagged = (u: User) => `${u.role === "staff" ? "⭐ " : u.role === "mentor" ? "🧭 " : ""}${u.name}${u.inCall ? " 🎧" : ""}`;
+      const tagged = (u: User) => `${u.role === "staff" ? "⭐ " : u.role === "mentor" ? "🧭 " : ""}${u.name}${u.privateCall ? " 🔒" : u.inCall ? " 🎧" : ""}`;
       for (const u of visible) addAvatar(u.id, tagged(u), u.look, others.current.get(u.id)!, false, true);
       addAvatar(p.me.id, tagged(p.me), p.me.look, my.current, true, true);
       items.sort((a, b) => a.key - b.key);

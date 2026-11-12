@@ -38,10 +38,13 @@ export default function App() {
   const [panelNew, setPanelNew] = useState(false);
   const [notice, setNotice] = useState("");
   const call = usePrivateCall(me?.id ?? null);
-  const { changeHallVoice } = call;
+  // En el pasillo de un evento se escucha a quien está cerca (salvo que elija no escuchar a nadie). En la recepción y
+  // dentro de las salas, no.
+  const { changeHallVoice, listening } = call;
   useEffect(() => {
-    if (place.kind === "reception") changeHallVoice(false);
-  }, [place.kind, changeHallVoice]);
+    changeHallVoice(place.kind === "hall" && listening);
+    // Al reconectarse cambia el id: se vuelve a avisar.
+  }, [place.kind, listening, changeHallVoice, me?.id]);
   // En una sala con tarima, la pantalla que comparte quien está arriba se ve en la pantalla grande del plano.
   const stageScreen = (() => {
     const c = call.call;
@@ -360,11 +363,6 @@ export default function App() {
                   Agenda
                 </button>
               )}
-              {place.kind === "hall" && (
-                <button className="btn ghost sm" aria-pressed={call.hallVoice} onClick={() => call.changeHallVoice(!call.hallVoice)}>
-                  {call.hallVoice ? "Desactivar voz de proximidad" : "Activar voz de proximidad"}
-                </button>
-              )}
               <button className="btn ghost sm" onClick={leaveVenue}>
                 Volver a recepción
               </button>
@@ -492,7 +490,7 @@ export default function App() {
           }}
         />
       )}
-      {venue && <CallPanel me={me} call={call} people={people} />}
+      {venue && <CallPanel me={me} call={call} people={people} inHall={place.kind === "hall"} />}
       {card && venue && !room && !card.roomId && card.venueId === venue.id && <UserCard user={card} call={call} onClose={() => setCardUser(null)} />}
       {notice && (
         <div className="toast" role="status">

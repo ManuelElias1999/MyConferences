@@ -11,6 +11,7 @@ import Modal from "./Modal.tsx";
 import SayBar from "./SayBar.tsx";
 import Scene, { type SceneHandle } from "./Scene.tsx";
 import type { DoorStatus } from "./world.ts";
+import SideToggle, { useSideHidden } from "./SideToggle.tsx";
 
 const themeLabel = (id: string) => THEMES.find((t) => t.id === id)?.label ?? "";
 const span = (t: Talk) => `${formatTime(t.start)}–${formatTime(t.end)}`;
@@ -67,6 +68,7 @@ export default function Hall({
     [venue],
   );
   const floors = useMemo(() => venueFloors(venue.theme, venue.rooms, stands, venue.capacity), [venue, stands]);
+  const [sideHidden, toggleSide] = useSideHidden();
   const [stand, setStand] = useState<number | null>(null);
   const standSponsor = stand !== null ? stands[stand] : undefined;
   const isOrganizer = standSponsor?.id === "organizador";
@@ -143,7 +145,7 @@ export default function Hall({
   };
 
   return (
-    <main className="hall">
+    <main className={`hall ${sideHidden ? "side-hidden" : ""}`}>
       <div className="world">
         <Scene
           key={`${venue.id}:${floor}`}
@@ -186,6 +188,7 @@ export default function Hall({
         <SayBar />
       </div>
 
+      <SideToggle hidden={sideHidden} onToggle={toggleSide} />
       <aside className="side">
         <section>
           <p className="eyebrow">

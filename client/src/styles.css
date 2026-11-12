@@ -2488,3 +2488,106 @@ textarea {
 .company-head .plan-line .link {
   color: #fff;
 }
+
+/* Panel de la derecha que se puede esconder: una pestaña en su borde. */
+.hall,
+.room {
+  position: relative;
+  --side-w: 340px;
+}
+.room {
+  --side-w: 360px;
+}
+.hall.side-hidden,
+.room.side-hidden {
+  grid-template-columns: minmax(0, 1fr) 0;
+}
+.side-hidden > .side,
+.side-hidden > .room-side {
+  display: none;
+}
+.side-toggle {
+  position: absolute;
+  top: 50%;
+  right: var(--side-w);
+  z-index: 25;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: var(--shadow);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.side-toggle span {
+  writing-mode: vertical-rl;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.side-hidden > .side-toggle {
+  right: 0;
+}
+@media (max-width: 900px) {
+  .side-toggle {
+    display: none;
+  }
+}
+
+/* Audio del pasillo: qué tan fuerte se escucha a cada uno, y los pedidos para sumarse a una charla privada. */
+.volume-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: auto;
+  height: 12px;
+}
+.volume-bars i {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--border);
+}
+.volume-bars i:nth-child(1) {
+  height: 5px;
+}
+.volume-bars i:nth-child(2) {
+  height: 8px;
+}
+.volume-bars i:nth-child(3) {
+  height: 12px;
+}
+.volume-bars i.on {
+  background: #16a34a;
+}
+.call-requests {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: #fef3c7;
+  list-style: none;
+}
+.call-requests li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.call-requests li > span {
+  flex: 1;
+}
+.call-panel.hall-off .call-actions {
+  margin-top: 8px;
+}

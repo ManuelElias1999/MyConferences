@@ -8,7 +8,7 @@
 // sin volver a negociar la conexión.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CallInfo, CallInvite, CallSignal } from "../../shared/types.ts";
+import type { CallInfo, CallInvite, CallRequest, CallSignal } from "../../shared/types.ts";
 import { socket } from "./lib.ts";
 
 const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
@@ -61,7 +61,10 @@ export function usePrivateCall(meId: string | null) {
   const [call, setCall] = useState<CallInfo | null>(null);
   const activeCall = useRef<CallInfo | null>(null);
   const [hallVoice, setHallVoice] = useState(false);
+  /** Quiere escuchar el pasillo (la voz de proximidad): empieza prendido; «No escuchar a nadie» lo apaga. */
+  const [listening, setListening] = useState(true);
   const [invites, setInvites] = useState<CallInvite[]>([]);
+  const [requests, setRequests] = useState<CallRequest[]>([]);
   const [remotes, setRemotes] = useState<Map<string, Remote>>(new Map());
   const [micOn, setMicOn] = useState(true);
   const [camera, setCamera] = useState<MediaStream | null>(null);
@@ -73,6 +76,9 @@ export function usePrivateCall(meId: string | null) {
   const tracks = useRef<(MediaStreamTrack | null)[]>([null, null, null]);
   const micOnRef = useRef(micOn);
   micOnRef.current = micOn;
+  /** En el pasillo el micrófono empieza cerrado; después se recuerda lo que eligió. */
+  const hallMic = useRef(false);
+  if (call?.proximity) hallMic.current = micOn;
   const callId = call?.id;
   const inCall = call !== null;
 
@@ -119,8 +125,10 @@ export function usePrivateCall(meId: string | null) {
   useEffect(() => releaseMedia, [releaseMedia]);
 
   useEffect(() => {
+    // El permiso del micrófono se pide recién al abrirlo (en el pasillo empieza cerrado).
+    if (micOn && inCall && !local.current) void ensureLocal();
     void local.current?.then((s) => s?.getAudioTracks().forEach((t) => (t.enabled = micOn)));
-  }, [micOn, inCall]);
+  }, [micOn, inCall, ensureLocal]);
 
   // Avisa a la charla si tienes la cámara o la pantalla prendida.
   useEffect(() => {
@@ -158,7 +166,12 @@ export function usePrivateCall(meId: string | null) {
       setCamera(null);
       setScreen(null);
       setMicError("");
-      if (info) void ensureLocal();
+      setRequests([]);
+      // En una charla el micrófono arranca abierto; en el pasillo, como lo dejó (cerrado la primera vez).
+      const mic = info?.proximity ? hallMic.current : true;
+      micOnRef.current = mic;
+      setMicOn(mic);
+      if (info && mic) void ensureLocal();
     }
     activeCall.current = info;
     for (const [id, peer] of peers.current) if (scopeFor(info, id) !== peer.scope) dropPeer(id);
@@ -171,6 +184,8 @@ export function usePrivateCall(meId: string | null) {
     const onCancelled = (callId: string) => setInvites((list) => list.filter((i) => i.callId !== callId));
     const onDeclined = ({ name }: { name: string }) => setNotice(`${name} no puede charlar ahora`);
     const onNotice = (text: string) => setNotice(text);
+    const onRequested = (req: CallRequest) => setRequests((list) => [...list.filter((r) => r.from.id !== req.from.id), req]);
+    const onRequestClosed = ({ userId }: { callId: string; userId: string }) => setRequests((list) => list.filter((r) => r.from.id !== userId));
     const onDisconnect = () => {
       updateCall(null);
       setInvites([]);
@@ -182,7 +197,11 @@ export function usePrivateCall(meId: string | null) {
     socket.on("callCancelled", onCancelled);
     socket.on("callDeclined", onDeclined);
     socket.on("callNotice", onNotice);
+    socket.on("callRequested", onRequested);
+    socket.on("callRequestClosed", onRequestClosed);
     return () => {
+      socket.off("callRequested", onRequested);
+      socket.off("callRequestClosed", onRequestClosed);
       socket.off("disconnect", onDisconnect);
       socket.off("callUpdated", onUpdated);
       socket.off("callInvited", onInvited);
@@ -331,6 +350,18 @@ export function usePrivateCall(meId: string | null) {
     });
   }, []);
 
+  /** Pide sumarse a la charla privada de esa persona. */
+  const requestJoin = useCallback(
+    (userId: string) =>
+      new Promise<void>((resolve, reject) => socket.emit("callRequest", userId, (res) => (res.ok ? resolve() : reject(new Error(res.error))))),
+    [],
+  );
+
+  const admit = useCallback((req: CallRequest, accept: boolean) => {
+    setRequests((list) => list.filter((r) => r.from.id !== req.from.id));
+    socket.emit("callAdmit", req.callId, req.from.id, accept);
+  }, []);
+
   const changeHallVoice = useCallback((enabled: boolean) => {
     setHallVoice(enabled);
     if (!enabled && activeCall.current?.proximity) updateCall(null);
@@ -338,7 +369,7 @@ export function usePrivateCall(meId: string | null) {
   }, [updateCall]);
 
   const leave = () => {
-    if (activeCall.current?.proximity) changeHallVoice(false);
+    if (activeCall.current?.proximity) setListening(false);
     else {
       socket.emit("callLeave");
       updateCall(null);
@@ -349,6 +380,11 @@ export function usePrivateCall(meId: string | null) {
     call,
     hallVoice,
     changeHallVoice,
+    listening,
+    setListening,
+    requests,
+    requestJoin,
+    admit,
     invites,
     remotes,
     micOn,

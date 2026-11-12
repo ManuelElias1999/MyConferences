@@ -744,6 +744,8 @@ interface PrivateCall {
   venueId: string;
   members: Set<string>;
   invited: Map<string, ReturnType<typeof setTimeout>>;
+  /** Quienes pidieron sumarse (solo en las privadas), con el vencimiento del pedido. */
+  requests?: Map<string, ReturnType<typeof setTimeout>>;
   /** Si es la conversación de una mesa de equipo: su nombre y cuántos caben. */
   zone?: { label: string; seats: number; meeting: boolean; stage?: Rect };
   media: Map<string, CallMedia>;
@@ -772,10 +774,11 @@ const callInfo = (call: PrivateCall): CallInfo => ({
   }),
 });
 
-function setInCall(userId: string, inCall: boolean) {
+function setInCall(userId: string, inCall: boolean, privateCall = false) {
   const c = connections.get(userId);
-  if (!c || c.user.inCall === inCall) return;
+  if (!c || (c.user.inCall === inCall && Boolean(c.user.privateCall) === privateCall)) return;
   c.user.inCall = inCall;
+  c.user.privateCall = privateCall;
   io.to(presenceChannel(c.user)).emit("userUpdated", c.user);
 }
 
@@ -797,6 +800,10 @@ function endCall(call: PrivateCall) {
   for (const [id, timeout] of call.invited) {
     clearTimeout(timeout);
     io.to(id).emit("callCancelled", call.id);
+  }
+  for (const [id, timeout] of call.requests ?? []) {
+    clearTimeout(timeout);
+    io.to(id).emit("callNotice", "Esa charla privada terminó");
   }
 }
 
@@ -869,18 +876,22 @@ function syncZone(u: User) {
 
 const hallVoice = new Set<string>();
 const hallPeers = new Map<string, Map<string, string>>();
-const HALL_RADIUS = 4;
-const HALL_PEER_LIMIT = 6;
+/** Se escucha a quien está a menos de 8 baldosas (cada vez más bajo); una conexión ya armada sigue hasta las 10. */
+const HALL_RADIUS = 8;
+const HALL_KEEP = 10;
+const HALL_PEER_LIMIT = 10;
+/** Distancias que se mandaron por última vez, para avisar solo cuando cambian. */
+const hallDistances = new Map<string, Record<string, number>>();
 
 function canUseHallVoice(u: User) {
   return u.venueId && !u.roomId && hallVoice.has(u.id) && !callOfUser.has(u.id)
     && !sceneMapFor(u).zones.some((zone) => inZone({ x: Math.round(u.x), y: Math.round(u.y) }, zone));
 }
 
-function hallDistance(a: User, b: User) {
+function hallDistance(a: User, b: User, radius = HALL_KEEP) {
   if (a.venueId !== b.venueId || a.floor !== b.floor) return Infinity;
   const distance = Math.hypot(b.x - a.x, b.y - a.y);
-  if (distance > HALL_RADIUS) return Infinity;
+  if (distance > radius) return Infinity;
 
   const map = sceneMapFor(a);
   const steps = Math.max(1, Math.ceil(distance * 4));
@@ -894,6 +905,7 @@ function hallDistance(a: User, b: User) {
 
 function syncHallVoice() {
   const next = new Map<string, Map<string, string>>();
+  const far = new Map<string, Record<string, number>>();
   const scenes = new Map<string, User[]>();
   for (const id of hallVoice) {
     const user = connections.get(id)?.user;
@@ -909,8 +921,9 @@ function syncHallVoice() {
     const pairs: { a: string; b: string; distance: number; existing?: string }[] = [];
     for (const [i, a] of people.entries()) {
       for (const b of people.slice(i + 1)) {
-        const distance = hallDistance(a, b);
-        if (Number.isFinite(distance)) pairs.push({ a: a.id, b: b.id, distance, existing: hallPeers.get(a.id)?.get(b.id) });
+        const existing = hallPeers.get(a.id)?.get(b.id);
+        const distance = hallDistance(a, b, existing ? HALL_KEEP : HALL_RADIUS);
+        if (Number.isFinite(distance)) pairs.push({ a: a.id, b: b.id, distance, existing });
       }
     }
     // Mantiene las conexiones activas y reparte los cupos libres entre las parejas más cercanas.
@@ -922,6 +935,10 @@ function syncHallVoice() {
       const scope = pair.existing ?? randomUUID();
       a.set(pair.b, scope);
       b.set(pair.a, scope);
+      // Redondeada a media baldosa: alcanza para el volumen y no se avisa por cada paso chiquito.
+      const d = Math.round(pair.distance * 2) / 2;
+      far.set(pair.a, { ...far.get(pair.a), [pair.b]: d });
+      far.set(pair.b, { ...far.get(pair.b), [pair.a]: d });
     }
   }
 
@@ -930,13 +947,17 @@ function syncHallVoice() {
     const peers = next.get(id);
     if (!peers) {
       hallPeers.delete(id);
+      hallDistances.delete(id);
       if (!callOfUser.has(id)) io.to(id).emit("callUpdated", null);
       continue;
     }
-    if (previous && previous.size === peers.size && [...peers].every(([peer, scope]) => previous.get(peer) === scope)) continue;
+    const distances = far.get(id) ?? {};
+    const sameDistances = JSON.stringify(distances) === JSON.stringify(hallDistances.get(id) ?? {});
+    if (previous && sameDistances && previous.size === peers.size && [...peers].every(([peer, scope]) => previous.get(peer) === scope)) continue;
     hallPeers.set(id, peers);
+    hallDistances.set(id, distances);
     const members = [id, ...peers.keys()].map((member) => connections.get(member)!.user);
-    io.to(id).emit("callUpdated", { id: "hall", members, zone: null, meeting: true, media: {}, proximity: Object.fromEntries(peers) });
+    io.to(id).emit("callUpdated", { id: "hall", members, zone: null, meeting: true, media: {}, proximity: Object.fromEntries(peers), distances });
   }
 }
 
@@ -1369,7 +1390,7 @@ io.on("connection", (socket) => {
       call = { id: randomUUID(), venueId: me.venueId, members: new Set([me.id]), invited: new Map(), media: new Map() };
       calls.set(call.id, call);
       callOfUser.set(me.id, call.id);
-      setInCall(me.id, true);
+      setInCall(me.id, true, true);
       emitCall(call);
       syncHallVoice();
     }
@@ -1402,10 +1423,60 @@ io.on("connection", (socket) => {
     if (!calls.has(call.id)) return ack({ ok: false, error: "Esa charla ya terminó" });
     call.members.add(me.id);
     callOfUser.set(me.id, call.id);
-    setInCall(me.id, true);
+    setInCall(me.id, true, true);
     emitCall(call);
     syncHallVoice();
     ack({ ok: true, data: callInfo(call) });
+  });
+
+  // Pedir sumarse a una charla privada: quienes están adentro aceptan o no.
+  socket.on("callRequest", (userId, ack) => {
+    const me = conn?.user;
+    const target = connections.get(String(userId))?.user;
+    if (!me?.venueId || me.roomId) return ack({ ok: false, error: "Ve al pasillo para pedir sumarte a una charla" });
+    if (!target || target.venueId !== me.venueId || target.id === me.id) return ack({ ok: false, error: "Esa persona ya no está en el evento" });
+    const call = calls.get(callOfUser.get(target.id) ?? "");
+    if (!call) return ack({ ok: false, error: `${target.name} no está en una charla privada: acércate y charlen en el pasillo` });
+    if (call.zone) return ack({ ok: false, error: `${target.name} está en ${call.zone.label}: acércate para sumarte` });
+    if (call.members.has(me.id)) return ack({ ok: false, error: "Ya estás en esa charla" });
+    if (call.members.size + call.invited.size >= MAX_CALL) return ack({ ok: false, error: `Esa charla está completa (hasta ${MAX_CALL} personas)` });
+    const requests = (call.requests ??= new Map());
+    if (requests.has(me.id)) return ack({ ok: false, error: "Ya pediste sumarte: espera la respuesta" });
+    const pending = call;
+    requests.set(
+      me.id,
+      setTimeout(() => {
+        if (!pending.requests?.delete(me.id)) return;
+        for (const id of pending.members) io.to(id).emit("callRequestClosed", { callId: pending.id, userId: me.id });
+        io.to(me.id).emit("callNotice", "Nadie respondió tu pedido para sumarte a la charla");
+      }, 45_000).unref(),
+    );
+    for (const id of call.members) io.to(id).emit("callRequested", { callId: call.id, from: me });
+    ack({ ok: true, data: null });
+  });
+
+  socket.on("callAdmit", (callId, userId, accept) => {
+    const me = conn?.user;
+    const call = calls.get(String(callId));
+    const guestId = String(userId);
+    if (!me || !call || !call.members.has(me.id) || !call.requests?.has(guestId)) return;
+    clearTimeout(call.requests.get(guestId));
+    call.requests.delete(guestId);
+    for (const id of call.members) io.to(id).emit("callRequestClosed", { callId: call.id, userId: guestId });
+    const guest = connections.get(guestId)?.user;
+    if (!guest) return;
+    if (!accept) return void io.to(guest.id).emit("callNotice", `${me.name} prefiere seguir en privado por ahora`);
+    if (guest.roomId || guest.venueId !== call.venueId) return;
+    if (call.members.size >= MAX_CALL) return void io.to(guest.id).emit("callNotice", "Esa charla se llenó");
+    const previous = callOfUser.get(guest.id);
+    if (previous?.startsWith("zone:")) zoneOptOut.set(guest.id, previous);
+    if (previous) leaveCall(guest.id);
+    if (!calls.has(call.id)) return;
+    call.members.add(guest.id);
+    callOfUser.set(guest.id, call.id);
+    setInCall(guest.id, true, true);
+    emitCall(call);
+    syncHallVoice();
   });
 
   socket.on("callLeave", () => {
@@ -1417,8 +1488,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("hallVoice", (enabled) => {
-    if (!conn?.account?.verified || !conn.user.venueId) return;
-    if (enabled === true && !conn.user.roomId) hallVoice.add(conn.user.id);
+    // Se guarda lo que eligió aunque todavía no haya vuelto a entrar al evento (por ejemplo, al reconectarse):
+    // solo se escucha a otros estando en el pasillo (lo revisa canUseHallVoice).
+    if (!conn?.account?.verified) return;
+    if (enabled === true) hallVoice.add(conn.user.id);
     else hallVoice.delete(conn.user.id);
     syncHallVoice();
   });
@@ -1493,6 +1566,11 @@ io.on("connection", (socket) => {
     for (const call of calls.values()) {
       clearTimeout(call.invited.get(u.id));
       if (call.invited.delete(u.id) && call.members.size < 2 && call.invited.size === 0) endCall(call);
+      if (call.requests?.has(u.id)) {
+        clearTimeout(call.requests.get(u.id));
+        call.requests.delete(u.id);
+        for (const id of call.members) io.to(id).emit("callRequestClosed", { callId: call.id, userId: u.id });
+      }
     }
     leaveCurrentRoom();
     connections.delete(socket.id);

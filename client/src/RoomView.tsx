@@ -7,6 +7,7 @@ import { useBroadcaster, useLiveViewer } from "./live.ts";
 import { formatTime, minutesUntil, roomSchedule, socket, toEmbedUrl } from "./lib.ts";
 import { EmoteButtons } from "./SayBar.tsx";
 import Scene, { type SceneHandle } from "./Scene.tsx";
+import SideToggle, { useSideHidden } from "./SideToggle.tsx";
 
 // pdf.js pesa bastante: se carga solo cuando hay diapositivas que mostrar.
 const SlideViewer = lazy(() => import("./SlideViewer.tsx"));
@@ -42,6 +43,7 @@ export default function RoomView({
   const deafened = useDeafened();
   const map = useMemo(() => interiorFor(venue.theme, venue.rooms, room.id), [venue.theme, venue.rooms, room.id]);
   const scene = useRef<SceneHandle>(null);
+  const [sideHidden, toggleSide] = useSideHidden();
   const [phase, setPhase] = useState<"entering" | "seated">("entering");
   const [stage, setStage] = useState<Stage>(snapshot.stage);
   const [chat, setChat] = useState<ChatMessage[]>(snapshot.chat);
@@ -112,7 +114,7 @@ export default function RoomView({
   const openQuestions = questions.filter((q) => !q.answered).length;
 
   return (
-    <main className={`room ${phase}`} style={{ "--room": room.color } as React.CSSProperties}>
+    <main className={`room ${phase} ${sideHidden ? "side-hidden" : ""}`} style={{ "--room": room.color } as React.CSSProperties}>
       <section className="room-main">
         <header className="room-head">
           <div>
@@ -173,6 +175,7 @@ export default function RoomView({
         </div>
       </section>
 
+      <SideToggle hidden={sideHidden} onToggle={toggleSide} />
       <aside className="room-side">
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === "chat"} onClick={() => setTab("chat")}>

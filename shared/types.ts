@@ -174,8 +174,10 @@ export interface User {
   floor: number;
   /** Sala que puede presentar, si dio el código de expositor. */
   speakerFor: string | null;
-  /** Está en una charla privada por micrófono (los demás no la escuchan). */
+  /** Está en una conversación por micrófono: de un espacio (mesa, sala) o privada. */
   inCall: boolean;
+  /** Esa conversación es privada: los demás no la escuchan, pero pueden pedir sumarse. */
+  privateCall?: boolean;
   /** Su papel en el evento en el que está: organizador, mentor o quien atiende un stand. */
   role: "staff" | "mentor" | "sponsor" | null;
   /** Si atiende un stand: la posición de su patrocinador en la lista. */
@@ -246,7 +248,9 @@ export type RtcSignal =
 export interface CallInfo {
   id: string;
   members: User[];
+  /** Voz de proximidad en el pasillo: con quién hay conexión (id → canal) y a qué distancia está cada uno, en baldosas. */
   proximity?: Record<string, string>;
+  distances?: Record<string, number>;
   /** Nombre de la mesa de equipo si es la conversación de una mesa (hackathon). */
   zone: string | null;
   /** Es una sala de reunión (mentores, organizadores): se charla, no se presenta. */
@@ -260,6 +264,12 @@ export interface CallInfo {
 export interface CallMedia {
   cam: boolean;
   screen: boolean;
+}
+
+/** Alguien que está cerca pide sumarse a una charla privada. */
+export interface CallRequest {
+  callId: string;
+  from: User;
 }
 
 export interface CallInvite {
@@ -310,6 +320,10 @@ export interface ClientToServerEvents {
   callInvite: (userId: string, ack: Ack<null>) => void;
   callRespond: (callId: string, accept: boolean, ack: Ack<CallInfo | null>) => void;
   callLeave: () => void;
+  /** Pedir sumarse a la charla privada de esa persona. */
+  callRequest: (userId: string, ack: Ack<null>) => void;
+  /** Quien está en la charla acepta (o no) a quien pidió sumarse. */
+  callAdmit: (callId: string, userId: string, accept: boolean) => void;
   callSignal: (to: string, scope: string, signal: CallSignal) => void;
   hallVoice: (enabled: boolean) => void;
   callMedia: (callId: string, media: CallMedia) => void;
@@ -340,6 +354,9 @@ export interface ServerToClientEvents {
   callDeclined: (data: { name: string }) => void;
   /** La invitación ya no vale (la charla terminó). */
   callCancelled: (callId: string) => void;
+  callRequested: (request: CallRequest) => void;
+  /** El pedido ya se respondió (o venció): se quita de la lista. */
+  callRequestClosed: (data: { callId: string; userId: string }) => void;
   callSignal: (from: string, scope: string, signal: CallSignal) => void;
   /** Aviso sobre las charlas (por ejemplo, una mesa llena). */
   callNotice: (text: string) => void;
