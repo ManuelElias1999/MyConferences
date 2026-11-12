@@ -2536,34 +2536,50 @@ textarea {
   color: #fff;
 }
 
-/* Panel de la derecha que se puede esconder: una pestaña en su borde. El panel se desliza y el mapa se agranda de a poco,
-   así la cámara se reacomoda suave. */
+/* Panel de la derecha que se puede esconder.
+   En el pasillo flota sobre el mapa y se desliza: el mapa no cambia de tamaño (no parpadea) y solo se corre la cámara.
+   En las salas el panel ocupa su columna y se achica de a poco. */
 .hall,
 .room {
   position: relative;
   --side-w: 340px;
-  transition: grid-template-columns 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hall {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hall > .side {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: var(--side-w);
+  box-shadow: -6px 0 18px rgb(22 22 29 / 0.12);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.45s;
+}
+.hall.side-hidden > .side {
+  transform: translateX(100%);
+  visibility: hidden;
 }
 .room {
   --side-w: 360px;
+  transition: grid-template-columns 0.42s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.hall.side-hidden,
 .room.side-hidden {
   grid-template-columns: minmax(0, 1fr) 0px;
 }
-.hall > .side,
 .room > .room-side {
   min-width: 0;
   overflow-x: hidden;
   transition: opacity 0.3s ease, visibility 0.42s;
 }
-.side-hidden > .side,
-.side-hidden > .room-side {
+.room.side-hidden > .room-side {
   opacity: 0;
   visibility: hidden;
-  padding-left: 0;
-  padding-right: 0;
   border-left: none;
+}
+.minimap {
+  transition: right 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .side-toggle {
   position: absolute;
@@ -2573,23 +2589,23 @@ textarea {
   display: grid;
   justify-items: center;
   gap: 10px;
-  width: 38px;
+  width: 40px;
   padding: 14px 0;
   border: none;
   border-radius: 14px 0 0 14px;
-  background: var(--navy);
+  background: linear-gradient(180deg, #4f7dff, var(--accent));
   color: #fff;
-  box-shadow: -4px 4px 0 rgb(22 22 29 / 0.14);
+  box-shadow: -4px 4px 0 rgb(22 22 29 / 0.16);
   transform: translateY(-50%);
-  transition: right 0.42s cubic-bezier(0.4, 0, 0.2, 1), width 0.18s ease, background 0.18s ease;
+  transition: right 0.45s cubic-bezier(0.4, 0, 0.2, 1), width 0.18s ease, filter 0.18s ease;
   cursor: pointer;
 }
 .side-toggle:hover {
-  width: 44px;
-  background: var(--navy-2);
+  width: 46px;
+  filter: brightness(1.08);
 }
 .side-toggle:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--primary);
   outline-offset: 2px;
 }
 .side-toggle-icon {
@@ -2598,9 +2614,9 @@ textarea {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
-  transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fff;
+  color: var(--accent);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 /* Escondido, la flecha apunta hacia adentro (para volver a abrirlo). */
 .side-hidden > .side-toggle .side-toggle-icon {
@@ -2619,8 +2635,9 @@ textarea {
   right: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-  .hall,
+  .hall > .side,
   .room,
+  .minimap,
   .side-toggle,
   .side-toggle-icon {
     transition: none;
@@ -2629,6 +2646,13 @@ textarea {
 @media (max-width: 900px) {
   .side-toggle {
     display: none;
+  }
+  .hall > .side {
+    position: static;
+    width: auto;
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
   }
 }
 
@@ -2678,4 +2702,14 @@ textarea {
 }
 .call-panel.hall-off .call-actions {
   margin-top: 8px;
+}
+
+/* «Siguiendo a …»: arriba al centro, debajo del cartel del piso. */
+.guide-chip.follow-chip {
+  top: 54px;
+  bottom: auto;
+  left: 50%;
+  z-index: 15;
+  background: var(--accent);
+  transform: translateX(-50%);
 }

@@ -45,6 +45,10 @@ export default function App() {
     changeHallVoice(place.kind === "hall" && listening);
     // Al reconectarse cambia el id: se vuelve a avisar.
   }, [place.kind, listening, changeHallVoice, me?.id]);
+  // Solo se sigue a alguien por el pasillo.
+  useEffect(() => {
+    if (place.kind !== "hall") setFollowing(null);
+  }, [place.kind]);
   // En una sala con tarima, la pantalla que comparte quien está arriba se ve en la pantalla grande del plano.
   const stageScreen = (() => {
     const c = call.call;
@@ -58,6 +62,8 @@ export default function App() {
   })();
   /** Persona a la que le hiciste clic (para invitarla a charlar). */
   const [cardUser, setCardUser] = useState<string | null>(null);
+  /** Persona a la que sigues por el pasillo. */
+  const [following, setFollowing] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
   // Las posiciones cambian muchas veces por segundo: viven en un ref que los mapas
@@ -444,6 +450,12 @@ export default function App() {
           onOpenAgenda={() => setAgendaOpen(true)}
           onUser={setCardUser}
           stageScreen={stageScreen}
+          follow={following}
+          onFollowEnd={(reason) => {
+            const name = following ? usersRef.current.get(following)?.name : null;
+            setFollowing(null);
+            if (reason === "gone" && name) setNotice(`${name} se fue a otro lugar: dejaste de seguirle`);
+          }}
         />
       )}
       {place.kind === "room" && room && (
@@ -491,7 +503,7 @@ export default function App() {
         />
       )}
       {venue && <CallPanel me={me} call={call} people={people} inHall={place.kind === "hall"} />}
-      {card && venue && !room && !card.roomId && card.venueId === venue.id && <UserCard user={card} call={call} onClose={() => setCardUser(null)} />}
+      {card && venue && !room && !card.roomId && card.venueId === venue.id && <UserCard user={card} call={call} following={following === card.id} onFollow={(on) => setFollowing(on ? card.id : null)} onClose={() => setCardUser(null)} />}
       {notice && (
         <div className="toast" role="status">
           {notice}

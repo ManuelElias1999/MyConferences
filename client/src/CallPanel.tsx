@@ -28,7 +28,19 @@ const hallVolume = (d: number | undefined) =>
   d === undefined || d <= 1 ? 1 : d > 5 ? 0 : 1 - ((d - 1) / 4) * (1 - HALL_MIN);
 
 /** Tarjeta de una persona del evento, con el botón para charlar en privado (o pedir sumarse a la suya). */
-export function UserCard({ user, call, onClose }: { user: User; call: PrivateCall; onClose: () => void }) {
+export function UserCard({
+  user,
+  call,
+  following,
+  onFollow,
+  onClose,
+}: {
+  user: User;
+  call: PrivateCall;
+  following: boolean;
+  onFollow: (on: boolean) => void;
+  onClose: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const privateCall = call.call && !call.call.proximity && !call.call.zone;
@@ -67,9 +79,19 @@ export function UserCard({ user, call, onClose }: { user: User; call: PrivateCal
         </div>
       </div>
       {error && <p className="error">{error}</p>}
+      <p className="muted small">Para una charla privada tienen que estar uno al lado del otro: si te alejas, sales de la charla. «Seguir» te lleva a su lado y lo acompaña mientras camina.</p>
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose}>
           Cancelar
+        </button>
+        <button
+          className="btn"
+          onClick={() => {
+            onFollow(!following);
+            onClose();
+          }}
+        >
+          {following ? "Dejar de seguir" : "👣 Seguir"}
         </button>
         <button className="btn primary" onClick={start} disabled={busy || alreadyIn}>
           {alreadyIn ? "Ya está en tu charla" : askToJoin ? "✋ Pedir sumarme" : privateCall ? "🎙 Sumar a la charla" : "🔒 Invitar a charla privada"}
@@ -106,8 +128,9 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
   const near = current?.distances ?? {};
   // En el pasillo se muestra solo a quienes se escuchan (5 baldosas o menos).
   const audible = proximity ? (current?.members ?? []).filter((m) => m.id !== me.id && hallVolume(near[m.id]) > 0) : [];
+  // Desde el pasillo solo se invita a quien está al lado (a 3 cuadros o menos).
   const candidates = people
-    .filter((u) => u.id !== me.id && !u.roomId && !memberIds.has(u.id) && !u.privateCall)
+    .filter((u) => u.id !== me.id && !u.roomId && !memberIds.has(u.id) && !u.privateCall && (!proximity || (near[u.id] ?? 99) <= 3))
     .sort((a, b) => (near[a.id] ?? 99) - (near[b.id] ?? 99));
   const zone = current?.zone ?? null;
 
@@ -268,7 +291,9 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
           {adding && !zone && (
             <div className="call-add">
               {candidates.length === 0 ? (
-                <p className="muted small">No hay más personas en el evento para sumar.</p>
+                <p className="muted small">
+                  {proximity ? "Acércate a alguien (a 3 cuadros o menos) para invitarle a una charla privada." : "No hay más personas en el evento para sumar."}
+                </p>
               ) : (
                 <ul>
                   {candidates.map((u) => (

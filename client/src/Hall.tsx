@@ -28,6 +28,8 @@ export default function Hall({
   onOpenAgenda,
   onUser,
   stageScreen = null,
+  follow = null,
+  onFollowEnd,
 }: {
   me: User;
   venue: Venue;
@@ -41,6 +43,9 @@ export default function Hall({
   onUser: (userId: string) => void;
   /** Lo que se comparte desde la tarima, para mostrarlo en la pantalla grande del plano. */
   stageScreen?: MediaStream | null;
+  /** Persona a la que sigues (caminas solo hasta quedar a su lado). */
+  follow?: string | null;
+  onFollowEnd: (reason: "manual" | "gone") => void;
 }) {
   const stageVideo = useMemo(() => {
     const v = document.createElement("video");
@@ -166,11 +171,22 @@ export default function Hall({
           media={{ sponsors: venue.sponsors, title: venue.name, logoUrl: venue.logoUrl, stands, stageVideo: stageScreen ? stageVideo : null }}
           handle={scene}
           label={`${venue.name}, ${map.floorName}`}
+          rightInset={sideHidden ? 0 : 340}
+          follow={follow}
+          onFollowEnd={onFollowEnd}
         />
         <p className="scene-hint">
           Recorre el evento: hay cafetería, zonas para charlar, juegos y un patio. Usa los tótems <b>?</b> o el minimapa para llegar a cada sala.
         </p>
         <span className="floor-badge">{map.floorName}</span>
+        {follow && users.get(follow) && (
+          <p className="guide-chip follow-chip">
+            👣 Siguiendo a <b>{users.get(follow)!.name}</b>
+            <button className="btn ghost sm" onClick={() => onFollowEnd("manual")}>
+              Dejar de seguir
+            </button>
+          </p>
+        )}
         {guiding && (
           <p className="guide-chip">
             Siguiendo el camino a <b>{guiding}</b>

@@ -178,6 +178,8 @@ export interface User {
   inCall: boolean;
   /** Esa conversación es privada: los demás no la escuchan, pero pueden pedir sumarse. */
   privateCall?: boolean;
+  /** Qué charla privada (para dibujar en el piso la burbuja que junta a quienes están en la misma). */
+  callGroup?: string | null;
   /** Su papel en el evento en el que está: organizador, mentor o quien atiende un stand. */
   role: "staff" | "mentor" | "sponsor" | null;
   /** Si atiende un stand: la posición de su patrocinador en la lista. */

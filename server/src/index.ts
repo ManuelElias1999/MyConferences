@@ -761,6 +761,37 @@ const wasOnStage = new Map<string, boolean>();
 const calls = new Map<string, PrivateCall>();
 const callOfUser = new Map<string, string>();
 const MAX_CALL = 8;
+/** Una charla privada es entre quienes están uno al lado del otro: para invitar o sumarse, a 3 cuadros o menos; quien se
+ *  aleja a más de 4 de todos los demás sale de la charla. */
+const PRIVATE_NEAR = 3;
+const PRIVATE_KEEP = 4;
+const apart = (a: User, b: User) =>
+  a.venueId !== b.venueId || a.floor !== b.floor || a.roomId || b.roomId ? Infinity : Math.hypot(a.x - b.x, a.y - b.y);
+/** Distancia de alguien a la persona más cercana de una charla (sin contarse). */
+const nearestIn = (u: User, members: Iterable<string>) =>
+  Math.min(...[...members].filter((id) => id !== u.id).map((id) => {
+    const other = connections.get(id)?.user;
+    return other ? apart(u, other) : Infinity;
+  }));
+
+/** Cuándo caminó cada uno por última vez: si dos quedan lejos, el que se fue es el que se movió. */
+const lastMoved = new Map<string, number>();
+
+/** Quien se alejó de su charla privada sale de ella (se revisa varias veces por segundo). */
+function checkPrivateDistance() {
+  for (const call of [...calls.values()]) {
+    if (call.zone || call.members.size < 2) continue;
+    const byLastMove = [...call.members].sort((a, b) => (lastMoved.get(b) ?? 0) - (lastMoved.get(a) ?? 0));
+    for (const id of byLastMove) {
+      const u = connections.get(id)?.user;
+      if (!u || !calls.has(call.id) || !call.members.has(id) || call.members.size < 2) continue;
+      if (nearestIn(u, call.members) <= PRIVATE_KEEP) continue;
+      leaveCall(id);
+      io.to(id).emit("callNotice", "Te alejaste: saliste de la charla privada");
+      for (const other of call.members) io.to(other).emit("callNotice", `${u.name} se alejó y salió de la charla`);
+    }
+  }
+}
 
 const callInfo = (call: PrivateCall): CallInfo => ({
   id: call.id,
@@ -774,11 +805,13 @@ const callInfo = (call: PrivateCall): CallInfo => ({
   }),
 });
 
-function setInCall(userId: string, inCall: boolean, privateCall = false) {
+/** Marca si alguien está en una conversación; `group` es el id de su charla privada (null si es la de un espacio). */
+function setInCall(userId: string, inCall: boolean, group: string | null = null) {
   const c = connections.get(userId);
-  if (!c || (c.user.inCall === inCall && Boolean(c.user.privateCall) === privateCall)) return;
+  if (!c || (c.user.inCall === inCall && (c.user.callGroup ?? null) === group)) return;
   c.user.inCall = inCall;
-  c.user.privateCall = privateCall;
+  c.user.privateCall = Boolean(group);
+  c.user.callGroup = group;
   io.to(presenceChannel(c.user)).emit("userUpdated", c.user);
 }
 
@@ -961,7 +994,10 @@ function syncHallVoice() {
   }
 }
 
-setInterval(syncHallVoice, 250).unref();
+setInterval(() => {
+  checkPrivateDistance();
+  syncHallVoice();
+}, 250).unref();
 
 /**
  * Baldosas libres dentro de una zona, en orden al azar (para repartir gente sin apilarla): bien adentro (no en la
@@ -1105,6 +1141,7 @@ io.on("connection", (socket) => {
     if (offLimits(map, { x: Math.round(x), y: Math.round(y) }, u)) return;
     u.x = Math.max(0, Math.min(map.w - 1, Math.round(x * 100) / 100));
     u.y = Math.max(0, Math.min(map.h - 1, Math.round(y * 100) / 100));
+    lastMoved.set(u.id, Date.now());
     socket.to(sceneChannel(u)).volatile.emit("moved", { id: u.id, x: u.x, y: u.y });
     syncZone(u);
   });
@@ -1384,13 +1421,15 @@ io.on("connection", (socket) => {
     let call = calls.get(callOfUser.get(me.id) ?? "");
     if (call?.zone) return ack({ ok: false, error: "En una mesa de equipo la gente se suma acercándose a la mesa" });
     if (call?.invited.has(target.id)) return ack({ ok: false, error: "Esa invitación ya está pendiente" });
+    if (apart(me, target) > PRIVATE_NEAR)
+      return ack({ ok: false, error: `Acércate a ${target.name}: para una charla privada tienen que estar uno al lado del otro (a ${PRIVATE_NEAR} cuadros o menos). Puedes seguirle con «👣 Seguir».` });
     if (call?.members.has(target.id)) return ack({ ok: false, error: `${target.name} ya está en tu charla` });
     if (call && call.members.size + call.invited.size >= MAX_CALL) return ack({ ok: false, error: `Una charla privada es de hasta ${MAX_CALL} personas` });
     if (!call) {
       call = { id: randomUUID(), venueId: me.venueId, members: new Set([me.id]), invited: new Map(), media: new Map() };
       calls.set(call.id, call);
       callOfUser.set(me.id, call.id);
-      setInCall(me.id, true, true);
+      setInCall(me.id, true, call.id);
       emitCall(call);
       syncHallVoice();
     }
@@ -1417,13 +1456,18 @@ io.on("connection", (socket) => {
       if (call.members.size < 2 && call.invited.size === 0) endCall(call);
       return ack({ ok: true, data: null });
     }
+    if (nearestIn(me, call.members) > PRIVATE_NEAR) {
+      for (const id of call.members) io.to(id).emit("callDeclined", { name: me.name });
+      if (call.members.size < 2 && call.invited.size === 0) endCall(call);
+      return ack({ ok: false, error: "Te alejaste: para sumarte a la charla privada acércate a quienes están en ella" });
+    }
     const previous = callOfUser.get(me.id);
     if (previous?.startsWith("zone:")) zoneOptOut.set(me.id, previous);
     if (previous) leaveCall(me.id);
     if (!calls.has(call.id)) return ack({ ok: false, error: "Esa charla ya terminó" });
     call.members.add(me.id);
     callOfUser.set(me.id, call.id);
-    setInCall(me.id, true, true);
+    setInCall(me.id, true, call.id);
     emitCall(call);
     syncHallVoice();
     ack({ ok: true, data: callInfo(call) });
@@ -1440,6 +1484,8 @@ io.on("connection", (socket) => {
     if (call.zone) return ack({ ok: false, error: `${target.name} está en ${call.zone.label}: acércate para sumarte` });
     if (call.members.has(me.id)) return ack({ ok: false, error: "Ya estás en esa charla" });
     if (call.members.size + call.invited.size >= MAX_CALL) return ack({ ok: false, error: `Esa charla está completa (hasta ${MAX_CALL} personas)` });
+    if (nearestIn(me, call.members) > PRIVATE_NEAR)
+      return ack({ ok: false, error: `Acércate a la charla para pedir sumarte (a ${PRIVATE_NEAR} cuadros o menos de alguien que esté en ella)` });
     const requests = (call.requests ??= new Map());
     if (requests.has(me.id)) return ack({ ok: false, error: "Ya pediste sumarte: espera la respuesta" });
     const pending = call;
@@ -1468,13 +1514,14 @@ io.on("connection", (socket) => {
     if (!accept) return void io.to(guest.id).emit("callNotice", `${me.name} prefiere seguir en privado por ahora`);
     if (guest.roomId || guest.venueId !== call.venueId) return;
     if (call.members.size >= MAX_CALL) return void io.to(guest.id).emit("callNotice", "Esa charla se llenó");
+    if (nearestIn(guest, call.members) > PRIVATE_NEAR) return void io.to(guest.id).emit("callNotice", "Te aceptaron, pero te alejaste: acércate y vuelve a pedirlo");
     const previous = callOfUser.get(guest.id);
     if (previous?.startsWith("zone:")) zoneOptOut.set(guest.id, previous);
     if (previous) leaveCall(guest.id);
     if (!calls.has(call.id)) return;
     call.members.add(guest.id);
     callOfUser.set(guest.id, call.id);
-    setInCall(guest.id, true, true);
+    setInCall(guest.id, true, call.id);
     emitCall(call);
     syncHallVoice();
   });
@@ -1574,6 +1621,7 @@ io.on("connection", (socket) => {
     }
     leaveCurrentRoom();
     connections.delete(socket.id);
+    lastMoved.delete(u.id);
     syncHallVoice();
     if (conn.account?.verified) io.to(presenceChannel(u)).emit("userLeft", u.id);
   });

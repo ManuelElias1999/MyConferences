@@ -91,6 +91,12 @@ export interface SceneProps {
   onUser?: (userId: string) => void;
   handle?: Ref<SceneHandle>;
   label: string;
+  /** Ancho que tapa el panel de la derecha (flota sobre el mapa): la cámara te centra en lo que queda visible. */
+  rightInset?: number;
+  /** Persona a la que se sigue: el personaje camina solo hasta quedar a su lado. */
+  follow?: string | null;
+  /** Se dejó de seguir: porque caminó por su cuenta o porque la otra persona ya no está en este plano. */
+  onFollowEnd?: (reason: "manual" | "gone") => void;
 }
 
 interface Walker {
@@ -132,7 +138,8 @@ export default function Scene(props: SceneProps) {
   const emotes = useRef(new Map<string, { emoji: string; at: number }>());
   const keys = useRef<Dir[]>([]);
   const guideTo = useRef<Tile | null>(null);
-  const view = useRef({ zoom: 1, camX: 0, camY: 0, w: 0, h: 0 });
+  // inset: lo que tapa el panel de la derecha; se acerca de a poco al valor pedido, así la cámara se corre suave.
+  const view = useRef({ zoom: 1, camX: 0, camY: 0, w: 0, h: 0, inset: props.rightInset ?? 0 });
   // Arrastrar el mapa corre la cámara sin mover al personaje; al caminar, vuelve a seguirlo.
   const pan = useRef({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
@@ -227,6 +234,7 @@ export default function Scene(props: SceneProps) {
       const dir = KEY_DIRS[k];
       if (dir) {
         e.preventDefault();
+        if (live.current.follow) live.current.onFollowEnd?.("manual");
         keys.current = [dir, ...keys.current.filter((d) => d !== dir)];
         const s = my.current;
         s.path = [];
@@ -400,16 +408,16 @@ export default function Scene(props: SceneProps) {
         const x1 = Math.max(...spots.map((s) => s.x)) + 2;
         const y0 = Math.min(...spots.map((s) => s.y)) - 1.5;
         const y1 = Math.max(...spots.map((s) => s.y)) + 1.5;
-        v.zoom = Math.min(2, v.w / ((x1 - x0) * T), v.h / ((y1 - y0) * T));
+        v.zoom = Math.min(2, (v.w - v.inset) / ((x1 - x0) * T), v.h / ((y1 - y0) * T));
         v.camX = ((x0 + x1) / 2) * T;
         v.camY = ((y0 + y1) / 2) * T;
         return;
       }
       // Mapas chicos se ven completos; en el recinto grande la cámara sigue al personaje.
-      v.zoom = showMinimap ? Math.max(1.1, Math.min(1.8, v.h / (17 * T))) : Math.max(1, Math.min(2, v.h / H, v.w / W));
+      v.zoom = showMinimap ? Math.max(1.1, Math.min(1.8, v.h / (17 * T))) : Math.max(1, Math.min(2, v.h / H, (v.w - v.inset) / W));
       // El personaje siempre queda al centro; solo deja de estarlo al llegar a los bordes del mapa.
       const f = feet(my.current.x, my.current.y);
-      const halfW = v.w / 2 / v.zoom;
+      const halfW = (v.w - v.inset) / 2 / v.zoom;
       const halfH = v.h / 2 / v.zoom;
       const clamp = (c: number, size: number, half: number) => (size <= half * 2 ? size / 2 : Math.max(half, Math.min(size - half, c)));
       const pn = pan.current;
@@ -433,11 +441,33 @@ export default function Scene(props: SceneProps) {
     let guidePath: Tile[] = [];
     let guideFrom = "";
 
+    let nextFollow = 0;
     const frame = (t: number) => {
       applySize();
       const dt = Math.min(0.05, (t - last) / 1000);
       last = t;
       const p = live.current;
+      {
+        const v = view.current;
+        const target = p.rightInset ?? 0;
+        v.inset += (target - v.inset) * Math.min(1, dt * 7);
+        if (Math.abs(target - v.inset) < 0.5) v.inset = target;
+      }
+      // Seguir a alguien: cada tanto camina hasta una baldosa libre a su lado.
+      if (p.follow && t > nextFollow) {
+        nextFollow = t + 350;
+        const o = others.current.get(p.follow);
+        if (!o) p.onFollowEnd?.("gone");
+        else {
+          const target = { x: Math.round(o.x), y: Math.round(o.y) };
+          const s = my.current;
+          const dest = s.path[s.path.length - 1] ?? s.seg?.to;
+          const headingThere = dest && Math.hypot(dest.x - target.x, dest.y - target.y) <= 1.5;
+          if (Math.hypot(target.x - s.x, target.y - s.y) > 1.6 && !headingThere) {
+            for (const spot of besideTile(target)) if (walkTo(spot)) break;
+          }
+        }
+      }
       const wall = Date.now();
       step(dt);
 
@@ -506,7 +536,7 @@ export default function Scene(props: SceneProps) {
       ctx.fillStyle = "#1d1b26";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const z = v.zoom * dpr;
-      ctx.setTransform(z, 0, 0, z, Math.round((v.w / 2 - v.camX * v.zoom) * dpr), Math.round((v.h / 2 - v.camY * v.zoom) * dpr));
+      ctx.setTransform(z, 0, 0, z, Math.round(((v.w - v.inset) / 2 - v.camX * v.zoom) * dpr), Math.round((v.h / 2 - v.camY * v.zoom) * dpr));
       ctx.imageSmoothingEnabled = false;
 
       ctx.drawImage(backdrop, 0, 0, W, H);
@@ -580,6 +610,34 @@ export default function Scene(props: SceneProps) {
       const tagged = (u: User) => `${u.role === "staff" ? "⭐ " : u.role === "mentor" ? "🧭 " : ""}${u.name}${u.privateCall ? " 🔒" : u.inCall ? " 🎧" : ""}`;
       for (const u of visible) addAvatar(u.id, tagged(u), u.look, others.current.get(u.id)!, false, true);
       addAvatar(p.me.id, tagged(p.me), p.me.look, my.current, true, true);
+
+      // Charla privada: una burbuja violeta en el piso junta a quienes están en la misma, así se ve desde lejos.
+      const groups = new Map<string, Walker[]>();
+      for (const u of [...visible, p.me]) {
+        if (!u.callGroup) continue;
+        const pos = u.id === p.me.id ? my.current : others.current.get(u.id);
+        if (pos) groups.set(u.callGroup, [...(groups.get(u.callGroup) ?? []), pos]);
+      }
+      for (const members of groups.values()) {
+        if (members.length < 2) continue;
+        const pts = members.map((m) => feet(m.x, m.y));
+        const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length;
+        const cy = pts.reduce((a, q) => a + q.y, 0) / pts.length;
+        const rx = Math.max(...pts.map((q) => Math.abs(q.x - cx))) + 30;
+        const ry = Math.max(...pts.map((q) => Math.abs(q.y - cy))) + 16;
+        const pulse = 0.5 + 0.5 * Math.sin(t / 600);
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(139, 92, 246, ${0.16 + pulse * 0.06})`;
+        ctx.fill();
+        ctx.setLineDash([6, 5]);
+        ctx.lineDashOffset = -t / 80;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(124, 58, 237, 0.75)";
+        ctx.stroke();
+        ctx.restore();
+      }
       items.sort((a, b) => a.key - b.key);
       for (const it of items) it.draw(ctx, wall);
 
@@ -664,7 +722,7 @@ export default function Scene(props: SceneProps) {
         // Recuadro de lo que se ve en pantalla.
         miniCtx.strokeStyle = "rgba(255,255,255,0.85)";
         miniCtx.lineWidth = 1;
-        miniCtx.strokeRect((v.camX - v.w / 2 / v.zoom) * miniScale, (v.camY - v.h / 2 / v.zoom) * miniScale, (v.w / v.zoom) * miniScale, (v.h / v.zoom) * miniScale);
+        miniCtx.strokeRect((v.camX - (v.w - v.inset) / 2 / v.zoom) * miniScale, (v.camY - v.h / 2 / v.zoom) * miniScale, ((v.w - v.inset) / v.zoom) * miniScale, (v.h / v.zoom) * miniScale);
       }
 
       raf = requestAnimationFrame(frame);
@@ -680,7 +738,7 @@ export default function Scene(props: SceneProps) {
   const toWorld = (e: React.MouseEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const v = view.current;
-    return { x: (e.clientX - rect.left - v.w / 2) / v.zoom + v.camX, y: (e.clientY - rect.top - v.h / 2) / v.zoom + v.camY };
+    return { x: (e.clientX - rect.left - (v.w - v.inset) / 2) / v.zoom + v.camX, y: (e.clientY - rect.top - v.h / 2) / v.zoom + v.camY };
   };
 
   const hitAvatar = (wx: number, wy: number, x: number, y: number) => {
@@ -750,6 +808,7 @@ export default function Scene(props: SceneProps) {
     if (p.locked) return;
     keys.current = [];
     const w = toWorld(e);
+    if (p.follow && ![...others.current].some(([, o]) => hitAvatar(w.x, w.y, o.x, o.y))) p.onFollowEnd?.("manual");
     const npc = map.npcs.find((n) => hitAvatar(w.x, w.y, n.x, n.y));
     if (npc) {
       const talk = () => p.onNpc?.(npc);
@@ -797,7 +856,7 @@ export default function Scene(props: SceneProps) {
         onMouseLeave={() => (hover.current = { tile: null, user: null, npc: null, door: null })}
         aria-label={props.label}
       />
-      {showMinimap && <canvas ref={miniRef} className="minimap" aria-label="Minimapa del recinto" />}
+      {showMinimap && <canvas ref={miniRef} className="minimap" style={{ right: (props.rightInset ?? 0) + 12 }} aria-label="Minimapa del recinto" />}
       {prompt && (
         <p className="scene-prompt">
           <kbd>X</kbd> {prompt}
