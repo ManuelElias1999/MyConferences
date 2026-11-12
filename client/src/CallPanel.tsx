@@ -19,8 +19,13 @@ function Voice({ stream, volume = 1 }: { stream: MediaStream; volume?: number })
   return <audio ref={ref} autoPlay />;
 }
 
-/** Volumen de alguien en el pasillo según la distancia: fuerte al lado y cada vez más bajo, hasta casi no oírse a 10 baldosas. */
-const hallVolume = (d: number | undefined) => (d === undefined || d <= 2 ? 1 : Math.max(0.04, (1 - (d - 2) / 8) ** 2));
+/**
+ * Volumen de alguien en el pasillo según la distancia: al máximo pegados (1 baldosa), cada vez más bajo, y lo mínimo a
+ * 5 baldosas. Más lejos ya no se escucha (la conexión sigue un poco, para no cortarse en el borde).
+ */
+const HALL_MIN = 0.12;
+const hallVolume = (d: number | undefined) =>
+  d === undefined || d <= 1 ? 1 : d > 5 ? 0 : 1 - ((d - 1) / 4) * (1 - HALL_MIN);
 
 /** Tarjeta de una persona del evento, con el botón para charlar en privado (o pedir sumarse a la suya). */
 export function UserCard({ user, call, onClose }: { user: User; call: PrivateCall; onClose: () => void }) {
@@ -99,6 +104,8 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
   const memberIds = new Set(proximity ? [] : current?.members.map((m) => m.id));
   // Para armar una charla privada: primero quienes están cerca.
   const near = current?.distances ?? {};
+  // En el pasillo se muestra solo a quienes se escuchan (5 baldosas o menos).
+  const audible = proximity ? (current?.members ?? []).filter((m) => m.id !== me.id && hallVolume(near[m.id]) > 0) : [];
   const candidates = people
     .filter((u) => u.id !== me.id && !u.roomId && !memberIds.has(u.id) && !u.privateCall)
     .sort((a, b) => (near[a.id] ?? 99) - (near[b.id] ?? 99));
@@ -146,15 +153,18 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
   return (
     <>
       {call.invites.length > 0 && (
-        <div className="call-invites" role="alert">
+        <div className="call-invites" role="alertdialog" aria-label="Invitación a una charla privada">
           {call.invites.map((inv) => (
             <div key={inv.callId} className="call-invite">
-              <AvatarCanvas look={inv.from.look} size={44} head />
+              <span className="call-invite-avatar">
+                <AvatarCanvas look={inv.from.look} size={64} head />
+              </span>
               <div>
-                <p>
-                  <b>{inv.from.name}</b> te invita a una charla privada
+                <p className="eyebrow">🔒 Charla privada</p>
+                <p className="call-invite-title">
+                  <b>{inv.from.name}</b> te invita a charlar
                 </p>
-                {inv.members.length > 1 && <p className="muted small">Con {inv.members.join(", ")}</p>}
+                <p className="muted small">{inv.members.length > 1 ? `Con ${inv.members.join(", ")}. ` : ""}Solo ustedes se van a escuchar.</p>
               </div>
               <div className="call-invite-actions">
                 <button className="btn primary sm" onClick={() => call.respond(inv.callId, true)}>
@@ -186,14 +196,14 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
             <h3>{proximity ? "🔊 Pasillo" : zone ? `🧑‍💻 ${zone}` : "🔒 Charla privada"}</h3>
             <span className="muted small">
               {proximity
-                ? `${current.members.length - 1} ${current.members.length === 2 ? "persona cerca" : "personas cerca"}`
+                ? `${audible.length} ${audible.length === 1 ? "persona cerca" : "personas cerca"}`
                 : `${current.members.length} ${current.members.length === 1 ? "persona" : "personas"}`}
             </span>
           </header>
           <p className="small call-lead">
             {proximity
-              ? current.members.length < 2
-                ? "Nadie cerca por ahora. Cuando alguien se acerque lo vas a escuchar: más fuerte cuanto más cerca."
+              ? audible.length === 0
+                ? "Nadie cerca por ahora. Desde 5 cuadros vas a escuchar a quien se acerque: más fuerte cuanto más cerca."
                 : "Escuchas a quienes están cerca, más fuerte cuanto más cerca. Para algo más privado, arma una charla privada."
               : zone
               ? current.members.length < 2
@@ -229,7 +239,7 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
             </ul>
           )}
           <ul className="call-members">
-            {current.members.filter((m) => !proximity || m.id !== me.id).map((m) => (
+            {(proximity ? audible : current.members).map((m) => (
               <li key={m.id}>
                 <AvatarCanvas look={m.look} size={28} head />
                 <span>
@@ -240,7 +250,7 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
                 </span>
                 {proximity && call.remotes.get(m.id)?.audio && (
                   <span className="volume-bars" title="Qué tan fuerte lo escuchas" aria-label={`Volumen ${Math.round(hallVolume(near[m.id]) * 100)}%`}>
-                    {[0.08, 0.3, 0.65].map((t) => (
+                    {[HALL_MIN, 0.4, 0.75].map((t) => (
                       <i key={t} className={hallVolume(near[m.id]) >= t ? "on" : ""} />
                     ))}
                   </span>

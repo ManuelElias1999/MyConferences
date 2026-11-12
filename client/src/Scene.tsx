@@ -288,7 +288,12 @@ export default function Scene(props: SceneProps) {
       mini.style.height = `${H * miniScale}px`;
     }
 
-    const resize = () => {
+    // Cambiar el tamaño del lienzo lo borra: se aplica justo antes de dibujar el cuadro siguiente, así al esconder el
+    // panel de la derecha (que agranda el mapa de a poco) no parpadea en negro.
+    let resizePending = true;
+    const applySize = () => {
+      if (!resizePending) return;
+      resizePending = false;
       const dpr = window.devicePixelRatio || 1;
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
@@ -299,9 +304,11 @@ export default function Scene(props: SceneProps) {
       view.current.w = w;
       view.current.h = h;
     };
-    const ro = new ResizeObserver(resize);
+    const ro = new ResizeObserver(() => {
+      resizePending = true;
+    });
     ro.observe(wrap);
-    resize();
+    applySize();
 
     let lastSent = "";
     const sendPos = (t: Tile) => {
@@ -427,6 +434,7 @@ export default function Scene(props: SceneProps) {
     let guideFrom = "";
 
     const frame = (t: number) => {
+      applySize();
       const dt = Math.min(0.05, (t - last) / 1000);
       last = t;
       const p = live.current;

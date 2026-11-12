@@ -876,9 +876,9 @@ function syncZone(u: User) {
 
 const hallVoice = new Set<string>();
 const hallPeers = new Map<string, Map<string, string>>();
-/** Se escucha a quien está a menos de 8 baldosas (cada vez más bajo); una conexión ya armada sigue hasta las 10. */
-const HALL_RADIUS = 8;
-const HALL_KEEP = 10;
+/** Se escucha a quien está a 5 baldosas o menos (cada vez más bajo); una conexión ya armada sigue hasta las 6 (sin sonido). */
+const HALL_RADIUS = 5;
+const HALL_KEEP = 6;
 const HALL_PEER_LIMIT = 10;
 /** Distancias que se mandaron por última vez, para avisar solo cuando cambian. */
 const hallDistances = new Map<string, Record<string, number>>();

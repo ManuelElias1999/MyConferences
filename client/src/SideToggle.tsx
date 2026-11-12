@@ -26,9 +26,13 @@ export function useSideHidden() {
 /** Pestaña en el borde del panel para esconderlo o mostrarlo. */
 export default function SideToggle({ hidden, onToggle }: { hidden: boolean; onToggle: () => void }) {
   return (
-    <button className="side-toggle" onClick={onToggle} aria-expanded={!hidden} title={hidden ? "Mostrar el panel" : "Esconder el panel"}>
-      {hidden ? "‹" : "›"}
-      <span>{hidden ? "Panel" : "Ocultar"}</span>
+    <button className="side-toggle" onClick={onToggle} aria-expanded={!hidden} aria-label={hidden ? "Mostrar el panel" : "Esconder el panel"}>
+      <span className="side-toggle-icon" aria-hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+      <span className="side-toggle-label">{hidden ? "Mostrar panel" : "Ocultar panel"}</span>
     </button>
   );
 }
