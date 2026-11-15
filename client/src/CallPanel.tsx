@@ -27,6 +27,44 @@ const HALL_MIN = 0.12;
 const hallVolume = (d: number | undefined) =>
   d === undefined || d <= 1 ? 1 : d > 5 ? 0 : 1 - ((d - 1) / 4) * (1 - HALL_MIN);
 
+/** Quiénes están hablando ahora: mide varias veces por segundo el volumen de lo que llega de cada uno. */
+function useSpeaking(streams: [string, MediaStream][]) {
+  const [speaking, setSpeaking] = useState<Set<string>>(new Set());
+  const key = streams.map(([id, stream]) => `${id}:${stream.id}`).join(",");
+  useEffect(() => {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!streams.length || !Ctx) {
+      setSpeaking(new Set());
+      return;
+    }
+    const ctx = new Ctx();
+    const meters = streams.map(([id, stream]) => {
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      return { id, analyser, buf: new Uint8Array(analyser.fftSize) };
+    });
+    const timer = setInterval(() => {
+      if (ctx.state === "suspended") void ctx.resume().catch(() => {});
+      const now = new Set<string>();
+      for (const m of meters) {
+        m.analyser.getByteTimeDomainData(m.buf);
+        let sum = 0;
+        for (const v of m.buf) sum += ((v - 128) / 128) ** 2;
+        if (Math.sqrt(sum / m.buf.length) > 0.04) now.add(m.id);
+      }
+      setSpeaking((prev) => (prev.size === now.size && [...now].every((id) => prev.has(id)) ? prev : now));
+    }, 150);
+    return () => {
+      clearInterval(timer);
+      void ctx.close();
+    };
+    // Se rearma solo cuando cambian las personas o sus audios.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return speaking;
+}
+
 /** Tarjeta de una persona del evento, con el botón para charlar en privado (o pedir sumarse a la suya). */
 export function UserCard({
   user,
@@ -137,6 +175,8 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
   useEffect(() => {
     if (!current) setAdding(false);
   }, [current]);
+
+  const speaking = useSpeaking([...call.remotes].flatMap(([id, r]): [string, MediaStream][] => (r.audio ? [[id, r.audio]] : [])));
 
   // Tecla M: abre o cierra el micrófono (salvo mientras se escribe).
   const { setMicOn, micOn } = call;
@@ -276,13 +316,14 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
           )}
           <ul className="call-members">
             {(proximity ? audible : current.members).map((m) => (
-              <li key={m.id}>
+              <li key={m.id} className={speaking.has(m.id) ? "speaking" : ""}>
                 <AvatarCanvas look={m.look} size={28} head />
                 <span>
                   {m.name}
                   {m.id === me.id && <span className="muted"> (tú{!call.micOn && ", silenciado"})</span>}
                   {current.media[m.id]?.cam && " 📷"}
                   {current.media[m.id]?.screen && " 🖥"}
+                  {speaking.has(m.id) && <span className="speaking-tag"> · hablando</span>}
                 </span>
                 {proximity && call.remotes.get(m.id)?.audio && (
                   <span className="volume-bars" title="Qué tan fuerte lo escuchas" aria-label={`Volumen ${Math.round(hallVolume(near[m.id]) * 100)}%`}>
