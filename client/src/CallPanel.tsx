@@ -138,6 +138,19 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
     if (!current) setAdding(false);
   }, [current]);
 
+  // Tecla M: abre o cierra el micrófono (salvo mientras se escribe).
+  const { setMicOn, micOn } = call;
+  useEffect(() => {
+    if (!current) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "m" || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.target instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable)) return;
+      setMicOn(!micOn);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, micOn, setMicOn]);
+
   // Con tarima, solo comparte pantalla quien está parado en ella: al bajar, se deja de compartir.
   const presenter = !current?.stage || current.stage.presenters.includes(me.id);
   useEffect(() => {
@@ -308,8 +321,8 @@ export default function CallPanel({ me, call, people, inHall }: { me: User; call
             </div>
           )}
           <div className="call-actions">
-            <button className={`btn sm ${call.micOn ? "" : "primary"}`} onClick={() => call.setMicOn(!call.micOn)}>
-              {call.micOn ? "🎙 Cerrar micrófono" : "🔇 Abrir micrófono"}
+            <button className={`btn sm ${call.micOn ? "" : "primary"}`} onClick={() => call.setMicOn(!call.micOn)} title="Atajo: tecla M">
+              {call.micOn ? "🎙 Cerrar micrófono" : "🔇 Abrir micrófono"} <kbd className="kbd-hint">M</kbd>
             </button>
             {!proximity && <button className={`btn sm ${call.camera ? "primary" : ""}`} onClick={() => void call.toggleCamera()}>
               {call.camera ? "📷 Apagar cámara" : "📷 Cámara"}
