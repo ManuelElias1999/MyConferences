@@ -4,3 +4,4 @@ server/uploads/
 .env
 .DS_Store
 server/data/
+server/undefined/
