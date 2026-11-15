@@ -204,6 +204,9 @@ const authRoute = (handler: (body: Record<string, unknown>) => Promise<unknown>)
 
 app.post("/api/register", ...authRoute((body) => accounts.register(body)));
 app.post("/api/login", ...authRoute((body) => accounts.login(body)));
+// Olvidé mi contraseña: primero se pide un código por correo y después se elige una nueva con él.
+app.post("/api/password/forgot", ...authRoute((body) => accounts.requestReset(body.email)));
+app.post("/api/password/reset", ...authRoute((body) => accounts.resetPassword(body)));
 
 /** La cuenta del encabezado Authorization, o null (y responde 401). */
 function accountFrom(req: express.Request, res: express.Response): Account | null {

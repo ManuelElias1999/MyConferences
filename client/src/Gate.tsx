@@ -32,7 +32,7 @@ export default function Gate({
 }
 
 function AuthForm({ onDone }: { onDone: (result: { account: Account; token: string }, created: boolean) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,6 +42,7 @@ function AuthForm({ onDone }: { onDone: (result: { account: Account; token: stri
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "forgot") return;
     setBusy(true);
     setError("");
     try {
@@ -51,6 +52,18 @@ function AuthForm({ onDone }: { onDone: (result: { account: Account; token: stri
       setBusy(false);
     }
   };
+
+  if (mode === "forgot")
+    return (
+      <ForgotForm
+        initialEmail={email}
+        onDone={(result) => onDone(result, false)}
+        onBack={() => {
+          setMode("login");
+          setError("");
+        }}
+      />
+    );
 
   return (
     <form className="form" onSubmit={submit}>
@@ -96,6 +109,104 @@ function AuthForm({ onDone }: { onDone: (result: { account: Account; token: stri
       >
         {registering ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Créala"}
       </button>
+      {!registering && (
+        <button type="button" className="link small" onClick={() => setMode("forgot")}>
+          ¿Olvidaste tu contraseña?
+        </button>
+      )}
+    </form>
+  );
+}
+
+/** Olvidé mi contraseña: se pide un código por correo y con él se elige una nueva (y se entra). */
+function ForgotForm({ initialEmail, onDone, onBack }: { initialEmail: string; onDone: (result: { account: Account; token: string }) => void; onBack: () => void }) {
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const ask = async () => {
+    setBusy(true);
+    setError("");
+    setInfo("");
+    try {
+      await accountApi("/password/forgot", { body: { email } });
+      setStep("code");
+      setInfo(`Si ${email} tiene una cuenta, te llegó un código de 6 números. Revisa también el correo no deseado.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Algo salió mal");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      onDone(await accountApi<{ account: Account; token: string }>("/password/reset", { body: { email, code, password } }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Algo salió mal");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void (step === "email" ? ask() : reset());
+      }}
+    >
+      <h1 className="gate-title">Recupera tu contraseña</h1>
+      {step === "email" ? (
+        <>
+          <p className="muted">Escribe el correo de tu cuenta y te mandamos un código para elegir una contraseña nueva.</p>
+          <label>
+            Correo
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus autoComplete="email" placeholder="ana@ejemplo.com" />
+          </label>
+        </>
+      ) : (
+        <>
+          {info && <p className="muted">{info}</p>}
+          <label>
+            Código
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+              autoFocus
+              placeholder="123456"
+              className="code-input"
+            />
+          </label>
+          <label>
+            Contraseña nueva
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" placeholder="Al menos 8 caracteres" />
+          </label>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+      <button className="btn primary" disabled={busy || (step === "code" && (code.length < 6 || password.length < 8))}>
+        {busy ? "Un momento…" : step === "email" ? "Mandarme el código" : "Guardar y entrar"}
+      </button>
+      <div className="gate-links">
+        {step === "code" && (
+          <button type="button" className="link" onClick={() => void ask()} disabled={busy}>
+            Mandar otro código
+          </button>
+        )}
+        <button type="button" className="link" onClick={onBack}>
+          Volver a iniciar sesión
+        </button>
+      </div>
     </form>
   );
 }

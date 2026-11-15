@@ -10,6 +10,7 @@ La estética es de bloques: personajes cuadrados, muebles cuadrados y una interf
 
 - **Para entrar hace falta una cuenta**: no hay invitados. Lo primero que se ve es la pantalla para iniciar sesión o crear la cuenta (correo, contraseña y nombre del personaje).
 - Al crearla llega por correo un **código de 6 números** que hay que escribir para confirmar el correo; sin confirmarlo no se entra a la recepción ni a los eventos. El código vence a los 15 minutos, admite 5 intentos y se puede pedir otro. Así nadie puede usar un correo ajeno para entrar a un evento privado.
+- **¿Olvidaste tu contraseña?**: en la pantalla de entrada se pide un código por correo y con él se elige una contraseña nueva (y se entra). No revela si un correo tiene cuenta.
 - La administración son los correos de `ADMIN_EMAILS` o de `server/data/admins.txt` (uno por línea), que se leen al arrancar el servidor. Ve el botón **Administración**, con todas las cuentas y el plan de cada una.
 
 ### Planes
@@ -197,6 +198,5 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 - Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
 - El cobro todavía no está integrado: el plan lo asigna la administración a mano. El siguiente paso es conectar un medio de pago (por ejemplo Stripe o USDC en Stellar) y activar el plan al pagar. Bajar de plan no cierra los eventos que ya existen.
-- No hay recuperación de contraseña todavía.
 - Cada evento tiene el auditorio y entre 8 y 16 salas. En el piso de arriba, los puestos sin sala muestran un cuadro en el muro.
 - La agenda se genera alrededor de la hora en que arranca el servidor, para que siempre haya algo en vivo durante la demo.

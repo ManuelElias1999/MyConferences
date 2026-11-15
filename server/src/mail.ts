@@ -18,3 +18,14 @@ export async function sendCode(to: string, name: string, code: string) {
   }
   await transport.sendMail({ from, to, subject, text });
 }
+
+/** Código para elegir una contraseña nueva (si alguien la olvidó). */
+export async function sendResetCode(to: string, name: string, code: string) {
+  const subject = `${code} es tu código para recuperar tu contraseña de MyConferences`;
+  const text = `Hola, ${name}:\n\nTu código para elegir una contraseña nueva en MyConferences es ${code}.\nVence en 15 minutos.\n\nSi no lo pediste, ignora este mensaje: tu contraseña sigue igual.`;
+  if (!transport) {
+    console.log(`[correo] Código para recuperar la contraseña de ${to}: ${code}`);
+    return;
+  }
+  await transport.sendMail({ from, to, subject, text });
+}

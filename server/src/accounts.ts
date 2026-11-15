@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { DEFAULT_LOOK, sanitizeLook } from "../../shared/look.ts";
 import { COMMUNITIES, isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
 import type { Account, AdminAccount, Look } from "../../shared/types.ts";
-import { sendCode } from "./mail.ts";
+import { sendCode, sendResetCode } from "./mail.ts";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
@@ -32,6 +32,8 @@ interface StoredAccount {
   verified?: boolean;
   /** Código pendiente para confirmar el correo (guardado como hash). */
   code?: { hash: string; expires: number; tries: number; sentAt: number };
+  /** Código pendiente para elegir una contraseña nueva (guardado como hash). */
+  reset?: { hash: string; expires: number; tries: number; sentAt: number };
   /** Plan asignado por la administración. Sin él: Pro para la administración y Gratis para el resto. */
   plan?: PlanId;
   /** Plan que pidió desde la página de planes. */
@@ -217,6 +219,46 @@ export function createAccountStore(dataDir: string) {
       if (account.verified !== false) return;
       if (account.code && Date.now() - account.code.sentAt < RESEND_MS) throw new AccountError("Espera unos segundos antes de pedir otro código");
       await issueCode(account);
+    },
+
+    /**
+     * Manda un código para elegir una contraseña nueva. No dice si el correo tiene cuenta (para no revelar quién está
+     * registrado): si no la tiene, simplemente no llega nada.
+     */
+    async requestReset(raw: unknown) {
+      const account = byEmail(normalizeEmail(raw));
+      if (!account) return { ok: true };
+      if (account.reset && Date.now() - account.reset.sentAt < RESEND_MS) throw new AccountError("Espera unos segundos antes de pedir otro código");
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      account.reset = { hash: sign(`reset:${account.id}:${code}`), expires: Date.now() + CODE_MS, tries: 0, sentAt: Date.now() };
+      await persist();
+      await sendResetCode(account.email, account.name, code);
+      return { ok: true };
+    },
+
+    /** Contraseña nueva con el código que llegó por correo. De paso confirma el correo y deja la sesión iniciada. */
+    async resetPassword(input: { email?: unknown; code?: unknown; password?: unknown }) {
+      const account = byEmail(normalizeEmail(input.email));
+      const password = typeof input.password === "string" ? input.password : "";
+      const code = typeof input.code === "string" ? input.code.replace(/\D/g, "") : "";
+      const pending = account?.reset;
+      if (!account || !pending || pending.expires < Date.now()) throw new AccountError("El código venció o no es de ese correo. Pide uno nuevo");
+      if (pending.tries >= CODE_TRIES) throw new AccountError("Demasiados intentos. Pide un código nuevo");
+      const given = Buffer.from(sign(`reset:${account.id}:${code}`));
+      const expected = Buffer.from(pending.hash);
+      if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+        pending.tries++;
+        await persist();
+        throw new AccountError("El código no es correcto");
+      }
+      if (password.length < 8) throw new AccountError("La contraseña debe tener al menos 8 caracteres");
+      account.passwordHash = await hash(password);
+      account.verified = true;
+      delete account.reset;
+      delete account.code;
+      failures.delete(account.email);
+      await persist();
+      return { account: toAccount(account), token: issueToken(account.id) };
     },
 
     /** Todas las cuentas, para la administración. */
