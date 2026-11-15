@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RECEPTION_DESKS, receptionMap, type Npc } from "../../shared/maps.ts";
 import { planOf } from "../../shared/plans.ts";
 import type { Account, User, VenueCard } from "../../shared/types.ts";
@@ -92,6 +92,15 @@ export default function Reception({
       setEntry({ step: "error", text: err instanceof Error ? err.message : "No pude revisar ese evento." });
     }
   };
+
+  // Escape cierra el diálogo (salvo mientras te acompañan al evento).
+  const busy = desk === "entry" && (entry.step === "checking" || entry.step === "ok");
+  useEffect(() => {
+    if (!desk || busy) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDesk(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [desk, busy]);
 
   const go = (action: () => void) => {
     setDesk(null);
@@ -233,7 +242,7 @@ export default function Reception({
               </>
             )}
           </div>
-          {!(info.desk === "entry" && (entry.step === "ok" || entry.step === "checking")) && (
+          {!busy && (
             <button className="btn ghost sm npc-close" onClick={() => setDesk(null)} aria-label="Cerrar">
               ✕
             </button>

@@ -289,7 +289,6 @@ export interface Welcome {
   user: User;
   account: Account | null;
   users: User[];
-  venues: VenueSummary[];
 }
 
 export interface ClientToServerEvents {

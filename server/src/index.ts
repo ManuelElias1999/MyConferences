@@ -1091,10 +1091,9 @@ io.on("connection", (socket) => {
   };
 
   socket.on("hello", (req, ack) => {
-    const venuesList = [...venues.values()].filter((v) => !v.venue.private).map(({ venue: { id, name, tagline } }) => ({ id, name, tagline }));
     if (conn) {
       const ready = Boolean(conn.account?.verified);
-      return ack({ ok: true, data: { user: conn.user, account: conn.account, users: ready ? usersIn(conn.user.venueId) : [], venues: ready ? venuesList : [] } });
+      return ack({ ok: true, data: { user: conn.user, account: conn.account, users: ready ? usersIn(conn.user.venueId) : [] } });
     }
     const account = accounts.verify(req?.token);
     const spot = spawnNear(RECEPTION, RECEPTION.spawn);
@@ -1120,7 +1119,7 @@ io.on("connection", (socket) => {
       socket.join("reception");
       socket.to("reception").emit("userJoined", user);
     }
-    ack({ ok: true, data: { user, account, users: account?.verified ? usersIn(null) : [], venues: account?.verified ? venuesList : [] } });
+    ack({ ok: true, data: { user, account, users: account?.verified ? usersIn(null) : [] } });
   });
 
   socket.on("setAccount", (token, ack) => {
