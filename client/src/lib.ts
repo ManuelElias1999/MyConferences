@@ -3,6 +3,18 @@ import type { Account, ClientToServerEvents, ServerToClientEvents, Talk, Venue }
 
 export const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({ autoConnect: true });
 
+/**
+ * Servidores para armar las conexiones de voz y video (WebRTC). Arranca con STUN públicos y, apenas carga la página, se
+ * completa con los del servidor (por ejemplo, un TURN para redes muy cerradas). Las conexiones se arman después.
+ */
+export const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
+fetch("/api/ice")
+  .then((res) => (res.ok ? res.json() : null))
+  .then((data: { iceServers?: RTCIceServer[] } | null) => {
+    if (data?.iceServers?.length) ICE.iceServers = data.iceServers;
+  })
+  .catch(() => {});
+
 const TOKEN_KEY = "myconferences.token";
 
 export function loadToken(): string | null {

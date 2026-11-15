@@ -169,6 +169,8 @@ Variables de entorno:
 | `ADMIN_EMAILS` | Correos de administración, separados por coma (además de los de `server/data/admins.txt`). Pueden habilitar a quién crea eventos. |
 | `SMTP_URL` | Servidor de correo para mandar los códigos de confirmación, por ejemplo `smtps://usuario:clave@smtp.ejemplo.com:465`. Sin él, los códigos se muestran en la terminal. |
 | `MAIL_FROM` | Remitente de esos correos (por defecto `MyConferences <no-reply@myconferences.app>`). |
+| `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Servidor TURN para que la voz y el video conecten en redes muy cerradas (empresas, universidades), por ejemplo `turn:turn.ejemplo.com:3478`. Sin él se usan solo STUN públicos. |
+| `ICE_SERVERS` | En lugar de lo anterior, la lista completa de servidores en JSON (formato `RTCIceServer`). |
 | `SESSION_SECRET` | Clave para firmar las sesiones. Si no se define, se genera una y se guarda en `server/data/accounts.json`. |
 | `DATA_DIR` | Carpeta de las cuentas, los eventos de las empresas y las listas de invitados (por defecto `server/data`). |
 
@@ -195,7 +197,7 @@ client/src/          Reception, Hall, RoomView, CompanyPanel, AvatarEditor, Auth
 ## Limitaciones actuales
 
 - El audio y el video van directo entre los navegadores (sin servidor de medios), así que hoy funciona bien hasta unas 50 personas por evento. Los topes de 100 y 200 de Comunidad y Pro necesitan un servidor de medios (por ejemplo LiveKit). Compartir pantalla en la tarima con muchas personas mirando exige mucho a la computadora de quien presenta. Para cientos habría que pasar por un servidor de medios (SFU), por ejemplo LiveKit.
-- Solo se usan servidores STUN públicos. En redes corporativas muy cerradas hace falta además un servidor TURN.
+- Sin `TURN_URL` solo se usan servidores STUN públicos: en redes corporativas muy cerradas la voz puede no conectar. Un TURN propio (por ejemplo coturn) lo resuelve.
 - El chat, las preguntas y las diapositivas viven en memoria: se pierden si el servidor se reinicia. Las cuentas sí se guardan.
 - El cobro todavía no está integrado: el plan lo asigna la administración a mano. El siguiente paso es conectar un medio de pago (por ejemplo Stripe o USDC en Stellar) y activar el plan al pagar. Bajar de plan no cierra los eventos que ya existen.
 - Cada evento tiene el auditorio y entre 8 y 16 salas. En el piso de arriba, los puestos sin sala muestran un cuadro en el muro.

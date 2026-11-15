@@ -204,6 +204,28 @@ const authRoute = (handler: (body: Record<string, unknown>) => Promise<unknown>)
 
 app.post("/api/register", ...authRoute((body) => accounts.register(body)));
 app.post("/api/login", ...authRoute((body) => accounts.login(body)));
+/**
+ * Servidores para las conexiones de voz y video. Por defecto, STUN públicos. Para redes muy cerradas se suma un TURN con
+ * TURN_URL (por ejemplo «turn:turn.midominio.com:3478», o varias separadas por coma), TURN_USERNAME y TURN_CREDENTIAL;
+ * o se pasa la lista completa en ICE_SERVERS (JSON con el formato de RTCIceServer).
+ */
+function iceServers() {
+  if (process.env.ICE_SERVERS) {
+    try {
+      const list = JSON.parse(process.env.ICE_SERVERS);
+      if (Array.isArray(list) && list.length) return list;
+    } catch {
+      console.warn("[voz] ICE_SERVERS no es un JSON válido: se usan los STUN públicos");
+    }
+  }
+  const servers: { urls: string[]; username?: string; credential?: string }[] = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+  const turn = process.env.TURN_URL?.split(",").map((u) => u.trim()).filter(Boolean);
+  if (turn?.length) servers.push({ urls: turn, username: process.env.TURN_USERNAME, credential: process.env.TURN_CREDENTIAL });
+  return servers;
+}
+const ICE_SERVERS = iceServers();
+app.get("/api/ice", (_req, res) => res.json({ iceServers: ICE_SERVERS }));
+
 // Olvidé mi contraseña: primero se pide un código por correo y después se elige una nueva con él.
 app.post("/api/password/forgot", ...authRoute((body) => accounts.requestReset(body.email)));
 app.post("/api/password/reset", ...authRoute((body) => accounts.resetPassword(body)));

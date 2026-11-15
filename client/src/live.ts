@@ -3,9 +3,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LiveInfo, RtcSignal, Stage } from "../../shared/types.ts";
-import { socket } from "./lib.ts";
+import { ICE, socket } from "./lib.ts";
 
-const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
 
 /**
  * Procesa las señales en orden: una respuesta no puede llegar antes que la oferta que contesta.

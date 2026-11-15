@@ -9,9 +9,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CallInfo, CallInvite, CallRequest, CallSignal } from "../../shared/types.ts";
-import { socket } from "./lib.ts";
+import { ICE, socket } from "./lib.ts";
 
-const ICE: RTCConfiguration = { iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }] };
 
 // Mientras estás en una charla, el resto del evento (el ponente, los videos)
 // queda en silencio: solo escuchas a la gente de tu charla.
