@@ -171,6 +171,7 @@ Variables de entorno:
 | `MAIL_FROM` | Remitente de esos correos (por defecto `MyConferences <no-reply@myconferences.app>`). |
 | `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Servidor TURN para que la voz y el video conecten en redes muy cerradas (empresas, universidades), por ejemplo `turn:turn.ejemplo.com:3478`. Sin él se usan solo STUN públicos. |
 | `ICE_SERVERS` | En lugar de lo anterior, la lista completa de servidores en JSON (formato `RTCIceServer`). |
+| `TRUST_PROXY` | Si el servidor está detrás de un proxy (Nginx, Caddy, Render, Railway…), ponlo en `1` para que los límites de intentos usen la IP real de cada persona. |
 | `SESSION_SECRET` | Clave para firmar las sesiones. Si no se define, se genera una y se guarda en `server/data/accounts.json`. |
 | `DATA_DIR` | Carpeta de las cuentas, los eventos de las empresas y las listas de invitados (por defecto `server/data`). |
 

@@ -175,7 +175,34 @@ function spawnNear(map: SceneMap, tile: Tile): Tile {
 // ---------- HTTP ----------
 
 const app = express();
+app.disable("x-powered-by");
+// Detrás de un proxy (Nginx, Caddy, Render…), TRUST_PROXY=1 hace que la IP de cada pedido sea la real (para los límites).
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 const httpServer = createServer(app);
+
+/**
+ * Límite de intentos en memoria: como mucho `max` por `key` cada `windowMs`. Frena el registro masivo, los correos en
+ * cadena y adivinar códigos de ponente. Devuelve true si todavía se puede.
+ */
+const attempts = new Map<string, { count: number; until: number }>();
+function allow(key: string, max: number, windowMs: number) {
+  const now = Date.now();
+  const entry = attempts.get(key);
+  if (!entry || entry.until < now) {
+    attempts.set(key, { count: 1, until: now + windowMs });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= max;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of attempts) if (entry.until < now) attempts.delete(key);
+}, 60_000).unref();
+const TOO_MANY = "Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.";
+/** Corta el pedido si esa IP pasó el límite de esa acción. */
+const limited = (action: string, max: number, windowMs: number): express.RequestHandler => (req, res, next) =>
+  allow(`${action}:${req.ip}`, max, windowMs) ? next() : res.status(429).json({ error: TOO_MANY });
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, { maxHttpBufferSize: 1e5 });
 
 interface Connection {
@@ -202,8 +229,8 @@ const authRoute = (handler: (body: Record<string, unknown>) => Promise<unknown>)
     },
   ] as const;
 
-app.post("/api/register", ...authRoute((body) => accounts.register(body)));
-app.post("/api/login", ...authRoute((body) => accounts.login(body)));
+app.post("/api/register", limited("register", 5, 15 * 60_000), ...authRoute((body) => accounts.register(body)));
+app.post("/api/login", limited("login", 30, 15 * 60_000), ...authRoute((body) => accounts.login(body)));
 /**
  * Servidores para las conexiones de voz y video. Por defecto, STUN públicos. Para redes muy cerradas se suma un TURN con
  * TURN_URL (por ejemplo «turn:turn.midominio.com:3478», o varias separadas por coma), TURN_USERNAME y TURN_CREDENTIAL;
@@ -227,8 +254,8 @@ const ICE_SERVERS = iceServers();
 app.get("/api/ice", (_req, res) => res.json({ iceServers: ICE_SERVERS }));
 
 // Olvidé mi contraseña: primero se pide un código por correo y después se elige una nueva con él.
-app.post("/api/password/forgot", ...authRoute((body) => accounts.requestReset(body.email)));
-app.post("/api/password/reset", ...authRoute((body) => accounts.resetPassword(body)));
+app.post("/api/password/forgot", limited("forgot", 5, 15 * 60_000), ...authRoute((body) => accounts.requestReset(body.email)));
+app.post("/api/password/reset", limited("reset", 20, 15 * 60_000), ...authRoute((body) => accounts.resetPassword(body)));
 
 /** La cuenta del encabezado Authorization, o null (y responde 401). */
 function accountFrom(req: express.Request, res: express.Response): Account | null {
@@ -344,6 +371,7 @@ app.post(
     const code = String(req.header("x-speaker-code") ?? "").toUpperCase();
     if (!state) return res.status(404).json({ error: "Sala no encontrada" });
     if (!code || speakerCodes.get(`${venueId}/${roomId}`) !== code) {
+      if (!allow(`speaker:${req.ip}`, 10, 15 * 60_000)) return res.status(429).json({ error: TOO_MANY });
       return res.status(403).json({ error: "Código de expositor inválido para esta sala" });
     }
     const body = req.body;
@@ -351,7 +379,8 @@ app.post(
       return res.status(400).json({ error: "El archivo debe ser un PDF" });
     }
 
-    const fileName = `${venueId}-${roomId}-${Date.now()}.pdf`;
+    // Nombre imposible de adivinar: las diapositivas de un evento privado no deben poder bajarse probando nombres.
+    const fileName = `${venueId}-${roomId}-${randomUUID()}.pdf`;
     await writeFile(path.join(uploadsDir, fileName), body);
     const previous = state.stage.slidesUrl;
     if (previous) unlink(path.join(uploadsDir, path.basename(previous))).catch(() => {});
@@ -1333,6 +1362,7 @@ io.on("connection", (socket) => {
     const state = currentRoom();
     if (!u || !state) return ack({ ok: false, error: "Entra a la sala que vas a presentar" });
     if (speakerCodes.get(`${u.venueId}/${u.roomId}`) !== clean(code, 20).toUpperCase()) {
+      if (!allow(`speaker:${socket.handshake.address}`, 10, 15 * 60_000)) return ack({ ok: false, error: TOO_MANY });
       return ack({ ok: false, error: "El código no corresponde a esta sala" });
     }
     u.speakerFor = u.roomId;
@@ -1348,7 +1378,8 @@ io.on("connection", (socket) => {
     const state = currentRoom();
     if (!u || !state) return;
     const msg = clean(text, 500);
-    if (!msg) return;
+    // Como mucho 10 mensajes cada 10 segundos por persona, para que nadie inunde el chat.
+    if (!msg || !allow(`chat:${u.id}`, 10, 10_000)) return;
     const entry: ChatMessage = { id: randomUUID(), userId: u.id, name: u.name, text: msg, ts: Date.now() };
     state.chat.push(entry);
     if (state.chat.length > MAX_CHAT) state.chat.splice(0, state.chat.length - MAX_CHAT);
@@ -1360,7 +1391,7 @@ io.on("connection", (socket) => {
     const state = currentRoom();
     if (!u || !state) return;
     const q = clean(text, 300);
-    if (!q) return;
+    if (!q || !allow(`ask:${u.id}`, 5, 60_000)) return;
     state.questions.push({ id: randomUUID(), userId: u.id, name: u.name, text: q, votes: [u.id], answered: false, ts: Date.now() });
     io.to(sceneChannel(u)).emit("questions", sortQuestions(state.questions));
   });
