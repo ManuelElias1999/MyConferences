@@ -6,7 +6,8 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { DEFAULT_LOOK, sanitizeLook } from "../../shared/look.ts";
+import { DEFAULT_LOOK, onlyOwned, sanitizeLook } from "../../shared/look.ts";
+import { SHOP_ITEMS } from "../../shared/shop.ts";
 import { COMMUNITIES, isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
 import type { Account, AdminAccount, Look } from "../../shared/types.ts";
 import { sendCode, sendResetCode } from "./mail.ts";
@@ -40,6 +41,8 @@ interface StoredAccount {
   planRequest?: PlanId;
   /** Comunidades a las que la sumó la administración (habilitan sus temáticas exclusivas). */
   communities?: string[];
+  /** Prendas de la tienda que compró. */
+  wardrobe?: string[];
   /** Eventos con fecha que organizó (no se borran al cerrar el evento: cuentan para el mes). */
   eventLog?: PlanUsage["log"];
 }
@@ -99,7 +102,10 @@ export function createAccountStore(dataDir: string) {
     planRequest: a.planRequest ?? null,
     // La administración puede usar todas las temáticas.
     communities: isAdmin(a) ? COMMUNITIES.map((c) => c.id) : (a.communities ?? []),
+    wardrobe: wardrobeOf(a),
   });
+  // La administración tiene todas las prendas, para probarlas.
+  const wardrobeOf = (a: StoredAccount) => (isAdmin(a) ? SHOP_ITEMS.map((i) => i.id) : (a.wardrobe ?? []));
   const byId = (id: string) => {
     const account = store.accounts.find((a) => a.id === id);
     if (!account) throw new AccountError("La cuenta ya no existe");
@@ -289,6 +295,14 @@ export function createAccountStore(dataDir: string) {
       return toAccount(account);
     },
 
+    /** Suma una prenda comprada (y se la pone, si quiere). */
+    async addToWardrobe(id: string, itemId: string) {
+      const account = byId(id);
+      account.wardrobe = [...new Set([...(account.wardrobe ?? []), itemId])];
+      await persist();
+      return toAccount(account);
+    },
+
     /** Pedido de plan desde la página de planes (null lo cancela). */
     async requestPlan(id: string, plan: unknown) {
       const account = byId(id);
@@ -333,7 +347,7 @@ export function createAccountStore(dataDir: string) {
       const name = cleanName(changes.name);
       if (!name) throw new AccountError("Escribe el nombre de tu personaje");
       account.name = name;
-      account.look = sanitizeLook(changes.look);
+      account.look = onlyOwned(sanitizeLook(changes.look), wardrobeOf(account));
       await persist();
       return toAccount(account);
     },

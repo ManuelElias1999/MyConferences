@@ -1,3 +1,4 @@
+import { itemFor } from "./shop.ts";
 import type { HairStyle, Look } from "./types.ts";
 
 export const SKINS = ["#f6d7c3", "#eec1a0", "#d9a07a", "#b9785a", "#8d5a3f", "#5e3b2a"];
@@ -46,5 +47,14 @@ export function sanitizeLook(raw: unknown): Look {
     shirt: pick(l.shirt, [...SHIRTS, DEFAULT_LOOK.shirt], DEFAULT_LOOK.shirt),
     pants: pick(l.pants, PANTS, DEFAULT_LOOK.pants),
     shoes: pick(l.shoes, SHOES, DEFAULT_LOOK.shoes),
+    outfit: itemFor("outfit", l.outfit),
+    hat: itemFor("hat", l.hat),
+    extra: itemFor("extra", l.extra),
   };
+}
+
+/** Saca las prendas de la tienda que la cuenta no compró. */
+export function onlyOwned(look: Look, wardrobe: readonly string[]): Look {
+  const keep = (id: string | null | undefined) => (id && wardrobe.includes(id) ? id : null);
+  return { ...look, outfit: keep(look.outfit), hat: keep(look.hat), extra: keep(look.extra) };
 }

@@ -39,6 +39,17 @@ Todas las cuentas empiezan con el plan **Gratis** (la administración, con **Pro
 - Cuando un evento llega a su tope de personas, la recepcionista avisa que está lleno. La organización, los ponentes y los sponsors entran igual. Los eventos de ejemplo usan el tope de Pro.
 - Los eventos creados antes de los planes no tienen fecha: siguen siempre abiertos y no cuentan entre los del mes.
 
+### Tienda de estilos
+
+Botón **Tienda** arriba (o «Más estilos en la tienda» en Mi personaje): prendas extravagantes para el personaje que se compran una vez con **USDC en Stellar** y quedan para siempre. Todos las ven en el mapa.
+
+- **Trajes** (cambian toda la ropa): Smoking (4 USDC), Astronauta con casco y mochila de oxígeno (8), Traje dorado (6), Superhéroe con capa (6), Armadura (7) y Buzo hacker (3).
+- **Sombreros**: de copa (3), corona (5), vaquero (3) y de mago (3).
+- **Accesorios**: lentes de sol (2), capa real (4) y mochila cohete (5).
+- Se lleva un traje, un sombrero y un accesorio a la vez. El servidor solo deja ponerse lo que la cuenta compró; la administración tiene todo, para probar.
+- **Cómo se paga:** cada compra crea un pedido con un memo único (por ejemplo `MC-736B304FE9`). Se manda el monto en USDC a la cuenta de la plataforma con ese memo, desde cualquier wallet (o con «Abrir en mi wallet», un enlace SEP-7). El servidor revisa en Horizon cada pocos segundos y, cuando llega el pago, la prenda pasa a ser de quien la compró. Cada pago sirve para un solo pedido, y el pedido vence a la hora.
+- **Modo de prueba:** sin `STELLAR_RECEIVER` y fuera de producción, el pago se simula con un botón. En producción sin esa variable, la tienda queda cerrada.
+
 ### Para las empresas
 
 - Con permiso para crear eventos, el botón **＋ Crear evento** aparece arriba. La primera vez pide el nombre de la organización con la que se firman los eventos; luego abre el panel en «Nuevo evento».
@@ -171,6 +182,9 @@ Variables de entorno:
 | `MAIL_FROM` | Remitente de esos correos (por defecto `MyConferences <no-reply@myconferences.app>`). |
 | `TURN_URL`, `TURN_USERNAME`, `TURN_CREDENTIAL` | Servidor TURN para que la voz y el video conecten en redes muy cerradas (empresas, universidades), por ejemplo `turn:turn.ejemplo.com:3478`. Sin él se usan solo STUN públicos. |
 | `ICE_SERVERS` | En lugar de lo anterior, la lista completa de servidores en JSON (formato `RTCIceServer`). |
+| `STELLAR_RECEIVER` | Cuenta de Stellar (empieza con G) que recibe los pagos en USDC de la tienda. Necesita una línea de confianza (trustline) para USDC. |
+| `STELLAR_NETWORK` | `testnet` (por defecto) o `public` para cobrar de verdad. |
+| `USDC_ISSUER` | Emisor de USDC si no es el de Circle para esa red. |
 | `TRUST_PROXY` | Si el servidor está detrás de un proxy (Nginx, Caddy, Render, Railway…), ponlo en `1` para que los límites de intentos usen la IP real de cada persona. |
 | `SESSION_SECRET` | Clave para firmar las sesiones. Si no se define, se genera una y se guarda en `server/data/accounts.json`. |
 | `DATA_DIR` | Carpeta de las cuentas, los eventos de las empresas y las listas de invitados (por defecto `server/data`). |

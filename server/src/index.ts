@@ -48,6 +48,8 @@ import type {
 import { HACKATHON_CAPACITIES } from "../../shared/types.ts";
 import { AccountError, createAccountStore } from "./accounts.ts";
 import { createEventStore, type StoredEvent } from "./events.ts";
+import { createShop } from "./shop.ts";
+import { shopItem } from "../../shared/shop.ts";
 import { createVenues } from "./seed.ts";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -62,6 +64,7 @@ mkdirSync(logosDir, { recursive: true });
 
 const accounts = createAccountStore(dataDir);
 const companyEvents = createEventStore(dataDir);
+const shop = createShop(dataDir);
 
 // ---------- Eventos y salas ----------
 
@@ -318,6 +321,37 @@ app.get("/api/plan/usage", (req, res) => {
   if (!account) return;
   res.json(usageOf(account.id));
 });
+
+// Tienda de estilos: prendas para el personaje, pagadas con USDC en Stellar.
+app.get("/api/shop", (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  res.json({ config: shop.config, wardrobe: account.wardrobe });
+});
+app.post("/api/shop/orders", limited("shop", 30, 15 * 60_000), express.json({ limit: "2kb" }), async (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  const item = shopItem((req.body ?? {}).itemId);
+  if (!shop.config.enabled) return res.status(503).json({ error: "La tienda todavía no está abierta" });
+  if (!item) return res.status(404).json({ error: "Esa prenda no existe" });
+  if (account.wardrobe.includes(item.id)) return res.status(400).json({ error: "Ya tienes esa prenda" });
+  res.json({ order: await shop.create(account.id, item.id, item.price) });
+});
+/** Revisa un pedido; si se acaba de pagar, la prenda pasa al guardarropa y la persona lo ve al instante. */
+const checkOrder = (simulate: boolean): express.RequestHandler => async (req, res) => {
+  const account = accountFrom(req, res);
+  if (!account) return;
+  const result = await shop.check(account.id, String(req.params.id), simulate);
+  if (!result) return res.status(404).json({ error: "Pedido no encontrado" });
+  if (result.paidNow) {
+    const updated = await accounts.addToWardrobe(account.id, result.order.itemId);
+    pushAccount(updated);
+    return res.json({ order: result.order, account: updated });
+  }
+  res.json({ order: result.order });
+};
+app.get("/api/shop/orders/:id", checkOrder(false));
+app.post("/api/shop/orders/:id/simulate", (req, res, next) => (shop.config.demo ? next() : res.status(403).json({ error: "Solo en modo de prueba" })), checkOrder(true));
 
 // Administración: ver las cuentas y asignarles un plan.
 const adminFrom = (req: express.Request, res: express.Response) => {

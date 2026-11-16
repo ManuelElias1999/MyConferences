@@ -579,7 +579,7 @@ export default function Scene(props: SceneProps) {
       }
 
       const items: Drawable[] = [...furni];
-      const labels: { x: number; y: number; name: string; mine: boolean; sitting: boolean; id: string; tag: boolean }[] = [];
+      const labels: { x: number; y: number; name: string; mine: boolean; sitting: boolean; id: string; tag: boolean; h: number }[] = [];
       const addAvatar = (id: string, name: string, look: Look, w: Walker, mine: boolean, tag: boolean, fixedDir?: Dir, sit = false) => {
         const pose = sit ? { dir: fixedDir ?? w.dir, walk: null, sitting: true } : poseFor(w, fixedDir);
         const f = feet(w.x, w.y);
@@ -601,7 +601,7 @@ export default function Scene(props: SceneProps) {
             },
           });
         items.push({ key: w.y + 0.82, draw: (g) => drawAvatar(g, look, f.x, f.y, pose) });
-        labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag });
+        labels.push({ x: f.x, y: f.y, name, mine, sitting: pose.sitting, id, tag, h: avatarHeight(pose.sitting, look) });
       };
       for (const n of map.npcs) if (!p.hideNpcs?.has(n.id)) addAvatar(n.id, n.name, n.look, { x: n.x, y: n.y, dir: n.dir, walk: 0, moving: false }, false, false, n.dir);
       for (const c of map.crowd) addAvatar(c.id, c.name, c.look, { x: c.x, y: c.y, dir: c.dir, walk: 0, moving: false }, false, false, c.dir, c.sit);
@@ -645,7 +645,7 @@ export default function Scene(props: SceneProps) {
 
       for (const l of labels) {
         if ((p.names === "all" && l.tag) || l.mine || h.user === l.id || h.npc === l.id) {
-          drawName(ctx, l.x, l.y - avatarHeight(l.sitting) - 8, l.mine ? `${l.name} (tú)` : l.name, l.mine);
+          drawName(ctx, l.x, l.y - l.h - 8, l.mine ? `${l.name} (tú)` : l.name, l.mine);
         }
       }
       // Marcadores sobre lo que se puede usar: la recepcionista y los directorios.
@@ -682,7 +682,7 @@ export default function Scene(props: SceneProps) {
         ctx.globalAlpha = age > EMOTE_MS - 400 ? (EMOTE_MS - age) / 400 : 1;
         ctx.font = "20px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(e.emoji, l.x + 16, l.y - avatarHeight(l.sitting) - 6 - rise * 10);
+        ctx.fillText(e.emoji, l.x + 16, l.y - l.h - 6 - rise * 10);
         ctx.restore();
       }
       for (const l of labels) {
@@ -694,7 +694,7 @@ export default function Scene(props: SceneProps) {
           continue;
         }
         const alpha = age > BUBBLE_MS - 1000 ? (BUBBLE_MS - age) / 1000 : 1;
-        drawBubble(ctx, l.x, l.y - avatarHeight(l.sitting) - 20, l.name, b.text, alpha);
+        drawBubble(ctx, l.x, l.y - l.h - 20, l.name, b.text, alpha);
       }
 
       if (miniCtx && mini) {

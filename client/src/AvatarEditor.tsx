@@ -32,11 +32,14 @@ export default function AvatarEditor({
   welcome,
   onSaved,
   onClose,
+  onShop,
 }: {
   account: Account;
   welcome: boolean;
   onSaved: (account: Account) => void;
   onClose: () => void;
+  /** Abrir la tienda de estilos (smoking, astronauta, sombreros…). */
+  onShop: () => void;
 }) {
   const [look, setLook] = useState<Look>(account.look);
   const [name, setName] = useState(account.name);
@@ -94,6 +97,10 @@ export default function AvatarEditor({
           <Swatches label="Polera" options={SHIRTS} value={look.shirt} onChange={set("shirt")} />
           <Swatches label="Pantalón" options={PANTS} value={look.pants} onChange={set("pants")} />
           <Swatches label="Zapatos" options={SHOES} value={look.shoes} onChange={set("shoes")} />
+          {look.outfit && <p className="muted small">Tu traje de la tienda cambia los colores de la ropa mientras lo llevas puesto.</p>}
+          <button type="button" className="btn shop-link" onClick={onShop}>
+            ✨ Más estilos en la tienda: smoking, astronauta, coronas…
+          </button>
         </div>
       </div>
       {error && <p className="error">{error}</p>}

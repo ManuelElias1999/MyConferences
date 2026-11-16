@@ -2739,3 +2739,115 @@ textarea {
   font-size: 0.78rem;
   font-weight: 700;
 }
+
+/* Tienda de estilos. */
+.shop-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shop-card {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.shop-card.wearing {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.shop-preview {
+  display: grid;
+  place-items: center;
+  padding: 6px 0;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #efe9dc, #e2dccd);
+}
+.shop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.shop-price {
+  font-weight: 800;
+}
+.shop-success {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: #dcfce7;
+  color: #14532d;
+}
+.shop-link {
+  justify-self: start;
+  margin-top: 6px;
+}
+.pay {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.pay-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  align-items: center;
+  margin: 0;
+  width: 100%;
+}
+.pay-fields dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.pay-fields dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+.pay-fields code {
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 0.82rem;
+}
+.pay-memo {
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+.pay-warning {
+  color: #92400e;
+  font-weight: 600;
+}
+.pay-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pay-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: pay-spin 0.9s linear infinite;
+}
+@keyframes pay-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

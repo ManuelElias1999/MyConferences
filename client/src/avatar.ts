@@ -263,6 +263,204 @@ function blocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
   return out;
 }
 
+// ---------- Prendas de la tienda ----------
+
+/** Colores de ropa que pone cada traje. */
+const OUTFIT_COLORS: Record<string, Pick<Look, "shirt" | "pants" | "shoes">> = {
+  smoking: { shirt: "#1d1d26", pants: "#1d1d26", shoes: "#0d0d12" },
+  astronauta: { shirt: "#eef2f6", pants: "#dde3ea", shoes: "#9aa3b5" },
+  dorado: { shirt: "#d6a92e", pants: "#b98f1d", shoes: "#f8f4e3" },
+  superheroe: { shirt: "#d62839", pants: "#1f3a93", shoes: "#d62839" },
+  armadura: { shirt: "#a9b3c1", pants: "#8d97a6", shoes: "#6b7280" },
+  hacker: { shirt: "#1f2430", pants: "#2b2f3b", shoes: "#22d3ee" },
+};
+
+/** El personaje con la ropa del traje puesta; con casco no se ve el pelo, y con sombrero el pelo alto se aplasta. */
+function dressed(look: Look): Look {
+  const colors = look.outfit ? OUTFIT_COLORS[look.outfit] : undefined;
+  let hair = look.hair;
+  if (look.outfit === "astronauta") hair = "bald";
+  else if (look.hat && (hair === "spiky" || hair === "bun" || hair === "cap")) hair = "short";
+  return { ...look, ...colors, hair };
+}
+
+type Side = "front" | "back" | "side";
+
+/** Capas de una prenda: lo que va detrás del cuerpo (capas, mochilas) y lo que va encima. */
+interface Layers {
+  behind: B[];
+  over: B[];
+}
+
+const GLASS = "rgba(125,211,252,0.28)";
+const SHINE = "rgba(255,255,255,0.7)";
+
+function outfitLayers(id: string, side: Side): Layers {
+  const none: Layers = { behind: [], over: [] };
+  switch (id) {
+    case "smoking":
+      if (side === "front")
+        return {
+          behind: [],
+          over: [
+            detail(-2, -26, 4, 10, "#f4f4f5"),
+            detail(-4, -23, 2, 7, "#2e2e3a"),
+            detail(2, -23, 2, 7, "#2e2e3a"),
+            detail(-4, -25, 3, 2, "#0b0b0f"),
+            detail(1, -25, 3, 2, "#0b0b0f"),
+            detail(-1, -25, 2, 2, "#2a2a33"),
+            detail(-1, -21, 1, 1, "#9ca3af"),
+            detail(-1, -18, 1, 1, "#9ca3af"),
+            detail(-7, -22, 2, 1, "#e5484d"),
+          ],
+        };
+      if (side === "side") return { behind: [], over: [detail(3, -26, 3, 7, "#f4f4f5"), detail(4, -25, 2, 2, "#0b0b0f")] };
+      return none;
+    case "astronauta":
+      if (side === "front")
+        return {
+          behind: [],
+          over: [
+            detail(-4, -22, 8, 5, "#c7d0db"),
+            detail(-3, -21, 2, 1, "#e5484d"),
+            detail(0, -21, 1, 1, "#22c55e"),
+            detail(2, -21, 1, 1, "#2f6bff"),
+            detail(-12, -24, 3, 2, "#2f6bff"),
+            // Casco: marco blanco y vidrio sobre la cara.
+            [-12, -51, 24, 3, "#f1f5f9"],
+            [-12, -48, 3, 21, "#f1f5f9"],
+            [9, -48, 3, 21, "#e2e8f0"],
+            [-12, -28, 24, 3, "#cbd5e1"],
+            detail(-9, -48, 18, 20, GLASS),
+            detail(-8, -47, 2, 6, SHINE),
+            detail(-5, -47, 1, 2, SHINE),
+          ],
+        };
+      if (side === "back")
+        return {
+          behind: [],
+          over: [[-12, -51, 24, 26, "#f1f5f9"], detail(-10, -49, 6, 2, "#ffffff"), [-7, -25, 14, 12, "#c7d0db"], detail(-5, -23, 10, 1, "#9aa3b5"), detail(-5, -20, 10, 1, "#9aa3b5")],
+        };
+      return {
+        behind: [[-10, -25, 5, 12, "#c7d0db"]],
+        over: [[-10, -51, 21, 3, "#f1f5f9"], [-10, -48, 4, 21, "#f1f5f9"], [-10, -28, 21, 3, "#cbd5e1"], [9, -48, 2, 21, "#e2e8f0"], detail(-6, -48, 15, 20, GLASS), detail(5, -47, 2, 5, SHINE)],
+      };
+    case "dorado": {
+      const spark = "#fff6c2";
+      if (side === "front")
+        return { behind: [], over: [detail(-2, -26, 4, 7, "#1d1d26"), detail(-6, -22, 1, 1, spark), detail(5, -19, 1, 1, spark), detail(-3, -15, 1, 1, spark), detail(3, -24, 1, 1, spark), detail(-5, -8, 1, 1, spark)] };
+      return { behind: [], over: [detail(0, -21, 1, 1, spark), detail(-3, -16, 1, 1, spark), detail(4, -24, 1, 1, spark)] };
+    }
+    case "superheroe":
+      if (side === "front")
+        return {
+          behind: [[-11, -27, 22, 23, "#b31b2c"]],
+          over: [detail(-3, -23, 6, 5, "#fbbf24"), detail(-2, -22, 4, 3, "#d62839"), detail(-1, -21, 2, 1, "#fbbf24"), detail(-8, -13, 16, 1, "#fbbf24")],
+        };
+      if (side === "back") return { behind: [], over: [[-10, -27, 20, 24, "#c0283a"], detail(-10, -27, 20, 2, "#a51d2d"), detail(-1, -24, 2, 18, "#a51d2d")] };
+      return { behind: [[-10, -26, 6, 22, "#b31b2c"]], over: [detail(-5, -13, 11, 1, "#fbbf24"), detail(2, -22, 3, 4, "#fbbf24")] };
+    case "armadura":
+      if (side === "side") return { behind: [], over: [[-3, -27, 7, 4, "#cbd5e1"], detail(-2, -26, 5, 1, "#e5e9f0")] };
+      return {
+        behind: [],
+        over: [
+          [-13, -27, 6, 4, "#cbd5e1"],
+          [7, -27, 6, 4, "#cbd5e1"],
+          detail(-12, -26, 4, 1, "#e5e9f0"),
+          detail(8, -26, 4, 1, "#e5e9f0"),
+          ...(side === "front" ? [detail(-1, -25, 2, 11, "#d7dee7"), detail(-6, -24, 1, 1, "#6b7280"), detail(5, -24, 1, 1, "#6b7280")] : []),
+        ],
+      };
+    case "hacker": {
+      const neon = "#22d3ee";
+      if (side === "front")
+        return { behind: [], over: [detail(-9, -27, 18, 2, "#2a3142"), detail(-3, -25, 1, 4, neon), detail(2, -25, 1, 4, neon), detail(-4, -18, 8, 3, "#262c3a"), detail(-8, -14, 16, 1, neon)] };
+      if (side === "back") return { behind: [], over: [[-8, -30, 16, 5, "#2a3142"], detail(-8, -14, 16, 1, neon)] };
+      return { behind: [], over: [[-9, -31, 5, 7, "#2a3142"], detail(-5, -14, 11, 1, neon)] };
+    }
+  }
+  return none;
+}
+
+function hatLayers(id: string, side: Side, lift: number): B[] {
+  const narrow = side === "side";
+  const up = (bs: B[]) => bs.map((b): B => [b[0], b[1] - lift, b[2], b[3], b[4], b[5]]);
+  switch (id) {
+    case "copa":
+      return up(narrow
+        ? [[-7, -61, 14, 12, "#16161d"], detail(-7, -52, 14, 2, "#b91c1c"), [-10, -50, 20, 2, "#16161d"]]
+        : [[-8, -61, 16, 12, "#16161d"], detail(-8, -52, 16, 2, "#b91c1c"), detail(-6, -60, 2, 7, "#2e2e3a"), [-11, -50, 22, 2, "#16161d"]]);
+    case "corona": {
+      const gold = "#f5c518";
+      return up(narrow
+        ? [[-7, -52, 14, 4, gold], [-7, -56, 3, 4, gold], [-1, -58, 3, 6, gold], [4, -56, 3, 4, gold], detail(-6, -52, 12, 1, "#ffe58a"), detail(0, -51, 2, 2, "#e5484d")]
+        : [[-8, -52, 16, 4, gold], [-8, -56, 3, 4, gold], [-2, -58, 4, 6, gold], [5, -56, 3, 4, gold], detail(-7, -52, 14, 1, "#ffe58a"), detail(-1, -51, 2, 2, "#e5484d"), detail(-6, -51, 2, 1, "#2f6bff"), detail(4, -51, 2, 1, "#10b981")]);
+    }
+    case "vaquero":
+      return up(narrow
+        ? [[-6, -56, 12, 7, "#8b5a2b"], detail(-6, -51, 12, 1, "#3b2414"), [-12, -50, 24, 3, "#7a4b22"]]
+        : [[-7, -56, 14, 7, "#8b5a2b"], detail(-1, -56, 2, 2, "#6f4520"), detail(-7, -51, 14, 1, "#3b2414"), [-14, -50, 28, 3, "#7a4b22"], [-14, -52, 2, 2, "#7a4b22"], [12, -52, 2, 2, "#7a4b22"]]);
+    case "mago": {
+      const star = "#fde68a";
+      return up([
+        [-8, -53, 16, 4, "#4c1d95"],
+        [-6, -57, 12, 4, "#4c1d95"],
+        [-4, -61, 8, 4, "#5b21b6"],
+        [-2, -65, 4, 4, "#5b21b6"],
+        [narrow ? 1 : 0, -67, 3, 2, "#5b21b6"],
+        detail(-4, -56, 1, 1, star),
+        detail(2, -60, 1, 1, star),
+        detail(-1, -52, 1, 1, star),
+        [-11, -50, 22, 2, "#3b0f7a"],
+      ]);
+    }
+  }
+  return [];
+}
+
+function extraLayers(id: string, side: Side): Layers {
+  switch (id) {
+    case "lentes": {
+      const dark = "#111318";
+      if (side === "front")
+        return { behind: [], over: [detail(-8, -38, 6, 3, dark), detail(2, -38, 6, 3, dark), detail(-2, -37, 4, 1, dark), detail(-7, -38, 2, 1, "#4b5563"), detail(3, -38, 2, 1, "#4b5563")] };
+      if (side === "side") return { behind: [], over: [detail(2, -38, 5, 3, dark), detail(-3, -37, 5, 1, dark)] };
+      return { behind: [], over: [detail(-9, -37, 18, 1, dark)] };
+    }
+    case "capa":
+      if (side === "front") return { behind: [[-11, -27, 22, 23, "#5b21b6"]], over: [] };
+      if (side === "back") return { behind: [], over: [[-10, -27, 20, 24, "#6d28d9"], detail(-10, -27, 20, 2, "#fbbf24"), detail(-10, -5, 20, 1, "#fbbf24")] };
+      return { behind: [[-10, -26, 6, 22, "#5b21b6"], detail(-10, -5, 6, 1, "#fbbf24")], over: [] };
+    case "jetpack": {
+      const tank = "#9aa3b5";
+      const fire = "#f97316";
+      if (side === "back")
+        return {
+          behind: [],
+          over: [[-8, -26, 6, 13, tank], [2, -26, 6, 13, tank], detail(-8, -26, 6, 2, "#cbd5e1"), detail(2, -26, 6, 2, "#cbd5e1"), [-7, -13, 4, 3, fire], [3, -13, 4, 3, fire], detail(-6, -10, 2, 2, "#fde047"), detail(4, -10, 2, 2, "#fde047")],
+        };
+      if (side === "front") return { behind: [[-10, -30, 4, 6, tank], [6, -30, 4, 6, tank]], over: [] };
+      return { behind: [[-11, -26, 6, 13, tank], [-10, -13, 4, 3, fire], detail(-9, -10, 2, 2, "#fde047")], over: [] };
+    }
+  }
+  return { behind: [], over: [] };
+}
+
+/** Bloques del personaje con sus prendas: lo de atrás primero, después el cuerpo, y encima traje, accesorio y sombrero. */
+function dressedBlocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
+  const l = dressed(look);
+  const base = blocks(l, dir, step, sitting);
+  if (!look.outfit && !look.hat && !look.extra) return base;
+  const side: Side = dir === "down" ? "front" : dir === "up" ? "back" : "side";
+  const drop = sitting ? 4 : 0;
+  const lift = (b: B): B => [b[0], b[1] + drop, b[2], b[3], b[4], b[5]];
+  const outfit = look.outfit ? outfitLayers(look.outfit, side) : { behind: [], over: [] };
+  const extra = look.extra ? extraLayers(look.extra, side) : { behind: [], over: [] };
+  // Sobre el casco del astronauta, el sombrero queda un poco más alto.
+  const hat = look.hat ? hatLayers(look.hat, side, look.outfit === "astronauta" ? 3 : 0) : [];
+  return [...[...extra.behind, ...outfit.behind].map(lift), ...base, ...[...outfit.over, ...extra.over, ...hat].map(lift)];
+}
+
 export interface AvatarPose {
   dir: Dir;
   /** Fase de la caminata en [0, 1), o null si está quieto. */
@@ -276,7 +474,7 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, look: Look, x: number,
   const step = Math.round(phase * 2);
   const bob = pose.walk !== null && Math.abs(phase) > 0.6 ? -1 : 0;
   const mirror = pose.dir === "left";
-  const list = blocks(look, pose.dir, step, pose.sitting);
+  const list = dressedBlocks(look, pose.dir, step, pose.sitting);
   const ox = Math.round(x);
   const oy = Math.round(y) + bob;
   const px = (b: B) => (mirror ? ox - b[0] - b[2] : ox + b[0]);
@@ -295,5 +493,9 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, look: Look, x: number,
   ctx.restore();
 }
 
-/** Alto aproximado del personaje en píxeles, para ubicar nombres y globos. */
-export const avatarHeight = (sitting: boolean) => (sitting ? 48 : 52);
+/** Lo que suma cada sombrero (y el casco) al alto del personaje. */
+const HAT_HEIGHT: Record<string, number> = { copa: 13, corona: 10, vaquero: 8, mago: 19 };
+
+/** Alto aproximado del personaje en píxeles, para ubicar nombres y globos (más alto con sombrero o casco). */
+export const avatarHeight = (sitting: boolean, look?: Look) =>
+  (sitting ? 48 : 52) + Math.max(look?.outfit === "astronauta" ? 3 : 0, (look?.hat ? HAT_HEIGHT[look.hat] ?? 0 : 0) + (look?.outfit === "astronauta" && look.hat ? 3 : 0));

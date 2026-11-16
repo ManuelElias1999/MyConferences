@@ -13,6 +13,10 @@ export interface Look {
   shirt: string;
   pants: string;
   shoes: string;
+  /** Prendas de la tienda que lleva puestas (ver shared/shop.ts). */
+  outfit?: string | null;
+  hat?: string | null;
+  extra?: string | null;
 }
 
 /** Datos de la cuenta que ve su dueño. El correo nunca se envía a otros usuarios. */
@@ -33,6 +37,33 @@ export interface Account {
   planRequest: PlanId | null;
   /** Comunidades a las que pertenece: le habilitan sus temáticas exclusivas (por ejemplo, Stellar). */
   communities: string[];
+  /** Prendas de la tienda que compró. */
+  wardrobe: string[];
+}
+
+/** Cómo cobra la tienda de estilos: en USDC sobre Stellar, o en modo de prueba (pago simulado). */
+export interface ShopConfig {
+  enabled: boolean;
+  demo: boolean;
+  network: "testnet" | "public";
+  /** Cuenta de Stellar que recibe los pagos. */
+  receiver: string | null;
+  assetCode: "USDC";
+  assetIssuer: string;
+}
+
+/** Un pedido de la tienda: se paga mandando `amount` USDC con el memo `memo`. */
+export interface ShopOrder {
+  id: string;
+  itemId: string;
+  /** Monto en USDC, con dos decimales. */
+  amount: string;
+  memo: string;
+  status: "pending" | "paid" | "expired";
+  createdAt: number;
+  expiresAt: number;
+  /** Enlace SEP-7 para abrir el pago en una wallet (null en modo de prueba). */
+  payUri: string | null;
 }
 
 /** Una cuenta vista desde la administración. */
