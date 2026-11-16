@@ -4,19 +4,32 @@ import type { PlanId } from "./plans.ts";
 import type { ThemeId } from "./themes.ts";
 
 export type HairStyle = "short" | "long" | "spiky" | "bun" | "cap" | "bald";
+export type Beard = "none" | "stubble" | "mustache" | "full";
 
-/** Apariencia del personaje. Los colores salen de las paletas de shared/look.ts. */
+/**
+ * Apariencia del personaje y la ropa que lleva. Los colores salen de las paletas de shared/look.ts y las prendas de
+ * shared/shop.ts; las partes sin prenda elegida usan la básica (polera, pantalón, zapatillas).
+ */
 export interface Look {
   skin: string;
   hair: HairStyle;
   hairColor: string;
+  beard?: Beard;
+  /** Prenda de arriba y su color. */
+  top?: string;
   shirt: string;
+  /** Prenda de abajo y su color. */
+  bottom?: string;
   pants: string;
+  /** Calzado y su color. */
+  feet?: string;
   shoes: string;
-  /** Prendas de la tienda que lleva puestas (ver shared/shop.ts). */
-  outfit?: string | null;
+  /** Lo que lleva en la cabeza, en la cara y en la espalda (null: nada), con su color si se elige. */
   hat?: string | null;
-  extra?: string | null;
+  hatColor?: string;
+  glasses?: string | null;
+  back?: string | null;
+  backColor?: string;
 }
 
 /** Datos de la cuenta que ve su dueño. El correo nunca se envía a otros usuarios. */

@@ -99,8 +99,63 @@ function sideHair(look: Look): { back: B[]; front: B[] } {
   }
 }
 
+// ---------- Ropa ----------
+
+/** El personaje ya vestido: colores fijos de las prendas especiales y forma de mangas, piernas y calzado. */
+interface Dress extends Look {
+  sleeves: "short" | "long";
+  legs: "long" | "shorts" | "skirt";
+  boots: boolean;
+}
+
+const TOP_STYLE: Record<string, { color?: string; sleeves: Dress["sleeves"] }> = {
+  polera: { sleeves: "short" },
+  camisa: { sleeves: "long" },
+  buzo: { sleeves: "long" },
+  smoking: { color: "#1d1d26", sleeves: "long" },
+  astronauta: { color: "#eef2f6", sleeves: "long" },
+  dorado: { color: "#d6a92e", sleeves: "long" },
+  superheroe: { color: "#d62839", sleeves: "long" },
+  armadura: { color: "#a9b3c1", sleeves: "long" },
+  hacker: { color: "#1f2430", sleeves: "long" },
+};
+const BOTTOM_STYLE: Record<string, { color?: string; legs: Dress["legs"] }> = {
+  pantalon: { legs: "long" },
+  shorts: { legs: "shorts" },
+  falda: { legs: "skirt" },
+  "pantalon-smoking": { color: "#1d1d26", legs: "long" },
+  "pantalon-astronauta": { color: "#dde3ea", legs: "long" },
+  "pantalon-armadura": { color: "#8d97a6", legs: "long" },
+};
+const FEET_STYLE: Record<string, { color?: string; boots: boolean }> = {
+  zapatillas: { boots: false },
+  botas: { boots: true },
+  charol: { color: "#0d0d12", boots: false },
+  "botas-espaciales": { color: "#9aa3b5", boots: true },
+};
+
+function dress(look: Look): Dress {
+  const top = TOP_STYLE[look.top ?? "polera"] ?? TOP_STYLE.polera!;
+  const bottom = BOTTOM_STYLE[look.bottom ?? "pantalon"] ?? BOTTOM_STYLE.pantalon!;
+  const feet = FEET_STYLE[look.feet ?? "zapatillas"] ?? FEET_STYLE.zapatillas!;
+  // Con casco no se ve el pelo; con sombrero, el pelo alto se aplasta.
+  let hair = look.hair;
+  if (look.hat === "casco-astronauta") hair = "bald";
+  else if (look.hat && (hair === "spiky" || hair === "bun" || hair === "cap")) hair = "short";
+  return {
+    ...look,
+    hair,
+    shirt: top.color ?? look.shirt,
+    pants: bottom.color ?? look.pants,
+    shoes: feet.color ?? look.shoes,
+    sleeves: top.sleeves,
+    legs: bottom.legs,
+    boots: feet.boots,
+  };
+}
+
 /** Personaje de perfil mirando a la derecha (para la izquierda se refleja). */
-function sideBlocks(look: Look, step: number, sitting: boolean): B[] {
+function sideBlocks(look: Dress, step: number, sitting: boolean): B[] {
   const skin = look.skin;
   const skinSide = shade(skin, -0.14);
   const skinDeep = shade(skin, -0.28);
@@ -114,37 +169,45 @@ function sideBlocks(look: Look, step: number, sitting: boolean): B[] {
   const lift = (b: B): B => [b[0], b[1] + drop, b[2], b[3], b[4], b[5]];
   const h = sideHair(look);
   const out: B[] = [];
+  const long = look.sleeves === "long";
 
   if (!sitting) {
-    // Pierna de atrás más oscura; al caminar se cruzan hacia adelante y atrás.
-    out.push(
-      [-3 - step, -12, 5, 9, pantsD],
-      [-3 - step, -4, 7, 3, shade(look.shoes, -0.15)],
-      detail(-3 - step, -1, 7, 1, sole),
-      [-2 + step, -12, 5, 9, pants],
-      detail(-2 + step, -12, 1, 8, shade(pants, 0.15)),
-      [-2 + step, -4, 8, 3, look.shoes],
-      detail(-2 + step, -1, 8, 1, sole),
-      detail(4 + step, -4, 2, 1, shade(look.shoes, 0.3)),
-    );
+    // Pierna de atrás más oscura; al caminar se cruzan hacia adelante y atrás. Con shorts o falda se ve la piel.
+    const bare = look.legs !== "long";
+    const shoeTop = look.boots ? -7 : -4;
+    const shoeH = look.boots ? 6 : 3;
+    for (const [x, front] of [
+      [-3 - step, false],
+      [-2 + step, true],
+    ] as const) {
+      const cloth = front ? pants : pantsD;
+      const leg = front ? skin : skinDeep;
+      if (look.legs === "shorts") out.push([x, -12, 5, 4, cloth], [x, -8, 5, 5, leg]);
+      else if (bare) out.push([x, -12, 5, 9, leg]);
+      else out.push([x, -12, 5, 9, cloth]);
+      if (front && !bare) out.push(detail(x, -12, 1, 8, shade(pants, 0.15)));
+      out.push([x, shoeTop, front ? 8 : 7, shoeH, front ? look.shoes : shade(look.shoes, -0.15)], detail(x, -1, front ? 8 : 7, 1, sole));
+      if (front) out.push(detail(x + 6, shoeTop, 2, 1, shade(look.shoes, 0.3)));
+    }
   }
   const swing = sitting ? 0 : step;
   const upper: B[] = [
     ...h.back,
     // Brazo de atrás.
-    [-2 - swing, -25, 4, 6, shade(shirt, -0.32)],
-    [-2 - swing, -19, 4, 5, skinDeep],
+    ...(long
+      ? [[-2 - swing, -25, 4, 9, shade(shirt, -0.32)] as B, [-2 - swing, -16, 4, 2, skinDeep] as B]
+      : [[-2 - swing, -25, 4, 6, shade(shirt, -0.32)] as B, [-2 - swing, -19, 4, 5, skinDeep] as B]),
     // Torso de costado, más angosto.
     [-5, -26, 11, 15, shirt],
     detail(-5, -26, 11, 2, shirtL),
     detail(3, -24, 3, 12, shirtD),
     detail(-5, -13, 11, 1, shirtD),
     [-5, -12, 11, 2, pantsD],
+    ...(look.legs === "skirt" ? [[-6, -13, 13, 5, pants] as B, detail(-6, -9, 13, 1, pantsD)] : []),
     // Brazo de adelante, balanceándose.
-    [-1 + swing, -25, 4, 7, shirtD],
-    detail(-1 + swing, -25, 4, 1, shirtL),
-    [-1 + swing, -18, 4, 4, skin],
-    detail(-1 + swing, -15, 4, 1, skinSide),
+    ...(long
+      ? [[-1 + swing, -25, 4, 9, shirtD] as B, detail(-1 + swing, -25, 4, 1, shirtL), [-1 + swing, -16, 4, 2, skin] as B]
+      : [[-1 + swing, -25, 4, 7, shirtD] as B, detail(-1 + swing, -25, 4, 1, shirtL), [-1 + swing, -18, 4, 4, skin] as B, detail(-1 + swing, -15, 4, 1, skinSide)]),
     // Cuello y cabeza de perfil, con la nariz hacia adelante.
     [-2, -28, 5, 3, skinSide],
     [-8, -43, 16, 17, skin],
@@ -168,7 +231,7 @@ function sideBlocks(look: Look, step: number, sitting: boolean): B[] {
   return out;
 }
 
-function blocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
+function blocks(look: Dress, dir: Dir, step: number, sitting: boolean): B[] {
   if (dir === "left" || dir === "right") return sideBlocks(look, step, sitting);
   const view: View = dir === "down" ? "front" : "back";
   const skin = look.skin;
@@ -190,30 +253,37 @@ function blocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
   if (!sitting) {
     const liftL = step > 0 ? 2 : 0;
     const liftR = step < 0 ? 2 : 0;
+    const shoeTop = look.boots ? 7 : 4;
     for (const [x, up] of [
       [-7, liftL],
       [1, liftR],
     ] as const) {
-      out.push(
-        [x, -12, 6, 9 - up, pants],
-        detail(x, -12, 1, 8 - up, pantsL),
-        detail(x + 5, -12, 1, 8 - up, pantsD),
-        [x, -4 - up, 6, 3, look.shoes],
-        detail(x, -1 - up, 6, 1, sole),
-        detail(x + 1, -4 - up, 2, 1, shade(look.shoes, 0.3)),
-      );
+      if (look.legs === "long") out.push([x, -12, 6, 9 - up, pants], detail(x, -12, 1, 8 - up, pantsL), detail(x + 5, -12, 1, 8 - up, pantsD));
+      else if (look.legs === "shorts") out.push([x, -12, 6, 4, pants], detail(x, -12, 1, 4, pantsL), [x, -8, 6, 5 - up, skin], detail(x + 5, -8, 1, 4 - up, skinSide));
+      else out.push([x, -12, 6, 9 - up, skin], detail(x + 5, -12, 1, 8 - up, skinSide));
+      out.push([x, -shoeTop - up, 6, shoeTop - 1, look.shoes], detail(x, -1 - up, 6, 1, sole), detail(x + 1, -shoeTop - up, 2, 1, shade(look.shoes, 0.3)));
     }
   }
 
   const swing = sitting ? 0 : step;
   const upper: B[] = [...h.back];
-  // Mangas cortas con antebrazo a la vista.
+  // Mangas cortas con el antebrazo a la vista, o largas hasta la mano.
+  if (look.sleeves === "long")
+    upper.push(
+      [-12, -25 + swing, 4, 10, shirtD],
+      [-12, -15 + swing, 4, 2, skin],
+      [8, -25 - swing, 4, 10, shirtD],
+      [8, -15 - swing, 4, 2, skinSide],
+    );
+  else
+    upper.push(
+      [-12, -25 + swing, 4, 6, shirtD],
+      [-12, -19 + swing, 4, 6, skin],
+      detail(-12, -14 + swing, 4, 1, skinSide),
+      [8, -25 - swing, 4, 6, shirtD],
+      [8, -19 - swing, 4, 6, skinSide],
+    );
   upper.push(
-    [-12, -25 + swing, 4, 6, shirtD],
-    [-12, -19 + swing, 4, 6, skin],
-    detail(-12, -14 + swing, 4, 1, skinSide),
-    [8, -25 - swing, 4, 6, shirtD],
-    [8, -19 - swing, 4, 6, skinSide],
     [-8, -26, 16, 15, shirt],
     detail(-8, -26, 16, 2, shirtL),
     detail(-8, -24, 2, 11, shirtL),
@@ -221,19 +291,9 @@ function blocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
     detail(-8, -13, 16, 1, shirtD),
     [-8, -12, 16, 2, pantsD],
   );
-  if (view === "front") {
-    // Cuello en V, solapas y hebilla del cinturón.
-    upper.push(
-      detail(-3, -26, 6, 2, skin),
-      detail(-2, -24, 4, 1, skin),
-      detail(-1, -23, 2, 1, skin),
-      detail(-4, -26, 1, 3, shirtL),
-      detail(3, -26, 1, 3, shirtL),
-      detail(-1, -12, 3, 2, "#e0b84a"),
-    );
-  } else {
-    upper.push(detail(-3, -26, 6, 1, skinSide));
-  }
+  if (look.legs === "skirt") upper.push([-9, -13, 18, 5, pants], detail(-9, -13, 18, 1, pantsL), detail(-9, -9, 18, 1, pantsD), detail(-3, -12, 1, 3, pantsD), detail(3, -12, 1, 3, pantsD));
+  else if (view === "front") upper.push(detail(-1, -12, 3, 2, "#e0b84a"));
+  if (view === "back") upper.push(detail(-3, -26, 6, 1, skinSide));
 
   // Cuello y cabeza: frente de la cara, tapa del cubo arriba y un lado en sombra.
   upper.push([-3, -28, 6, 3, skinSide]);
@@ -263,41 +323,40 @@ function blocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
   return out;
 }
 
-// ---------- Prendas de la tienda ----------
-
-/** Colores de ropa que pone cada traje. */
-const OUTFIT_COLORS: Record<string, Pick<Look, "shirt" | "pants" | "shoes">> = {
-  smoking: { shirt: "#1d1d26", pants: "#1d1d26", shoes: "#0d0d12" },
-  astronauta: { shirt: "#eef2f6", pants: "#dde3ea", shoes: "#9aa3b5" },
-  dorado: { shirt: "#d6a92e", pants: "#b98f1d", shoes: "#f8f4e3" },
-  superheroe: { shirt: "#d62839", pants: "#1f3a93", shoes: "#d62839" },
-  armadura: { shirt: "#a9b3c1", pants: "#8d97a6", shoes: "#6b7280" },
-  hacker: { shirt: "#1f2430", pants: "#2b2f3b", shoes: "#22d3ee" },
-};
-
-/** El personaje con la ropa del traje puesta; con casco no se ve el pelo, y con sombrero el pelo alto se aplasta. */
-function dressed(look: Look): Look {
-  const colors = look.outfit ? OUTFIT_COLORS[look.outfit] : undefined;
-  let hair = look.hair;
-  if (look.outfit === "astronauta") hair = "bald";
-  else if (look.hat && (hair === "spiky" || hair === "bun" || hair === "cap")) hair = "short";
-  return { ...look, ...colors, hair };
-}
+// ---------- Capas de cada prenda ----------
 
 type Side = "front" | "back" | "side";
 
-/** Capas de una prenda: lo que va detrás del cuerpo (capas, mochilas) y lo que va encima. */
+/** Lo que va detrás del cuerpo (capas, mochilas) y lo que va encima. */
 interface Layers {
   behind: B[];
   over: B[];
 }
 
+const NONE: Layers = { behind: [], over: [] };
 const GLASS = "rgba(125,211,252,0.28)";
 const SHINE = "rgba(255,255,255,0.7)";
 
-function outfitLayers(id: string, side: Side): Layers {
-  const none: Layers = { behind: [], over: [] };
-  switch (id) {
+function topLayers(d: Dress, side: Side): Layers {
+  const c = d.shirt;
+  switch (d.top ?? "polera") {
+    case "polera":
+      // Cuello en V con solapas.
+      if (side === "front")
+        return { behind: [], over: [detail(-3, -26, 6, 2, d.skin), detail(-2, -24, 4, 1, d.skin), detail(-1, -23, 2, 1, d.skin), detail(-4, -26, 1, 3, shade(c, 0.18)), detail(3, -26, 1, 3, shade(c, 0.18))] };
+      return NONE;
+    case "camisa":
+      if (side === "front")
+        return { behind: [], over: [detail(-2, -26, 4, 2, d.skin), detail(-5, -26, 4, 2, shade(c, 0.3)), detail(1, -26, 4, 2, shade(c, 0.3)), detail(0, -24, 1, 11, shade(c, -0.25)), detail(1, -22, 1, 1, "#f4f4f5"), detail(1, -18, 1, 1, "#f4f4f5"), detail(1, -14, 1, 1, "#f4f4f5")] };
+      if (side === "side") return { behind: [], over: [detail(1, -26, 4, 2, shade(c, 0.3))] };
+      return { behind: [], over: [detail(-5, -27, 10, 2, shade(c, 0.3))] };
+    case "buzo": {
+      const hood = shade(c, -0.22);
+      if (side === "front")
+        return { behind: [], over: [detail(-7, -27, 14, 2, hood), detail(-2, -25, 1, 4, "#f4f4f5"), detail(1, -25, 1, 4, "#f4f4f5"), detail(-5, -18, 10, 3, hood)] };
+      if (side === "back") return { behind: [], over: [[-7, -30, 14, 5, hood]] };
+      return { behind: [], over: [[-8, -31, 5, 7, hood]] };
+    }
     case "smoking":
       if (side === "front")
         return {
@@ -315,50 +374,21 @@ function outfitLayers(id: string, side: Side): Layers {
           ],
         };
       if (side === "side") return { behind: [], over: [detail(3, -26, 3, 7, "#f4f4f5"), detail(4, -25, 2, 2, "#0b0b0f")] };
-      return none;
+      return NONE;
     case "astronauta":
       if (side === "front")
-        return {
-          behind: [],
-          over: [
-            detail(-4, -22, 8, 5, "#c7d0db"),
-            detail(-3, -21, 2, 1, "#e5484d"),
-            detail(0, -21, 1, 1, "#22c55e"),
-            detail(2, -21, 1, 1, "#2f6bff"),
-            detail(-12, -24, 3, 2, "#2f6bff"),
-            // Casco: marco blanco y vidrio sobre la cara.
-            [-12, -51, 24, 3, "#f1f5f9"],
-            [-12, -48, 3, 21, "#f1f5f9"],
-            [9, -48, 3, 21, "#e2e8f0"],
-            [-12, -28, 24, 3, "#cbd5e1"],
-            detail(-9, -48, 18, 20, GLASS),
-            detail(-8, -47, 2, 6, SHINE),
-            detail(-5, -47, 1, 2, SHINE),
-          ],
-        };
-      if (side === "back")
-        return {
-          behind: [],
-          over: [[-12, -51, 24, 26, "#f1f5f9"], detail(-10, -49, 6, 2, "#ffffff"), [-7, -25, 14, 12, "#c7d0db"], detail(-5, -23, 10, 1, "#9aa3b5"), detail(-5, -20, 10, 1, "#9aa3b5")],
-        };
-      return {
-        behind: [[-10, -25, 5, 12, "#c7d0db"]],
-        over: [[-10, -51, 21, 3, "#f1f5f9"], [-10, -48, 4, 21, "#f1f5f9"], [-10, -28, 21, 3, "#cbd5e1"], [9, -48, 2, 21, "#e2e8f0"], detail(-6, -48, 15, 20, GLASS), detail(5, -47, 2, 5, SHINE)],
-      };
+        return { behind: [], over: [detail(-4, -22, 8, 5, "#c7d0db"), detail(-3, -21, 2, 1, "#e5484d"), detail(0, -21, 1, 1, "#22c55e"), detail(2, -21, 1, 1, "#2f6bff"), detail(-12, -24, 3, 2, "#2f6bff")] };
+      if (side === "side") return { behind: [], over: [detail(0, -24, 3, 2, "#2f6bff")] };
+      return NONE;
     case "dorado": {
       const spark = "#fff6c2";
-      if (side === "front")
-        return { behind: [], over: [detail(-2, -26, 4, 7, "#1d1d26"), detail(-6, -22, 1, 1, spark), detail(5, -19, 1, 1, spark), detail(-3, -15, 1, 1, spark), detail(3, -24, 1, 1, spark), detail(-5, -8, 1, 1, spark)] };
+      if (side === "front") return { behind: [], over: [detail(-2, -26, 4, 7, "#1d1d26"), detail(-6, -22, 1, 1, spark), detail(5, -19, 1, 1, spark), detail(-3, -15, 1, 1, spark), detail(3, -24, 1, 1, spark)] };
       return { behind: [], over: [detail(0, -21, 1, 1, spark), detail(-3, -16, 1, 1, spark), detail(4, -24, 1, 1, spark)] };
     }
     case "superheroe":
-      if (side === "front")
-        return {
-          behind: [[-11, -27, 22, 23, "#b31b2c"]],
-          over: [detail(-3, -23, 6, 5, "#fbbf24"), detail(-2, -22, 4, 3, "#d62839"), detail(-1, -21, 2, 1, "#fbbf24"), detail(-8, -13, 16, 1, "#fbbf24")],
-        };
-      if (side === "back") return { behind: [], over: [[-10, -27, 20, 24, "#c0283a"], detail(-10, -27, 20, 2, "#a51d2d"), detail(-1, -24, 2, 18, "#a51d2d")] };
-      return { behind: [[-10, -26, 6, 22, "#b31b2c"]], over: [detail(-5, -13, 11, 1, "#fbbf24"), detail(2, -22, 3, 4, "#fbbf24")] };
+      if (side === "front") return { behind: [], over: [detail(-3, -23, 6, 5, "#fbbf24"), detail(-2, -22, 4, 3, "#d62839"), detail(-1, -21, 2, 1, "#fbbf24"), detail(-8, -13, 16, 1, "#fbbf24")] };
+      if (side === "side") return { behind: [], over: [detail(-5, -13, 11, 1, "#fbbf24"), detail(2, -22, 3, 4, "#fbbf24")] };
+      return { behind: [], over: [detail(-8, -13, 16, 1, "#fbbf24")] };
     case "armadura":
       if (side === "side") return { behind: [], over: [[-3, -27, 7, 4, "#cbd5e1"], detail(-2, -26, 5, 1, "#e5e9f0")] };
       return {
@@ -373,36 +403,95 @@ function outfitLayers(id: string, side: Side): Layers {
       };
     case "hacker": {
       const neon = "#22d3ee";
-      if (side === "front")
-        return { behind: [], over: [detail(-9, -27, 18, 2, "#2a3142"), detail(-3, -25, 1, 4, neon), detail(2, -25, 1, 4, neon), detail(-4, -18, 8, 3, "#262c3a"), detail(-8, -14, 16, 1, neon)] };
+      if (side === "front") return { behind: [], over: [detail(-9, -27, 18, 2, "#2a3142"), detail(-3, -25, 1, 4, neon), detail(2, -25, 1, 4, neon), detail(-4, -18, 8, 3, "#262c3a"), detail(-8, -14, 16, 1, neon)] };
       if (side === "back") return { behind: [], over: [[-8, -30, 16, 5, "#2a3142"], detail(-8, -14, 16, 1, neon)] };
       return { behind: [], over: [[-9, -31, 5, 7, "#2a3142"], detail(-5, -14, 11, 1, neon)] };
     }
   }
-  return none;
+  return NONE;
 }
 
-function hatLayers(id: string, side: Side, lift: number): B[] {
-  const narrow = side === "side";
-  const up = (bs: B[]) => bs.map((b): B => [b[0], b[1] - lift, b[2], b[3], b[4], b[5]]);
+/** Detalles en las piernas (solo de pie: sentado no se ven). */
+function bottomLayers(d: Dress, side: Side): B[] {
+  if (side === "side") {
+    if (d.bottom === "pantalon-astronauta") return [detail(-1, -8, 4, 2, "#c7d0db")];
+    if (d.bottom === "pantalon-armadura") return [detail(-1, -10, 4, 3, "#cbd5e1")];
+    return [];
+  }
+  switch (d.bottom) {
+    case "pantalon-smoking":
+      return [detail(-7, -12, 1, 8, "#3a3a48"), detail(6, -12, 1, 8, "#3a3a48")];
+    case "pantalon-astronauta":
+      return [detail(-6, -8, 4, 2, "#c7d0db"), detail(2, -8, 4, 2, "#c7d0db")];
+    case "pantalon-armadura":
+      return [detail(-6, -10, 4, 3, "#cbd5e1"), detail(2, -10, 4, 3, "#cbd5e1")];
+  }
+  return [];
+}
+
+function beardLayers(d: Dress, side: Side): B[] {
+  const hc = shade(d.hairColor, -0.1);
+  if (side === "back" || !d.beard || d.beard === "none") return [];
+  if (side === "side") {
+    if (d.beard === "stubble") return [detail(0, -31, 8, 4, "rgba(40,25,15,0.22)")];
+    if (d.beard === "mustache") return [detail(4, -31, 4, 1, hc)];
+    return [detail(-3, -33, 3, 6, hc), detail(-1, -28, 9, 2, hc), detail(4, -31, 4, 1, hc)];
+  }
+  if (d.beard === "stubble") return [detail(-7, -31, 14, 4, "rgba(40,25,15,0.22)")];
+  if (d.beard === "mustache") return [detail(-4, -31, 8, 1, hc)];
+  return [detail(-9, -34, 2, 7, hc), detail(7, -34, 2, 7, hc), detail(-9, -28, 18, 2, hc), detail(-4, -31, 8, 1, hc)];
+}
+
+function glassesLayers(id: string, side: Side): B[] {
+  const dark = "#1f2937";
   switch (id) {
+    case "lentes":
+      if (side === "front")
+        return [
+          detail(-8, -38, 6, 1, dark), detail(-8, -33, 6, 1, dark), detail(-8, -37, 1, 4, dark), detail(-3, -37, 1, 4, dark),
+          detail(2, -38, 6, 1, dark), detail(2, -33, 6, 1, dark), detail(2, -37, 1, 4, dark), detail(7, -37, 1, 4, dark),
+          detail(-2, -37, 4, 1, dark),
+        ];
+      if (side === "side") return [detail(2, -38, 5, 1, dark), detail(2, -33, 5, 1, dark), detail(6, -37, 1, 4, dark), detail(-3, -37, 5, 1, dark)];
+      return [];
+    case "lentes-sol":
+      if (side === "front") return [detail(-8, -38, 6, 3, "#111318"), detail(2, -38, 6, 3, "#111318"), detail(-2, -37, 4, 1, "#111318"), detail(-7, -38, 2, 1, "#4b5563"), detail(3, -38, 2, 1, "#4b5563")];
+      if (side === "side") return [detail(2, -38, 5, 3, "#111318"), detail(-3, -37, 5, 1, "#111318")];
+      return [detail(-9, -37, 18, 1, "#111318")];
+    case "visor":
+      if (side === "front") return [detail(-10, -38, 20, 3, "rgba(34,211,238,0.85)"), detail(-8, -38, 5, 1, SHINE)];
+      if (side === "side") return [detail(-1, -38, 10, 3, "rgba(34,211,238,0.85)")];
+      return [detail(-10, -37, 20, 1, "#0e7490")];
+  }
+  return [];
+}
+
+function hatLayers(d: Dress, side: Side): B[] {
+  const narrow = side === "side";
+  switch (d.hat) {
+    case "gorro": {
+      const c = d.hatColor ?? "#e5484d";
+      return narrow
+        ? [[-9, -53, 18, 8, c], detail(-9, -47, 18, 2, shade(c, -0.2)), [-3, -57, 5, 4, shade(c, 0.3)]]
+        : [[-10, -53, 20, 8, c], detail(-10, -47, 20, 2, shade(c, -0.2)), detail(-6, -52, 1, 4, shade(c, 0.15)), detail(0, -52, 1, 4, shade(c, 0.15)), detail(5, -52, 1, 4, shade(c, 0.15)), [-3, -57, 6, 4, shade(c, 0.3)]];
+    }
     case "copa":
-      return up(narrow
+      return narrow
         ? [[-7, -61, 14, 12, "#16161d"], detail(-7, -52, 14, 2, "#b91c1c"), [-10, -50, 20, 2, "#16161d"]]
-        : [[-8, -61, 16, 12, "#16161d"], detail(-8, -52, 16, 2, "#b91c1c"), detail(-6, -60, 2, 7, "#2e2e3a"), [-11, -50, 22, 2, "#16161d"]]);
+        : [[-8, -61, 16, 12, "#16161d"], detail(-8, -52, 16, 2, "#b91c1c"), detail(-6, -60, 2, 7, "#2e2e3a"), [-11, -50, 22, 2, "#16161d"]];
     case "corona": {
       const gold = "#f5c518";
-      return up(narrow
+      return narrow
         ? [[-7, -52, 14, 4, gold], [-7, -56, 3, 4, gold], [-1, -58, 3, 6, gold], [4, -56, 3, 4, gold], detail(-6, -52, 12, 1, "#ffe58a"), detail(0, -51, 2, 2, "#e5484d")]
-        : [[-8, -52, 16, 4, gold], [-8, -56, 3, 4, gold], [-2, -58, 4, 6, gold], [5, -56, 3, 4, gold], detail(-7, -52, 14, 1, "#ffe58a"), detail(-1, -51, 2, 2, "#e5484d"), detail(-6, -51, 2, 1, "#2f6bff"), detail(4, -51, 2, 1, "#10b981")]);
+        : [[-8, -52, 16, 4, gold], [-8, -56, 3, 4, gold], [-2, -58, 4, 6, gold], [5, -56, 3, 4, gold], detail(-7, -52, 14, 1, "#ffe58a"), detail(-1, -51, 2, 2, "#e5484d"), detail(-6, -51, 2, 1, "#2f6bff"), detail(4, -51, 2, 1, "#10b981")];
     }
     case "vaquero":
-      return up(narrow
+      return narrow
         ? [[-6, -56, 12, 7, "#8b5a2b"], detail(-6, -51, 12, 1, "#3b2414"), [-12, -50, 24, 3, "#7a4b22"]]
-        : [[-7, -56, 14, 7, "#8b5a2b"], detail(-1, -56, 2, 2, "#6f4520"), detail(-7, -51, 14, 1, "#3b2414"), [-14, -50, 28, 3, "#7a4b22"], [-14, -52, 2, 2, "#7a4b22"], [12, -52, 2, 2, "#7a4b22"]]);
+        : [[-7, -56, 14, 7, "#8b5a2b"], detail(-1, -56, 2, 2, "#6f4520"), detail(-7, -51, 14, 1, "#3b2414"), [-14, -50, 28, 3, "#7a4b22"], [-14, -52, 2, 2, "#7a4b22"], [12, -52, 2, 2, "#7a4b22"]];
     case "mago": {
       const star = "#fde68a";
-      return up([
+      return [
         [-8, -53, 16, 4, "#4c1d95"],
         [-6, -57, 12, 4, "#4c1d95"],
         [-4, -61, 8, 4, "#5b21b6"],
@@ -412,25 +501,31 @@ function hatLayers(id: string, side: Side, lift: number): B[] {
         detail(2, -60, 1, 1, star),
         detail(-1, -52, 1, 1, star),
         [-11, -50, 22, 2, "#3b0f7a"],
-      ]);
+      ];
     }
+    case "casco-astronauta":
+      // Marco blanco y vidrio sobre la cara (de espaldas, la parte de atrás del casco).
+      if (side === "front")
+        return [[-12, -51, 24, 3, "#f1f5f9"], [-12, -48, 3, 21, "#f1f5f9"], [9, -48, 3, 21, "#e2e8f0"], [-12, -28, 24, 3, "#cbd5e1"], detail(-9, -48, 18, 20, GLASS), detail(-8, -47, 2, 6, SHINE), detail(-5, -47, 1, 2, SHINE)];
+      if (side === "back") return [[-12, -51, 24, 26, "#f1f5f9"], detail(-10, -49, 6, 2, "#ffffff")];
+      return [[-10, -51, 21, 3, "#f1f5f9"], [-10, -48, 4, 21, "#f1f5f9"], [-10, -28, 21, 3, "#cbd5e1"], [9, -48, 2, 21, "#e2e8f0"], detail(-6, -48, 15, 20, GLASS), detail(5, -47, 2, 5, SHINE)];
   }
   return [];
 }
 
-function extraLayers(id: string, side: Side): Layers {
-  switch (id) {
-    case "lentes": {
-      const dark = "#111318";
-      if (side === "front")
-        return { behind: [], over: [detail(-8, -38, 6, 3, dark), detail(2, -38, 6, 3, dark), detail(-2, -37, 4, 1, dark), detail(-7, -38, 2, 1, "#4b5563"), detail(3, -38, 2, 1, "#4b5563")] };
-      if (side === "side") return { behind: [], over: [detail(2, -38, 5, 3, dark), detail(-3, -37, 5, 1, dark)] };
-      return { behind: [], over: [detail(-9, -37, 18, 1, dark)] };
+function backLayers(d: Dress, side: Side): Layers {
+  const c = d.backColor ?? "#5b5bf0";
+  switch (d.back) {
+    case "mochila":
+      if (side === "front") return { behind: [], over: [detail(-7, -26, 2, 11, shade(c, -0.2)), detail(5, -26, 2, 11, shade(c, -0.2))] };
+      if (side === "back") return { behind: [], over: [[-6, -25, 12, 12, c], detail(-6, -25, 12, 1, shade(c, 0.2)), detail(-4, -21, 8, 3, shade(c, -0.15))] };
+      return { behind: [[-10, -25, 5, 11, c]], over: [] };
+    case "capa": {
+      const trim = shade(c, -0.3);
+      if (side === "front") return { behind: [[-11, -27, 22, 23, shade(c, -0.15)]], over: [] };
+      if (side === "back") return { behind: [], over: [[-10, -27, 20, 24, c], detail(-10, -27, 20, 2, trim), detail(-10, -5, 20, 1, trim), detail(-1, -24, 2, 18, shade(c, -0.12))] };
+      return { behind: [[-10, -26, 6, 22, shade(c, -0.15)], detail(-10, -5, 6, 1, trim)], over: [] };
     }
-    case "capa":
-      if (side === "front") return { behind: [[-11, -27, 22, 23, "#5b21b6"]], over: [] };
-      if (side === "back") return { behind: [], over: [[-10, -27, 20, 24, "#6d28d9"], detail(-10, -27, 20, 2, "#fbbf24"), detail(-10, -5, 20, 1, "#fbbf24")] };
-      return { behind: [[-10, -26, 6, 22, "#5b21b6"], detail(-10, -5, 6, 1, "#fbbf24")], over: [] };
     case "jetpack": {
       const tank = "#9aa3b5";
       const fire = "#f97316";
@@ -442,23 +537,26 @@ function extraLayers(id: string, side: Side): Layers {
       if (side === "front") return { behind: [[-10, -30, 4, 6, tank], [6, -30, 4, 6, tank]], over: [] };
       return { behind: [[-11, -26, 6, 13, tank], [-10, -13, 4, 3, fire], detail(-9, -10, 2, 2, "#fde047")], over: [] };
     }
+    case "mochila-oxigeno":
+      if (side === "back") return { behind: [], over: [[-7, -25, 14, 12, "#c7d0db"], detail(-5, -23, 10, 1, "#9aa3b5"), detail(-5, -20, 10, 1, "#9aa3b5")] };
+      if (side === "side") return { behind: [[-10, -25, 5, 12, "#c7d0db"]], over: [] };
+      return NONE;
   }
-  return { behind: [], over: [] };
+  return NONE;
 }
 
-/** Bloques del personaje con sus prendas: lo de atrás primero, después el cuerpo, y encima traje, accesorio y sombrero. */
+/** Bloques del personaje vestido: lo de atrás primero, después el cuerpo, y encima ropa, barba, lentes y sombrero. */
 function dressedBlocks(look: Look, dir: Dir, step: number, sitting: boolean): B[] {
-  const l = dressed(look);
-  const base = blocks(l, dir, step, sitting);
-  if (!look.outfit && !look.hat && !look.extra) return base;
+  const d = dress(look);
+  const base = blocks(d, dir, step, sitting);
   const side: Side = dir === "down" ? "front" : dir === "up" ? "back" : "side";
   const drop = sitting ? 4 : 0;
   const lift = (b: B): B => [b[0], b[1] + drop, b[2], b[3], b[4], b[5]];
-  const outfit = look.outfit ? outfitLayers(look.outfit, side) : { behind: [], over: [] };
-  const extra = look.extra ? extraLayers(look.extra, side) : { behind: [], over: [] };
-  // Sobre el casco del astronauta, el sombrero queda un poco más alto.
-  const hat = look.hat ? hatLayers(look.hat, side, look.outfit === "astronauta" ? 3 : 0) : [];
-  return [...[...extra.behind, ...outfit.behind].map(lift), ...base, ...[...outfit.over, ...extra.over, ...hat].map(lift)];
+  const top = topLayers(d, side);
+  const back = backLayers(d, side);
+  const legs = sitting ? [] : bottomLayers(d, side);
+  const over = [...top.over, ...beardLayers(d, side), ...(d.glasses ? glassesLayers(d.glasses, side) : []), ...back.over, ...hatLayers(d, side)];
+  return [...[...back.behind, ...top.behind].map(lift), ...base, ...legs, ...over.map(lift)];
 }
 
 export interface AvatarPose {
@@ -493,9 +591,8 @@ export function drawAvatar(ctx: CanvasRenderingContext2D, look: Look, x: number,
   ctx.restore();
 }
 
-/** Lo que suma cada sombrero (y el casco) al alto del personaje. */
-const HAT_HEIGHT: Record<string, number> = { copa: 13, corona: 10, vaquero: 8, mago: 19 };
+/** Lo que suma cada sombrero al alto del personaje. */
+const HAT_HEIGHT: Record<string, number> = { gorro: 9, copa: 13, corona: 10, vaquero: 8, mago: 19, "casco-astronauta": 3 };
 
-/** Alto aproximado del personaje en píxeles, para ubicar nombres y globos (más alto con sombrero o casco). */
-export const avatarHeight = (sitting: boolean, look?: Look) =>
-  (sitting ? 48 : 52) + Math.max(look?.outfit === "astronauta" ? 3 : 0, (look?.hat ? HAT_HEIGHT[look.hat] ?? 0 : 0) + (look?.outfit === "astronauta" && look.hat ? 3 : 0));
+/** Alto aproximado del personaje en píxeles, para ubicar nombres y globos (más alto con sombrero). */
+export const avatarHeight = (sitting: boolean, look?: Look) => (sitting ? 48 : 52) + (look?.hat ? (HAT_HEIGHT[look.hat] ?? 0) : 0);

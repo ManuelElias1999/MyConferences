@@ -335,6 +335,7 @@ app.post("/api/shop/orders", limited("shop", 30, 15 * 60_000), express.json({ li
   if (!shop.config.enabled) return res.status(503).json({ error: "La tienda todavía no está abierta" });
   if (!item) return res.status(404).json({ error: "Esa prenda no existe" });
   if (account.wardrobe.includes(item.id)) return res.status(400).json({ error: "Ya tienes esa prenda" });
+  if (!item.price) return res.status(400).json({ error: "Esa prenda es gratis: elígela en Mi personaje" });
   res.json({ order: await shop.create(account.id, item.id, item.price) });
 });
 /** Revisa un pedido; si se acaba de pagar, la prenda pasa al guardarropa y la persona lo ve al instante. */

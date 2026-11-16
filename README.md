@@ -39,16 +39,17 @@ Todas las cuentas empiezan con el plan **Gratis** (la administración, con **Pro
 - Cuando un evento llega a su tope de personas, la recepcionista avisa que está lleno. La organización, los ponentes y los sponsors entran igual. Los eventos de ejemplo usan el tope de Pro.
 - Los eventos creados antes de los planes no tienen fecha: siguen siempre abiertos y no cuentan entre los del mes.
 
-### Tienda de estilos
+### Mi personaje: apariencia y ropa
 
-Botón **Tienda** arriba (o «Más estilos en la tienda» en Mi personaje): prendas extravagantes para el personaje que se compran una vez con **USDC en Stellar** y quedan para siempre. Todos las ven en el mapa.
+**Mi personaje** tiene dos pestañas. En **Apariencia** se elige piel, peinado, color de pelo y barba (corta, bigote o completa). En **Ropa** se viste el personaje por partes que se combinan entre sí: arriba, abajo, zapatos, cabeza, lentes y espalda. El botón **Tienda** abre directo la ropa.
 
-- **Trajes** (cambian toda la ropa): Smoking (4 USDC), Astronauta con casco y mochila de oxígeno (8), Traje dorado (6), Superhéroe con capa (6), Armadura (7) y Buzo hacker (3).
-- **Sombreros**: de copa (3), corona (5), vaquero (3) y de mago (3).
-- **Accesorios**: lentes de sol (2), capa real (4) y mochila cohete (5).
-- Se lleva un traje, un sombrero y un accesorio a la vez. El servidor solo deja ponerse lo que la cuenta compró; la administración tiene todo, para probar.
+- **Gratis, del color que quieras:** polera, camisa, buzo, pantalón, shorts, falda, zapatillas, botas, gorro de lana, lentes y mochila.
+- **Especiales, con USDC en Stellar** (se compran una vez y quedan para siempre): saco de smoking (3), traje espacial (4), saco dorado (4), traje de superhéroe (3), armadura (4), buzo hacker (2); pantalón de smoking, espacial y grebas (2 c/u); zapatos de charol (1) y botas espaciales (2); sombrero de copa (3), corona (5), vaquero (2), de mago (2) y casco de astronauta (4); lentes de sol (1) y visor futurista (2); capa de cualquier color (3), mochila cohete (4) y mochila de oxígeno (2).
+- Todo se combina: por ejemplo, el casco de astronauta con el smoking.
+- Las prendas especiales se pueden **probar** en la vista previa. Para guardar el personaje con una que no compraste, aparece el botón para comprarla ahí mismo. El servidor solo deja usar las prendas compradas; la administración tiene todas, para probar.
 - **Cómo se paga:** cada compra crea un pedido con un memo único (por ejemplo `MC-736B304FE9`). Se manda el monto en USDC a la cuenta de la plataforma con ese memo, desde cualquier wallet (o con «Abrir en mi wallet», un enlace SEP-7). El servidor revisa en Horizon cada pocos segundos y, cuando llega el pago, la prenda pasa a ser de quien la compró. Cada pago sirve para un solo pedido, y el pedido vence a la hora.
 - **Modo de prueba:** sin `STELLAR_RECEIVER` y fuera de producción, el pago se simula con un botón. En producción sin esa variable, la tienda queda cerrada.
+- Los personajes y compras del sistema anterior (un traje entero en una sola pieza) se convierten solos a las prendas nuevas.
 
 ### Para las empresas
 

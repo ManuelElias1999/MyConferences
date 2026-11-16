@@ -5,7 +5,6 @@ import Agenda from "./Agenda.tsx";
 import CompanyPanel, { CompanyUpgrade } from "./CompanyPanel.tsx";
 import AdminPanel from "./AdminPanel.tsx";
 import Plans from "./Plans.tsx";
-import Shop from "./Shop.tsx";
 import Gate from "./Gate.tsx";
 import AvatarCanvas from "./AvatarCanvas.tsx";
 import AvatarEditor from "./AvatarEditor.tsx";
@@ -32,8 +31,7 @@ export default function App() {
   const [fading, setFading] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
-  const [shopOpen, setShopOpen] = useState(false);
-  const [editor, setEditor] = useState<{ welcome: boolean } | null>(null);
+  const [editor, setEditor] = useState<{ welcome: boolean; tab?: "look" | "clothes" } | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
@@ -410,7 +408,7 @@ export default function App() {
             </button>
           )}
           {account && (
-            <button className="btn sm" onClick={() => setShopOpen(true)} title="Prendas para tu personaje, con USDC">
+            <button className="btn sm" onClick={() => setEditor({ welcome: false, tab: "clothes" })} title="Ropa para tu personaje: básica gratis y especial con USDC">
               Tienda
             </button>
           )}
@@ -531,7 +529,6 @@ export default function App() {
       )}
       {adminOpen && account?.admin && <AdminPanel onClose={() => setAdminOpen(false)} />}
       {plansOpen && account && <Plans account={account} onChange={setAccount} onClose={() => setPlansOpen(false)} />}
-      {shopOpen && account && <Shop account={account} onChange={setAccount} onClose={() => setShopOpen(false)} />}
       {editor && account && (
         <AvatarEditor
           account={account}
@@ -541,10 +538,8 @@ export default function App() {
             setEditor(null);
           }}
           onClose={() => setEditor(null)}
-          onShop={() => {
-            setEditor(null);
-            setShopOpen(true);
-          }}
+          onAccount={setAccount}
+          tab={editor.tab}
         />
       )}
     </div>

@@ -7,7 +7,7 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { DEFAULT_LOOK, onlyOwned, sanitizeLook } from "../../shared/look.ts";
-import { SHOP_ITEMS } from "../../shared/shop.ts";
+import { LEGACY_ITEMS, SHOP_ITEMS } from "../../shared/shop.ts";
 import { COMMUNITIES, isPlan, type PlanId, type PlanUsage } from "../../shared/plans.ts";
 import type { Account, AdminAccount, Look } from "../../shared/types.ts";
 import { sendCode, sendResetCode } from "./mail.ts";
@@ -94,7 +94,8 @@ export function createAccountStore(dataDir: string) {
     id: a.id,
     email: a.email,
     name: a.name,
-    look: a.look,
+    // Pasa por el filtro al leer: convierte personajes guardados con el sistema anterior y saca lo que no compró.
+    look: onlyOwned(sanitizeLook(a.look), wardrobeOf(a)),
     company: a.company ?? null,
     verified: a.verified !== false,
     admin: isAdmin(a),
@@ -105,7 +106,8 @@ export function createAccountStore(dataDir: string) {
     wardrobe: wardrobeOf(a),
   });
   // La administración tiene todas las prendas, para probarlas.
-  const wardrobeOf = (a: StoredAccount) => (isAdmin(a) ? SHOP_ITEMS.map((i) => i.id) : (a.wardrobe ?? []));
+  // Las compras de antes (un traje entero en una pieza) equivalen ahora a varias prendas.
+  const wardrobeOf = (a: StoredAccount) => (isAdmin(a) ? SHOP_ITEMS.map((i) => i.id) : [...new Set((a.wardrobe ?? []).flatMap((id) => [id, ...(LEGACY_ITEMS[id] ?? [])]))]);
   const byId = (id: string) => {
     const account = store.accounts.find((a) => a.id === id);
     if (!account) throw new AccountError("La cuenta ya no existe");
